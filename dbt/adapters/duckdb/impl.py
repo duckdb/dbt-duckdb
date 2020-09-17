@@ -1,5 +1,5 @@
 from dbt.adapters.duckdb import DuckDBConnectionManager
-
+from dbt.adapters.sql import SQLAdapter
 
 class DuckDBAdapter(SQLAdapter):
     ConnectionManager = DuckDBConnectionManager
@@ -11,4 +11,3 @@ class DuckDBAdapter(SQLAdapter):
     @classmethod
     def is_cancelable(cls):
         return False
-
