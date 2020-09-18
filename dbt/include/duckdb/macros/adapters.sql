@@ -13,7 +13,7 @@
 
 {% macro duckdb__list_schemas(database) -%}
   {% set sql %}
-    select distinct schema_name
+    select schema_name
     from information_schema_schemata()
   {% endset %}
   {{ return(run_query(sql)) }}
@@ -86,4 +86,10 @@
     where table_schema = '{{ schema_relation.schema }}'
   {% endcall %}
   {{ return(load_result('list_relations_without_caching').table) }}
+{% endmacro %}
+
+{% macro default__truncate_relation(relation) -%}
+  {% call statement('truncate_relation') -%}
+    DELETE FROM {{ relation.include(database=False) }} WHERE 1=1
+  {%- endcall %}
 {% endmacro %}
