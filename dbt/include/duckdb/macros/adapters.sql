@@ -88,8 +88,15 @@
   {{ return(load_result('list_relations_without_caching').table) }}
 {% endmacro %}
 
-{% macro default__truncate_relation(relation) -%}
+{% macro duckdb__truncate_relation(relation) -%}
   {% call statement('truncate_relation') -%}
     DELETE FROM {{ relation.include(database=False) }} WHERE 1=1
+  {%- endcall %}
+{% endmacro %}
+
+{% macro duckdb__rename_relation(from_relation, to_relation) -%}
+  {% set target_name = adapter.quote_as_configured(to_relation.identifier, 'identifier') %}
+  {% call statement('rename_relation') -%}
+    alter {{ from_relation.type }} {{ from_relation }} rename to {{ target_name }}
   {%- endcall %}
 {% endmacro %}

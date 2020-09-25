@@ -37,10 +37,10 @@ class DuckDBConnectionManager(SQLConnectionManager):
 
         credentials = cls.get_credentials(connection.credentials)
         try:
-            handle = duckdb.connect(credentials.database, read_only=False)
+            handle = duckdb.connect(credentials.path, read_only=False)
             connection.handle = handle
             connection.state = 'open'
-        except Error as e:
+        except RuntimeError as e:
             logger.debug("Got an error when attempting to open a duckdb "
                          "database: '{}'"
                          .format(e))
@@ -51,6 +51,12 @@ class DuckDBConnectionManager(SQLConnectionManager):
             raise dbt.exceptions.FailedToConnectException(str(e))
 
         return connection
+
+    def close(self, connection):
+        if connection.state == 'open':
+            connection.state = 'closed'
+            connection.handle.close()
+            connection.handle = None
 
     def cancel(self, connection):
         pass
