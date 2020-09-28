@@ -68,41 +68,11 @@ class DuckDBConnectionManager(SQLConnectionManager):
         bindings: Optional[Any] = None,
         abridge_sql_log: bool = False
     ) -> Tuple[Connection, Any]:
-        connection = self.get_thread_connection()
-        if auto_begin and connection.transaction_open is False:
-            self.begin()
-
         # Work around error that is thrown with None bindings in
         # duckdb/sqlite
         if bindings is None:
             bindings = []
-
-        logger.debug('Using {} connection "{}".'
-                     .format(self.TYPE, connection.name))
-
-        with self.exception_handler(sql):
-            if abridge_sql_log:
-                log_sql = '{}...'.format(sql[:512])
-            else:
-                log_sql = sql
-
-            logger.debug(
-                'On {connection_name}: {sql}',
-                connection_name=connection.name,
-                sql=log_sql,
-            )
-            pre = time.time()
-
-            cursor = connection.handle.cursor()
-            cursor.execute(sql, bindings)
-
-            logger.debug(
-                "SQL status: {status} in {elapsed:0.2f} seconds",
-                status=self.get_status(cursor),
-                elapsed=(time.time() - pre)
-            )
-
-            return connection, cursor
+        return super().add_query(sql, auto_begin, bindings, abridge_sql_log)
 
 
     @contextmanager
