@@ -13,7 +13,13 @@
         '' as column_comment,
         '' as table_owner
     FROM information_schema_tables() t JOIN information_schema_columns() c ON t.table_schema = c.table_schema AND t.table_name = c.table_name
-    order by
+    WHERE (
+        {%- for schema in schemas -%}
+          upper(t.table_schema) = upper('{{ schema }}'){%- if not loop.last %} or {% endif -%}
+        {%- endfor -%}
+    )
+    AND t.table_type IN ('BASE TABLE', 'VIEW')
+    ORDER BY
         t.table_schema,
         t.table_name,
         c.ordinal_position
