@@ -88,6 +88,12 @@
   {{ return(load_result('list_relations_without_caching').table) }}
 {% endmacro %}
 
+{% macro duckdb__drop_relation(relation) -%}
+  {% call statement('drop_relation', auto_begin=False) -%}
+    drop {{ relation.type }} if exists {{ relation.include(database=False) }} cascade
+  {%- endcall %}
+{% endmacro %}
+
 {% macro duckdb__truncate_relation(relation) -%}
   {% call statement('truncate_relation') -%}
     DELETE FROM {{ relation.include(database=False) }} WHERE 1=1
@@ -100,3 +106,26 @@
     alter {{ from_relation.type }} {{ from_relation }} rename to {{ target_name }}
   {%- endcall %}
 {% endmacro %}
+
+{% macro duckdb__make_temp_relation(base_relation, suffix) %}
+    {% set tmp_identifier = base_relation.identifier ~ suffix ~ py_current_timestring() %}
+    {% do return(base_relation.incorporate(
+                                  path={
+                                    "identifier": tmp_identifier,
+                                    "schema": none,
+                                    "database": none
+                                  })) -%}
+{% endmacro %}
+
+{% macro duckdb__current_timestamp() -%}
+  now()
+{%- endmacro %}
+
+{% macro duckdb__snapshot_string_as_time(timestamp) -%}
+    {%- set result = "'" ~ timestamp ~ "'::timestamp" -%}
+    {{ return(result) }}
+{%- endmacro %}
+
+{% macro duckdb__snapshot_get_time() -%}
+  {{ current_timestamp() }}::timestamp
+{%- endmacro %}
