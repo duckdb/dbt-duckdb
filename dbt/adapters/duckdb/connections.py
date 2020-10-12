@@ -52,12 +52,6 @@ class DuckDBConnectionManager(SQLConnectionManager):
 
         return connection
 
-    def close(self, connection):
-        if connection.state == 'open':
-            connection.state = 'closed'
-            connection.handle.close()
-            connection.handle = None
-
     def cancel(self, connection):
         pass
 
@@ -72,7 +66,10 @@ class DuckDBConnectionManager(SQLConnectionManager):
         # duckdb/sqlite
         if bindings is None:
             bindings = []
-        return super().add_query(sql, auto_begin, bindings, abridge_sql_log)
+        ret = super().add_query(sql, auto_begin, bindings, abridge_sql_log)
+        if ret and len(ret) == 2:
+            ret[1].close()
+        return ret
 
 
     @contextmanager
