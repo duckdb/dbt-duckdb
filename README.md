@@ -29,7 +29,7 @@ to exercise the [dbt-adapter-tests](https://github.com/fishtown-analytics/dbt-ad
 
 ### Configuring your profile
 
-[DuckDB](http://duckdb) is an embedded database, similar to SQLite, but designed for OLAP-style analytics instead of OLTP. The only
+[DuckDB](http://duckdb.org) is an embedded database, similar to SQLite, but designed for OLAP-style analytics instead of OLTP. The only
 configuration parameter that is required in your profile (in addition to `type: duckdb`) is the `path` field, which should refer to
 a path on your local filesystem where you would like the DuckDB database file (and it's associated write-ahead log) to be written.
 You can also specify the `schema` parameter if you would like to use a schema besides the default (which is called `main`).
