@@ -30,7 +30,7 @@ setup(
         ]
     },
     install_requires=[
-        'dbt-core',
+        'dbt-core=={}'.format(package_version),
         'duckdb',
     ]
 )
