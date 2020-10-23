@@ -6,6 +6,7 @@ in order to test it out. If you would like to try it, you can run:
 
 ```
 $ git clone https://github.com/cwida/duckdb.git
+$ cd duckdb
 $ pip3 install -e tools/pythonpkg
 ```
 
