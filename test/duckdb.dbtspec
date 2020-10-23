@@ -1,6 +1,5 @@
 target:
   type: duckdb
-  database: main
   path: /tmp/dbtest.db
   schema: "dbt_test_{{ var('_dbt_random_suffix') }}"
 sequences:

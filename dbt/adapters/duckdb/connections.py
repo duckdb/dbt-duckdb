@@ -14,9 +14,9 @@ from dataclasses import dataclass
 
 @dataclass
 class DuckDBCredentials(Credentials):
-    database: str
-    schema: str
-    path: str
+    database: str = 'main'
+    schema: str = 'main'
+    path: str = ':memory:'
 
     @property
     def type(self):
