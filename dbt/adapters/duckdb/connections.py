@@ -66,10 +66,7 @@ class DuckDBConnectionManager(SQLConnectionManager):
         # duckdb/sqlite
         if bindings is None:
             bindings = []
-        ret = super().add_query(sql, auto_begin, bindings, abridge_sql_log)
-        if ret and len(ret) == 2:
-            ret[1].close()
-        return ret
+        return super().add_query(sql, auto_begin, bindings, abridge_sql_log)
 
 
     @contextmanager
