@@ -11,4 +11,4 @@ sequences:
   test_dbt_snapshot_strategy_check_cols: snapshot_strategy_check_cols
   test_dbt_data_test: data_test
   test_dbt_schema_test: schema_test
-#  test_dbt_ephemeral_data_tests: data_test_ephemeral_models
+  test_dbt_ephemeral_data_tests: data_test_ephemeral_models

@@ -8,7 +8,7 @@ with open(os.path.join(this_directory, 'README.md')) as f:
     long_description = f.read()
 
 package_name = "dbt-duckdb"
-package_version = "0.18.0"
+package_version = "0.18.1"
 description = """The duckdb adpter plugin for dbt (data build tool)"""
 
 setup(
