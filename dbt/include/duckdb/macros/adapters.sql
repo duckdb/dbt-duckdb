@@ -14,7 +14,7 @@
 {% macro duckdb__list_schemas(database) -%}
   {% set sql %}
     select schema_name
-    from information_schema_schemata()
+    from information_schema.schemata
   {% endset %}
   {{ return(run_query(sql)) }}
 {% endmacro %}
@@ -22,7 +22,7 @@
 {% macro duckdb__check_schema_exists(information_schema, schema) -%}
   {% set sql -%}
         select count(*)
-        from information_schema_schemata()
+        from information_schema.schemata
         where schema_name='{{ schema }}'
   {%- endset %}
   {{ return(run_query(sql)) }}
@@ -59,7 +59,7 @@
           numeric_precision,
           numeric_scale
 
-      from information_schema_columns()
+      from information_schema.columns
       where table_name = '{{ relation.identifier }}'
         {% if relation.schema %}
         and table_schema = '{{ relation.schema }}'
@@ -82,7 +82,7 @@
         WHEN 'VIEW' THEN 'view'
         WHEN 'LOCAL TEMPORARY' THEN 'table'
         END as type
-    from information_schema_tables()
+    from information_schema.tables
     where table_schema = '{{ schema_relation.schema }}'
   {% endcall %}
   {{ return(load_result('list_relations_without_caching').table) }}

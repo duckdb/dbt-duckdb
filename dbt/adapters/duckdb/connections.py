@@ -26,6 +26,28 @@ class DuckDBCredentials(Credentials):
         return ('database', 'schema', 'path')
 
 
+# See https://github.com/jwills/dbt-duckdb/issues/2 for why this wrapper is 
+# necessary. Instead of modeling separate cursors on a shared connection, 
+# duckdb treats the connection as the cursor. Calls to the cursor() API are 
+# supported for compatibility, but duckdb creates a whole new connection 
+# session. This breaks the semantics of temporary tables as used by dbt. If the 
+# underlying semantics of duckdb change, just delete this class and store the 
+# un-wrapped connection handle in the Connection object in 
+# DuckDBConnectionManager.open()
+class DuckDBConnectionWrapper:
+    def __init__(self, conn):
+        self._conn = conn
+
+    def cursor(self):
+        return self._conn
+    
+    def close(self):
+        self._conn.close()
+
+    def rollback(self):
+        self._conn.rollback()
+
+
 class DuckDBConnectionManager(SQLConnectionManager):
     TYPE = 'duckdb'
 
@@ -38,7 +60,7 @@ class DuckDBConnectionManager(SQLConnectionManager):
         credentials = cls.get_credentials(connection.credentials)
         try:
             handle = duckdb.connect(credentials.path, read_only=False)
-            connection.handle = handle
+            connection.handle = DuckDBConnectionWrapper(handle)
             connection.state = 'open'
         except RuntimeError as e:
             logger.debug("Got an error when attempting to open a duckdb "
