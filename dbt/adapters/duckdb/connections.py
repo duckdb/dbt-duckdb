@@ -109,5 +109,5 @@ class DuckDBConnectionManager(SQLConnectionManager):
         return credentials
 
     @classmethod
-    def get_status(cls, cursor):
+    def get_response(cls, cursor):
         return 'OK'
