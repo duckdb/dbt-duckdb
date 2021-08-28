@@ -38,14 +38,13 @@ class DuckDBConnectionWrapper:
     def __init__(self, conn):
         self._conn = conn
 
-    def cursor(self):
-        return self._conn
-    
-    def close(self):
-        self._conn.close()
+    # forward along all non-cursor() methods/attribute look ups
+    def __getattr__(self, name):
+        return getattr(self._conn, name)
 
-    def rollback(self):
-        self._conn.rollback()
+    # treat the connection as the cursor
+    def cursor(self):
+        return self
 
 
 class DuckDBConnectionManager(SQLConnectionManager):
