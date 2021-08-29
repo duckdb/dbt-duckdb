@@ -12,7 +12,7 @@
         c.data_type column_type,
         '' as column_comment,
         '' as table_owner
-    FROM information_schema_tables() t JOIN information_schema_columns() c ON t.table_schema = c.table_schema AND t.table_name = c.table_name
+    FROM information_schema.tables t JOIN information_schema.columns c ON t.table_schema = c.table_schema AND t.table_name = c.table_name
     WHERE (
         {%- for schema in schemas -%}
           upper(t.table_schema) = upper('{{ schema }}'){%- if not loop.last %} or {% endif -%}
