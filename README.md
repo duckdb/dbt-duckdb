@@ -6,6 +6,8 @@ This project is hosted on PyPI, so you should be able to install it and the nece
 
 `pip3 install dbt-duckdb`
 
+The latest supported version targets `dbt-core` 1.0.0 and `duckdb` 0.3.1.
+
 ### Configuring your profile
 
 [DuckDB](http://duckdb.org) is an embedded database, similar to SQLite, but designed for OLAP-style analytics instead of OLTP. The only
@@ -44,4 +46,4 @@ $ pytest test/duckdb.dbtspec
 
 to exercise the [dbt-adapter-tests](https://github.com/fishtown-analytics/dbt-adapter-tests) locally against your build of DuckDB
 (note that you also need to update `setup.py` in this directory to ensure that you are using your local version of duckdb, and not
-the released duckdb version 0.2.2)
+the released duckdb version 0.3.1)

@@ -9,4 +9,5 @@ from dbt.include import duckdb
 Plugin = AdapterPlugin(
     adapter=DuckDBAdapter,
     credentials=DuckDBCredentials,
-    include_path=duckdb.PACKAGE_PATH)
+    include_path=duckdb.PACKAGE_PATH,
+)
