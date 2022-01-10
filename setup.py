@@ -23,7 +23,7 @@ def _dbt_duckdb_version():
         return match.group(1)
 
 
-package_version = "1.0.0"
+package_version = _dbt_duckdb_version()
 description = """The duckdb adpter plugin for dbt (data build tool)"""
 
 setup(
