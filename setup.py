@@ -2,12 +2,27 @@
 from setuptools import find_packages
 from distutils.core import setup
 import os
+import re
 
 this_directory = os.path.abspath(os.path.dirname(__file__))
 with open(os.path.join(this_directory, "README.md")) as f:
     long_description = f.read()
 
 package_name = "dbt-duckdb"
+
+
+def _dbt_duckdb_version():
+    _version_path = os.path.join(
+        this_directory, 'dbt', 'adapters', 'duckdb', '__version__.py'
+    )
+    _version_pattern = r'''version\s*=\s*["'](.+)["']'''
+    with open(_version_path) as f:
+        match = re.search(_version_pattern, f.read().strip())
+        if match is None:
+            raise ValueError(f'invalid version at {_version_path}')
+        return match.group(1)
+
+
 package_version = "1.0.0"
 description = """The duckdb adpter plugin for dbt (data build tool)"""
 
@@ -29,7 +44,7 @@ setup(
         ]
     },
     install_requires=[
-        "dbt-core>={}".format(package_version),
+        "dbt-core~={}".format(package_version),
         "duckdb>=0.3.1",
     ],
 )
