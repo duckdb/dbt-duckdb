@@ -47,6 +47,12 @@ class DuckDBConnectionWrapper:
     def cursor(self):
         return self
 
+    def execute(self, sql, bindings=None):
+        if bindings is None:
+            return self._conn.execute(sql)
+        else:
+            return self._conn.execute(sql, bindings)
+
 
 class DuckDBConnectionManager(SQLConnectionManager):
     TYPE = "duckdb"
@@ -77,19 +83,6 @@ class DuckDBConnectionManager(SQLConnectionManager):
 
     def cancel(self, connection):
         pass
-
-    def add_query(
-        self,
-        sql: str,
-        auto_begin: bool = True,
-        bindings: Optional[Any] = None,
-        abridge_sql_log: bool = False,
-    ) -> Tuple[Connection, Any]:
-        # Work around error that is thrown with None bindings in
-        # duckdb/sqlite
-        if bindings is None:
-            bindings = []
-        return super().add_query(sql, auto_begin, bindings, abridge_sql_log)
 
     @contextmanager
     def exception_handler(self, sql: str, connection_name="master"):
