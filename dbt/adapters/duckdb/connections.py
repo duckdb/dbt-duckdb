@@ -48,10 +48,13 @@ class DuckDBConnectionWrapper:
         return self
 
     def execute(self, sql, bindings=None):
-        if bindings is None:
-            return self._conn.execute(sql)
-        else:
-            return self._conn.execute(sql, bindings)
+        try:
+            if bindings is None:
+                return self._conn.execute(sql)
+            else:
+                return self._conn.execute(sql, bindings)
+        except RuntimeError as e:
+            raise dbt.exceptions.RuntimeException(str(e))
 
 
 class DuckDBConnectionManager(SQLConnectionManager):
