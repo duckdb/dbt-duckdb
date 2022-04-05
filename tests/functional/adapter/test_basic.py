@@ -10,37 +10,37 @@ from dbt.tests.adapter.basic.test_generic_tests import BaseGenericTests
 from dbt.tests.adapter.basic.test_snapshot_check_cols import BaseSnapshotCheckCols
 from dbt.tests.adapter.basic.test_snapshot_timestamp import BaseSnapshotTimestamp
 
-class TestSimpleMaterializationsMyAdapter(BaseSimpleMaterializations):
+class TestSimpleMaterializationsDuckDB(BaseSimpleMaterializations):
     pass
 
 
-class TestSingularTestsMyAdapter(BaseSingularTests):
+class TestSingularTestsDuckDB(BaseSingularTests):
     pass
 
 
-class TestSingularTestsEphemeralMyAdapter(BaseSingularTestsEphemeral):
+class TestSingularTestsEphemeralDuckDB(BaseSingularTestsEphemeral):
     pass
 
 
-class TestEmptyMyAdapter(BaseEmpty):
+class TestEmptyDuckDB(BaseEmpty):
     pass
 
 
-class TestEphemeralMyAdapter(BaseEphemeral):
+class TestEphemeralDuckDB(BaseEphemeral):
     pass
 
 
-class TestIncrementalMyAdapter(BaseIncremental):
+class TestIncrementalDuckDB(BaseIncremental):
     pass
 
 
-class TestGenericTestsMyAdapter(BaseGenericTests):
+class TestGenericTestsDuckDB(BaseGenericTests):
     pass
 
 
-class TestSnapshotCheckColsMyAdapter(BaseSnapshotCheckCols):
+class TestSnapshotCheckColsDuckDB(BaseSnapshotCheckCols):
     pass
 
 
-class TestSnapshotTimestampMyAdapter(BaseSnapshotTimestamp):
+class TestSnapshotTimestampDuckDB(BaseSnapshotTimestamp):
     pass
