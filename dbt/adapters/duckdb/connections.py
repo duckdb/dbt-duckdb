@@ -27,14 +27,24 @@ class DuckDBCredentials(Credentials):
         return ("database", "schema", "path")
 
 
-# See https://github.com/jwills/dbt-duckdb/issues/2 for why this wrapper is
-# necessary. Instead of modeling separate cursors on a shared connection,
-# duckdb treats the connection as the cursor. Calls to the cursor() API are
-# supported for compatibility, but duckdb creates a whole new connection
-# session. This breaks the semantics of temporary tables as used by dbt. If the
-# underlying semantics of duckdb change, just delete this class and store the
-# un-wrapped connection handle in the Connection object in
-# DuckDBConnectionManager.open()
+class DuckDBCursorWrapper:
+    def __init__(self, cursor):
+        self.cursor = cursor
+
+    # forward along all non-execute() methods/attribute look ups
+    def __getattr__(self, name):
+        return getattr(self.cursor, name)
+
+    def execute(self, sql, bindings=None):
+        try:
+            if bindings is None:
+                 return self.cursor.execute(sql)
+            else:
+                 return self.cursor.execute(sql, bindings)
+        except RuntimeError as e:
+            raise dbt.exceptions.RuntimeException(str(e))
+
+
 class DuckDBConnectionWrapper:
     def __init__(self, conn):
         self._conn = conn
@@ -43,18 +53,8 @@ class DuckDBConnectionWrapper:
     def __getattr__(self, name):
         return getattr(self._conn, name)
 
-    # treat the connection as the cursor
     def cursor(self):
-        return self
-
-    def execute(self, sql, bindings=None):
-        try:
-            if bindings is None:
-                return self._conn.execute(sql)
-            else:
-                return self._conn.execute(sql, bindings)
-        except RuntimeError as e:
-            raise dbt.exceptions.RuntimeException(str(e))
+        return DuckDBCursorWrapper(self._conn.cursor())
 
 
 class DuckDBConnectionManager(SQLConnectionManager):

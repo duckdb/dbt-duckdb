@@ -6,7 +6,7 @@ This project is hosted on PyPI, so you should be able to install it and the nece
 
 `pip3 install dbt-duckdb`
 
-The latest supported version targets `dbt-core` 1.0.1 and `duckdb` 0.3.1.
+The latest supported version targets `dbt-core` 1.0.1 and `duckdb` 0.3.2.
 
 ### Configuring your profile
 
@@ -24,7 +24,7 @@ If you find that you need to add a feature to DuckDB in order to implement some 
 the workflow you can use for doing local development. First, you need to clone and build DuckDB from source:
 
 ```
-$ git clone https://github.com/cwida/duckdb.git
+$ git clone https://github.com/duckdb/duckdb.git
 $ cd duckdb
 $ pip3 install -e tools/pythonpkg
 ```
@@ -46,4 +46,4 @@ $ pytest test/duckdb.dbtspec
 
 to exercise the [dbt-adapter-tests](https://github.com/fishtown-analytics/dbt-adapter-tests) locally against your build of DuckDB
 (note that you also need to update `setup.py` in this directory to ensure that you are using your local version of duckdb, and not
-the released duckdb version 0.3.1)
+the released duckdb version 0.3.2)
