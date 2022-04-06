@@ -24,7 +24,7 @@ def _dbt_duckdb_version():
 
 
 package_version = _dbt_duckdb_version()
-description = """The duckdb adpter plugin for dbt (data build tool)"""
+description = """The duckdb adapter plugin for dbt (data build tool)"""
 
 setup(
     name=package_name,
