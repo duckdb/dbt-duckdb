@@ -1,3 +1,9 @@
+1.2.0 (2022-04-11)
+------------------
+
+- Upgraded to DuckDB 0.3.3
+- Added contextlib support for the DuckDBCursorWrapper
+
 1.1.0 (2022-04-06)
 ------------------
 
