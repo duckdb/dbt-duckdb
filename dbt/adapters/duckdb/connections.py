@@ -1,33 +1,40 @@
-from contextlib import contextmanager
-from typing import Any, Optional, Tuple
-import time
+import contextlib
+from dataclasses import dataclass
+from typing import Any, Dict, Optional
 
 import duckdb
 
 import dbt.exceptions
 from dbt.adapters.base import Credentials
 from dbt.adapters.sql import SQLConnectionManager
-from dbt.contracts.connection import Connection, ConnectionState, AdapterResponse
+from dbt.contracts.connection import ConnectionState, AdapterResponse
 from dbt.logger import GLOBAL_LOGGER as logger
-
-from dataclasses import dataclass
 
 
 @dataclass
 class DuckDBCredentials(Credentials):
-    database: str = "main"
-    schema: str = "main"
-    path: str = ":memory:"
+    path: str
+    database: Optional[str]
+    schema: Optional[str]
+
+    @classmethod
+    def __pre_deserialize__(cls, data: Dict[Any, Any]) -> Dict[Any, Any]:
+        data = super().__pre_deserialize__(data)
+        if "database" not in data:
+            data["database"] = "main"
+        if "schema" not in data:
+            data["schema"] = "main"
+        return data
 
     @property
     def type(self):
         return "duckdb"
 
     def _connection_keys(self):
-        return ("database", "schema", "path")
+        return ("path", "database", "schema")
 
 
-class DuckDBCursorWrapper:
+class DuckDBCursorWrapper(contextlib.AbstractContextManager):
     def __init__(self, cursor):
         self.cursor = cursor
 
@@ -35,14 +42,21 @@ class DuckDBCursorWrapper:
     def __getattr__(self, name):
         return getattr(self.cursor, name)
 
+    def __exit__(self, exc_type, exc_value, traceback):
+        self.cursor.close()
+        return None
+
     def execute(self, sql, bindings=None):
         try:
             if bindings is None:
-                 return self.cursor.execute(sql)
+                return self.cursor.execute(sql)
             else:
-                 return self.cursor.execute(sql, bindings)
+                return self.cursor.execute(sql, bindings)
         except RuntimeError as e:
-            raise dbt.exceptions.RuntimeException(str(e))
+            if "cannot commit - no transaction is active" in str(e):
+                return
+            else:
+                raise e
 
 
 class DuckDBConnectionWrapper:
@@ -73,8 +87,7 @@ class DuckDBConnectionManager(SQLConnectionManager):
             connection.state = ConnectionState.OPEN
         except RuntimeError as e:
             logger.debug(
-                "Got an error when attempting to open a duckdb "
-                "database: '{}'".format(e)
+                "Got an error when attempting to open a duckdb " "database: '{}'".format(e)
             )
 
             connection.handle = None
@@ -87,18 +100,33 @@ class DuckDBConnectionManager(SQLConnectionManager):
     def cancel(self, connection):
         pass
 
-    @contextmanager
+    @contextlib.contextmanager
     def exception_handler(self, sql: str, connection_name="master"):
         try:
             yield
-        except dbt.exceptions.RuntimeException as dbte:
-            raise
+
         except RuntimeError as e:
-            logger.debug("duckdb error: {}".format(str(e)))
-        except Exception as exc:
-            logger.debug("Error running SQL: {}".format(sql))
+            logger.debug("DuckDB error: {}".format(str(e)))
+
+            try:
+                self.rollback_if_open()
+            except RuntimeError:
+                logger.debug("Failed to release connection!")
+                pass
+
+            raise dbt.exceptions.DatabaseException(str(e).strip()) from e
+
+        except Exception as e:
+            logger.debug("Error running SQL: {}", sql)
             logger.debug("Rolling back transaction.")
-            raise dbt.exceptions.RuntimeException(str(exc)) from exc
+            self.rollback_if_open()
+            if isinstance(e, dbt.exceptions.RuntimeException):
+                # during a sql query, an internal to dbt exception was raised.
+                # this sounds a lot like a signal handler and probably has
+                # useful information, so raise it without modification.
+                raise
+
+            raise dbt.exceptions.RuntimeException(e) from e
 
     @classmethod
     def get_credentials(cls, credentials):

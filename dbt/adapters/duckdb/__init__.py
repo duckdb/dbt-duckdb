@@ -1,4 +1,4 @@
-from dbt.adapters.duckdb.connections import DuckDBConnectionManager
+from dbt.adapters.duckdb.connections import DuckDBConnectionManager  # noqa
 from dbt.adapters.duckdb.connections import DuckDBCredentials
 from dbt.adapters.duckdb.impl import DuckDBAdapter
 
