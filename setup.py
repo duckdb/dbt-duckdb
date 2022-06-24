@@ -45,6 +45,6 @@ setup(
     },
     install_requires=[
         "dbt-core~=1.1.0",
-        "duckdb>=0.3.2",
+        "duckdb>=0.3.2,<0.4.0",
     ],
 )
