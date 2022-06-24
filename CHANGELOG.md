@@ -1,7 +1,13 @@
-1.1.1 (Unreleased)
+1.1.2 (Unreleased)
 ------------------
 
 - Align with minor version of dbt-core
+- Constrain range of compatible duckdb versions
+
+1.1.1 (2022-04-06)
+------------------
+
+- Fix typo in package description
 
 1.1.0 (2022-04-06)
 ------------------
