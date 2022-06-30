@@ -1,4 +1,9 @@
-1.1.2 (Unreleased)
+1.1.3 (2022-06-29)
+------------------
+
+- Fixes DuckDB 0.4.0 compatibility issue
+
+1.1.2 (2022-06-29)
 ------------------
 
 - Align with minor version of dbt-core
