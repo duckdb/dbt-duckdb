@@ -29,18 +29,18 @@ class DuckDBCredentials(Credentials):
 
 class DuckDBCursorWrapper:
     def __init__(self, cursor):
-        self.cursor = cursor
+        self._cursor = cursor
 
     # forward along all non-execute() methods/attribute look ups
     def __getattr__(self, name):
-        return getattr(self.cursor, name)
+        return getattr(self._cursor, name)
 
     def execute(self, sql, bindings=None):
         try:
             if bindings is None:
-                 return self.cursor.execute(sql)
+                 return self._cursor.execute(sql)
             else:
-                 return self.cursor.execute(sql, bindings)
+                 return self._cursor.execute(sql, bindings)
         except RuntimeError as e:
             raise dbt.exceptions.RuntimeException(str(e))
 
@@ -48,13 +48,14 @@ class DuckDBCursorWrapper:
 class DuckDBConnectionWrapper:
     def __init__(self, conn):
         self._conn = conn
+        self._cursor = DuckDBCursorWrapper(self._conn.cursor())
 
     # forward along all non-cursor() methods/attribute look ups
     def __getattr__(self, name):
         return getattr(self._conn, name)
 
     def cursor(self):
-        return DuckDBCursorWrapper(self._conn.cursor())
+        return self._cursor
 
 
 class DuckDBConnectionManager(SQLConnectionManager):
