@@ -1,6 +1,6 @@
 from contextlib import contextmanager
-from typing import Any, Optional, Tuple
-import time
+from dataclasses import dataclass, field
+from typing import Any, List, Optional, Tuple
 
 import duckdb
 
@@ -10,14 +10,13 @@ from dbt.adapters.sql import SQLConnectionManager
 from dbt.contracts.connection import Connection, ConnectionState, AdapterResponse
 from dbt.logger import GLOBAL_LOGGER as logger
 
-from dataclasses import dataclass
-
 
 @dataclass
 class DuckDBCredentials(Credentials):
     database: str = "main"
     schema: str = "main"
     path: str = ":memory:"
+    extensions: List[str] = field(default_factory=list)
 
     @property
     def type(self):
@@ -25,37 +24,6 @@ class DuckDBCredentials(Credentials):
 
     def _connection_keys(self):
         return ("database", "schema", "path")
-
-
-class DuckDBCursorWrapper:
-    def __init__(self, cursor):
-        self._cursor = cursor
-
-    # forward along all non-execute() methods/attribute look ups
-    def __getattr__(self, name):
-        return getattr(self._cursor, name)
-
-    def execute(self, sql, bindings=None):
-        try:
-            if bindings is None:
-                 return self._cursor.execute(sql)
-            else:
-                 return self._cursor.execute(sql, bindings)
-        except RuntimeError as e:
-            raise dbt.exceptions.RuntimeException(str(e))
-
-
-class DuckDBConnectionWrapper:
-    def __init__(self, conn):
-        self._conn = conn
-        self._cursor = DuckDBCursorWrapper(self._conn.cursor())
-
-    # forward along all non-cursor() methods/attribute look ups
-    def __getattr__(self, name):
-        return getattr(self._conn, name)
-
-    def cursor(self):
-        return self._cursor
 
 
 class DuckDBConnectionManager(SQLConnectionManager):
@@ -70,8 +38,15 @@ class DuckDBConnectionManager(SQLConnectionManager):
         credentials = cls.get_credentials(connection.credentials)
         try:
             handle = duckdb.connect(credentials.path, read_only=False)
-            connection.handle = DuckDBConnectionWrapper(handle)
+            connection.handle = handle
             connection.state = ConnectionState.OPEN
+
+            if len(credentials.extensions) > 0:
+                cursor = handle.cursor()
+                for extension in credentials.extensions:
+                    cursor.execute(f"INSTALL '{extension}'")
+                    cursor.execute(f"LOAD '{extension}'")
+                cursor.close()
         except RuntimeError as e:
             logger.debug(
                 "Got an error when attempting to open a duckdb "
@@ -87,6 +62,27 @@ class DuckDBConnectionManager(SQLConnectionManager):
 
     def cancel(self, connection):
         pass
+
+    def add_query(
+        self,
+        sql: str,
+        auto_begin: bool = True,
+        bindings: Optional[Any] = None,
+        abridge_sql_log: bool = False,
+    ) -> Tuple[Connection, Any]:
+        """
+        DuckDB's cursor.execute() doesn't like None (just like SQLite) (just like SQLite)
+        as a bindings argument, so substitute an empty list
+        """
+        if not bindings:
+            bindings = []
+
+        return super().add_query(
+            sql=sql,
+            auto_begin=auto_begin,
+            bindings=bindings,
+            abridge_sql_log=abridge_sql_log,
+        )
 
     @contextmanager
     def exception_handler(self, sql: str, connection_name="master"):
