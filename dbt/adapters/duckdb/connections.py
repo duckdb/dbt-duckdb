@@ -7,7 +7,11 @@ import duckdb
 import dbt.exceptions
 from dbt.adapters.base import Credentials
 from dbt.adapters.sql import SQLConnectionManager
-from dbt.contracts.connection import Connection, ConnectionState, AdapterResponse
+from dbt.contracts.connection import (
+    AdapterRequiredConfig,
+    ConnectionState,
+    AdapterResponse,
+)
 from dbt.logger import GLOBAL_LOGGER as logger
 
 from dataclasses import dataclass
@@ -38,9 +42,9 @@ class DuckDBCursorWrapper:
     def execute(self, sql, bindings=None):
         try:
             if bindings is None:
-                 return self._cursor.execute(sql)
+                return self._cursor.execute(sql)
             else:
-                 return self._cursor.execute(sql, bindings)
+                return self._cursor.execute(sql, bindings)
         except RuntimeError as e:
             raise dbt.exceptions.RuntimeException(str(e))
 
@@ -60,6 +64,10 @@ class DuckDBConnectionWrapper:
 
 class DuckDBConnectionManager(SQLConnectionManager):
     TYPE = "duckdb"
+
+    def __init__(self, profile: AdapterRequiredConfig):
+        assert profile.threads == 1, "dbt-duckdb only supports one thread"
+        super().__init__(profile)
 
     @classmethod
     def open(cls, connection):
