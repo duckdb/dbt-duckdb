@@ -1,3 +1,8 @@
+1.1.4 (2022-07-06)
+------------------
+
+- Enforces the single-thread limit on the dbt-duckdb profile
+
 1.1.3 (2022-06-29)
 ------------------
 
