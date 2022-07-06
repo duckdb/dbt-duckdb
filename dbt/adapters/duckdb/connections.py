@@ -66,8 +66,11 @@ class DuckDBConnectionManager(SQLConnectionManager):
     TYPE = "duckdb"
 
     def __init__(self, profile: AdapterRequiredConfig):
-        assert profile.threads == 1, "dbt-duckdb only supports one thread"
         super().__init__(profile)
+        if profile.threads > 1:
+            raise dbt.exceptions.RuntimeException(
+                "dbt-duckdb only supports 1 thread at this time"
+            )
 
     @classmethod
     def open(cls, connection):
