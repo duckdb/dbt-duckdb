@@ -13,12 +13,16 @@ from dbt.tests.adapter.basic.test_snapshot_check_cols import BaseSnapshotCheckCo
 from dbt.tests.adapter.basic.test_snapshot_timestamp import BaseSnapshotTimestamp
 from dbt.tests.adapter.basic.test_adapter_methods import BaseAdapterMethod
 from dbt.tests.adapter.basic.test_validate_connection import BaseValidateConnection
-from dbt.tests.adapter.basic.test_docs_generate import BaseDocsGenerate, BaseDocsGenReferences
+from dbt.tests.adapter.basic.test_docs_generate import (
+    BaseDocsGenerate,
+    BaseDocsGenReferences,
+)
 from dbt.tests.adapter.basic.expected_catalog import (
     base_expected_catalog,
     no_stats,
     expected_references_catalog,
 )
+
 
 class TestSimpleMaterializationsDuckDB(BaseSimpleMaterializations):
     pass
@@ -55,6 +59,7 @@ class TestSnapshotCheckColsDuckDB(BaseSnapshotCheckCols):
 class TestSnapshotTimestampDuckDB(BaseSnapshotTimestamp):
     pass
 
+
 class TestBaseAdapterMethodDuckDB(BaseAdapterMethod):
     pass
 
@@ -74,8 +79,9 @@ class TestDocsGenerateDuckDB(BaseDocsGenerate):
             time_type="TIMESTAMP",
             view_type="VIEW",
             table_type="BASE TABLE",
-            model_stats=no_stats()
+            model_stats=no_stats(),
         )
+
 
 class TestDocsGenReferencesDuckDB(BaseDocsGenReferences):
     @pytest.fixture(scope="class")
@@ -91,4 +97,3 @@ class TestDocsGenReferencesDuckDB(BaseDocsGenReferences):
             model_stats=no_stats(),
             bigint_type="BIGINT",
         )
-
