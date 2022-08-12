@@ -23,6 +23,15 @@ class DuckDBCredentials(Credentials):
     schema: str = "main"
     path: str = ":memory:"
 
+    # any extensions we want to install/load (httpfs, json, etc.)
+    extensions: Optional[Tuple[str, ...]] = None
+
+    # for connecting to data in S3 via the httpfs extension
+    s3_region: Optional[str] = None
+    s3_access_key_id: Optional[str] = None
+    s3_secret_access_key: Optional[str] = None
+    s3_session_token: Optional[str] = None
+
     @property
     def type(self):
         return "duckdb"
@@ -80,9 +89,33 @@ class DuckDBConnectionManager(SQLConnectionManager):
 
         credentials = cls.get_credentials(connection.credentials)
         try:
-            handle = duckdb.connect(credentials.path, read_only=False)
-            connection.handle = DuckDBConnectionWrapper(handle)
+            h = duckdb.connect(credentials.path, read_only=False)
+            connection.handle = DuckDBConnectionWrapper(h)
             connection.state = ConnectionState.OPEN
+
+            # load any extensions on the handle
+            if credentials.extensions is not None:
+                for extension in credentials.extensions:
+                    h.execute(f"LOAD '{extension}'")
+
+            if credentials.s3_region is not None:
+                h.execute("LOAD 'httpfs'")
+                h.execute(f"SET s3_region = '{credentials.s3_region}'")
+                if credentials.s3_session_token is not None:
+                    h.execute(
+                        f"SET s3_session_token = '{credentials.s3_session_token}'"
+                    )
+                elif credentials.s3_access_key_id is not None:
+                    h.execute(
+                        f"SET s3_access_key_id = '{credentials.s3_access_key_id}'"
+                    )
+                    h.execute(
+                        f"SET s3_secret_access_key = '{credentials.s3_secret_access_key}'"
+                    )
+                else:
+                    raise dbt.exceptions.RuntimeException(
+                        "You must specify either s3_session_token or s3_access_key_id and s3_secret_access_key"
+                    )
         except RuntimeError as e:
             logger.debug(
                 "Got an error when attempting to open a duckdb "
