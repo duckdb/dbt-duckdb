@@ -89,9 +89,10 @@ class DuckDBConnectionManager(SQLConnectionManager):
 
         credentials = cls.get_credentials(connection.credentials)
         try:
-            h = duckdb.connect(credentials.path, read_only=False)
-            connection.handle = DuckDBConnectionWrapper(h)
+            conn = duckdb.connect(credentials.path, read_only=False)
+            connection.handle = DuckDBConnectionWrapper(conn)
             connection.state = ConnectionState.OPEN
+            h = connection.handle
 
             # load any extensions on the handle
             if credentials.extensions is not None:
@@ -116,6 +117,7 @@ class DuckDBConnectionManager(SQLConnectionManager):
                     raise dbt.exceptions.RuntimeException(
                         "You must specify either s3_session_token or s3_access_key_id and s3_secret_access_key"
                     )
+
         except RuntimeError as e:
             logger.debug(
                 "Got an error when attempting to open a duckdb "
