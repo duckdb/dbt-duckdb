@@ -59,11 +59,30 @@ class DuckDBCursorWrapper:
 
 
 class DuckDBConnectionWrapper:
-    def __init__(self, conn):
+    def __init__(self, conn, credentials):
         self._conn = conn
-        self._cursor = DuckDBCursorWrapper(self._conn.cursor())
 
-    # forward along all non-cursor() methods/attribute look ups
+        # Extensions need to be config'd per cursor for reasons
+        cursor = conn.cursor()
+        for ext in credentials.extensions or []:
+            cursor.execute(f"LOAD '{ext}'")
+        if credentials.s3_region is not None:
+            cursor.execute("LOAD 'httpfs'")
+            cursor.execute(f"SET s3_region = '{credentials.s3_region}'")
+            if credentials.s3_access_key_id is not None:
+                cursor.execute(
+                    f"SET s3_access_key_id = '{credentials.s3_access_key_id}'"
+                )
+                cursor.execute(
+                    f"SET s3_secret_access_key = '{credentials.s3_secret_access_key}'"
+                )
+            else:
+                cursor.execute(
+                    f"SET s3_session_token = '{credentials.s3_session_token}'"
+                )
+
+        self._cursor = DuckDBCursorWrapper(cursor)
+
     def __getattr__(self, name):
         return getattr(self._conn, name)
 
@@ -90,33 +109,24 @@ class DuckDBConnectionManager(SQLConnectionManager):
         credentials = cls.get_credentials(connection.credentials)
         try:
             conn = duckdb.connect(credentials.path, read_only=False)
-            connection.handle = DuckDBConnectionWrapper(conn)
-            connection.state = ConnectionState.OPEN
-            h = connection.handle
 
-            # load any extensions on the handle
+            # install any extensions on the connection
             if credentials.extensions is not None:
                 for extension in credentials.extensions:
-                    h.execute(f"LOAD '{extension}'")
+                    conn.execute(f"INSTALL '{extension}'")
 
             if credentials.s3_region is not None:
-                h.execute("LOAD 'httpfs'")
-                h.execute(f"SET s3_region = '{credentials.s3_region}'")
-                if credentials.s3_session_token is not None:
-                    h.execute(
-                        f"SET s3_session_token = '{credentials.s3_session_token}'"
-                    )
-                elif credentials.s3_access_key_id is not None:
-                    h.execute(
-                        f"SET s3_access_key_id = '{credentials.s3_access_key_id}'"
-                    )
-                    h.execute(
-                        f"SET s3_secret_access_key = '{credentials.s3_secret_access_key}'"
-                    )
-                else:
+                conn.execute("INSTALL 'httpfs'")
+                if credentials.s3_session_token is None and (
+                    credentials.s3_access_key_id is None
+                    or credentials.s3_secret_access_key is None
+                ):
                     raise dbt.exceptions.RuntimeException(
                         "You must specify either s3_session_token or s3_access_key_id and s3_secret_access_key"
                     )
+
+            connection.handle = DuckDBConnectionWrapper(conn, credentials)
+            connection.state = ConnectionState.OPEN
 
         except RuntimeError as e:
             logger.debug(
