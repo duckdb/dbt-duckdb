@@ -23,31 +23,19 @@ There is also a `database` field defined in the `DuckDBCredentials` class for co
 but it defaults to `main` and setting it to be something else will likely cause strange things to happen that I cannot fully predict,
 so, ya know, don't do that.
 
+As of version 1.2.0, dbt-duckdb also allows you to configure your S3 settings in your credentials, including `s3_region` and
+either `s3_session_token` or `s3_access_key_id` and `s3_secret_access_key`, so that you can use dbt-duckdb to read and transform
+data stored in S3 files. You can also specify an arbitrary number of [DuckDB extensions](https://duckdb.org/docs/extensions/overview) to
+load as part of your dbt-duckdb project using the `extensions: []` credentials field.
+
 ### Developer Workflow
-If you find that you need to add a feature to DuckDB in order to implement some functionality in dbt-duckdb, here is
-the workflow you can use for doing local development. First, you need to clone and build DuckDB from source:
 
-```
-$ git clone https://github.com/duckdb/duckdb.git
-$ cd duckdb
-$ pip3 install -e tools/pythonpkg
-```
-
-in order to do a local install off of the main branch, and then run:
+If you need to add features to dbt-duckdb itself, use this workflow to get started:
 
 ```
 $ git clone https://github.com/jwills/dbt-duckdb.git
 $ cd dbt-duckdb
+$ "hack on stuff for awhile"
 $ pip3 install .
+$ pytest tests/
 ```
-
-to install `dbt-duckdb`, at which point you will be able to run:
-
-```
-$ pip3 install pytest-dbt-adapter
-$ pytest test/duckdb.dbtspec
-```
-
-to exercise the [dbt-adapter-tests](https://github.com/fishtown-analytics/dbt-adapter-tests) locally against your build of DuckDB
-(note that you also need to update `setup.py` in this directory to ensure that you are using your local version of duckdb, and not
-the released duckdb version 0.3.2)
