@@ -6,7 +6,7 @@ This project is hosted on PyPI, so you should be able to install it and the nece
 
 `pip3 install dbt-duckdb`
 
-The latest supported version targets `dbt-core` 1.1.x and `duckdb` 0.3.2.
+The latest supported version targets `dbt-core` 1.2.x and `duckdb` version 0.5.0 (but should also work with 0.4.0 and 0.3.2!)
 
 ### Configuring your profile
 
