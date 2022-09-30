@@ -126,7 +126,9 @@ class DuckDBConnectionManager(SQLConnectionManager):
                                 "You must specify either s3_session_token or s3_access_key_id and s3_secret_access_key"
                             )
 
-                connection.handle = DuckDBConnectionWrapper(cls.CONN.cursor(), credentials)
+                connection.handle = DuckDBConnectionWrapper(
+                    cls.CONN.cursor(), credentials
+                )
                 connection.state = ConnectionState.OPEN
 
             except RuntimeError as e:
