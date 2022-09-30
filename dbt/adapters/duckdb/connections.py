@@ -1,6 +1,7 @@
+import atexit
 from contextlib import contextmanager
+import threading
 from typing import Any, Optional, Tuple
-import time
 
 import duckdb
 
@@ -92,13 +93,11 @@ class DuckDBConnectionWrapper:
 
 class DuckDBConnectionManager(SQLConnectionManager):
     TYPE = "duckdb"
+    LOCK = threading.RLock()
+    CONN = None
 
     def __init__(self, profile: AdapterRequiredConfig):
         super().__init__(profile)
-        if profile.threads > 1:
-            raise dbt.exceptions.RuntimeException(
-                "dbt-duckdb only supports 1 thread at this time"
-            )
 
     @classmethod
     def open(cls, connection):
@@ -106,40 +105,41 @@ class DuckDBConnectionManager(SQLConnectionManager):
             logger.debug("Connection is already open, skipping open.")
             return connection
 
-        credentials = cls.get_credentials(connection.credentials)
-        try:
-            conn = duckdb.connect(credentials.path, read_only=False)
+        with cls.LOCK:
+            credentials = cls.get_credentials(connection.credentials)
+            try:
+                if not cls.CONN:
+                    cls.CONN = duckdb.connect(credentials.path, read_only=False)
 
-            # install any extensions on the connection
-            if credentials.extensions is not None:
-                for extension in credentials.extensions:
-                    conn.execute(f"INSTALL '{extension}'")
+                    # install any extensions on the connection
+                    if credentials.extensions is not None:
+                        for extension in credentials.extensions:
+                            cls.CONN.execute(f"INSTALL '{extension}'")
 
-            if credentials.s3_region is not None:
-                conn.execute("INSTALL 'httpfs'")
-                if credentials.s3_session_token is None and (
-                    credentials.s3_access_key_id is None
-                    or credentials.s3_secret_access_key is None
-                ):
-                    raise dbt.exceptions.RuntimeException(
-                        "You must specify either s3_session_token or s3_access_key_id and s3_secret_access_key"
-                    )
+                    if credentials.s3_region is not None:
+                        cls.CONN.execute("INSTALL 'httpfs'")
+                        if credentials.s3_session_token is None and (
+                            credentials.s3_access_key_id is None
+                            or credentials.s3_secret_access_key is None
+                        ):
+                            raise dbt.exceptions.RuntimeException(
+                                "You must specify either s3_session_token or s3_access_key_id and s3_secret_access_key"
+                            )
 
-            connection.handle = DuckDBConnectionWrapper(conn, credentials)
-            connection.state = ConnectionState.OPEN
+                connection.handle = DuckDBConnectionWrapper(cls.CONN.cursor(), credentials)
+                connection.state = ConnectionState.OPEN
 
-        except RuntimeError as e:
-            logger.debug(
-                "Got an error when attempting to open a duckdb "
-                "database: '{}'".format(e)
-            )
+            except RuntimeError as e:
+                logger.debug(
+                    "Got an error when attempting to open a duckdb "
+                    "database: '{}'".format(e)
+                )
 
-            connection.handle = None
-            connection.state = ConnectionState.FAIL
+                connection.handle = None
+                connection.state = ConnectionState.FAIL
 
-            raise dbt.exceptions.FailedToConnectException(str(e))
-
-        return connection
+                raise dbt.exceptions.FailedToConnectException(str(e))
+            return connection
 
     def cancel(self, connection):
         pass
@@ -166,3 +166,13 @@ class DuckDBConnectionManager(SQLConnectionManager):
         # https://github.com/dbt-labs/dbt-spark/issues/142
         message = "OK"
         return AdapterResponse(_message=message)
+
+    @classmethod
+    def close_all_connections(cls):
+        with cls.LOCK:
+            if cls.CONN is not None:
+                cls.CONN.close()
+                cls.CONN = None
+
+
+atexit.register(DuckDBConnectionManager.close_all_connections)
