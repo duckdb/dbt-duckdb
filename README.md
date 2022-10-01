@@ -15,9 +15,8 @@ configuration parameter that is required in your profile (in addition to `type: 
 a path on your local filesystem where you would like the DuckDB database file (and it's associated write-ahead log) to be written.
 You can also specify the `schema` parameter if you would like to use a schema besides the default (which is called `main`).
 
-Note that dbt-duckdb currently only works in single-threaded mode, just like [dbt-sqlite](https://github.com/codeforkjeff/dbt-sqlite); if
-you try to run dbt-duckdb with multiple `threads` configured in your profile, the adapter will raise an exception. We are
-looking forward to fixing this limitation in the near future.
+Prior to version 1.2.1, dbt-duckdb was limited to a single dbt execution thread; in version 1.2.1 this constraint was lifted and
+now dbt-duckdb can run with as many threads as you can throw at it.
 
 There is also a `database` field defined in the `DuckDBCredentials` class for consistency with the parent `Credentials` class,
 but it defaults to `main` and setting it to be something else will likely cause strange things to happen that I cannot fully predict,
