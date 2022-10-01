@@ -105,8 +105,8 @@ class DuckDBConnectionManager(SQLConnectionManager):
             logger.debug("Connection is already open, skipping open.")
             return connection
 
+        credentials = cls.get_credentials(connection.credentials)
         with cls.LOCK:
-            credentials = cls.get_credentials(connection.credentials)
             try:
                 if not cls.CONN:
                     cls.CONN = duckdb.connect(credentials.path, read_only=False)
