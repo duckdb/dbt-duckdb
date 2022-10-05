@@ -1,6 +1,6 @@
 import atexit
-from contextlib import contextmanager
 import threading
+from contextlib import contextmanager
 from typing import Any, Optional, Tuple
 
 import duckdb
@@ -9,6 +9,7 @@ import dbt.exceptions
 from dbt.adapters.base import Credentials
 from dbt.adapters.sql import SQLConnectionManager
 from dbt.contracts.connection import (
+    Connection,
     AdapterRequiredConfig,
     ConnectionState,
     AdapterResponse,
@@ -95,12 +96,13 @@ class DuckDBConnectionManager(SQLConnectionManager):
     TYPE = "duckdb"
     LOCK = threading.RLock()
     CONN = None
+    CONN_COUNT = 0
 
     def __init__(self, profile: AdapterRequiredConfig):
         super().__init__(profile)
 
     @classmethod
-    def open(cls, connection):
+    def open(cls, connection: Connection) -> Connection:
         if connection.state == ConnectionState.OPEN:
             logger.debug("Connection is already open, skipping open.")
             return connection
@@ -130,6 +132,7 @@ class DuckDBConnectionManager(SQLConnectionManager):
                     cls.CONN.cursor(), credentials
                 )
                 connection.state = ConnectionState.OPEN
+                cls.CONN_COUNT += 1
 
             except RuntimeError as e:
                 logger.debug(
@@ -142,6 +145,23 @@ class DuckDBConnectionManager(SQLConnectionManager):
 
                 raise dbt.exceptions.FailedToConnectException(str(e))
             return connection
+
+    @classmethod
+    def close(cls, connection: Connection) -> Connection:
+        # if the connection is in closed or init, there's nothing to do
+        if connection.state in {ConnectionState.CLOSED, ConnectionState.INIT}:
+            return connection
+
+        connection = super(SQLConnectionManager, cls).close(connection)
+
+        if connection.state == ConnectionState.CLOSED:
+            with cls.LOCK:
+                cls.CONN_COUNT -= 1
+                if cls.CONN_COUNT == 0:
+                    cls.CONN.close()
+                    cls.CONN = None
+
+        return connection
 
     def cancel(self, connection):
         pass
