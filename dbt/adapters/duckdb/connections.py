@@ -25,7 +25,7 @@ class DuckDBCredentials(Credentials):
     schema: str = "main"
     path: str = ":memory:"
 
-    # any extensions we want to install/load (httpfs, json, etc.)
+    # any extensions we want to install/load (httpfs, json, parquet, etc.)
     extensions: Optional[Tuple[str, ...]] = None
 
     # for connecting to data in S3 via the httpfs extension
@@ -33,6 +33,12 @@ class DuckDBCredentials(Credentials):
     s3_access_key_id: Optional[str] = None
     s3_secret_access_key: Optional[str] = None
     s3_session_token: Optional[str] = None
+
+    # The name of another SQL dialect that should be transpiled to DuckDB-compatible
+    # SQL using sqlglot (e.g., 'postgres', 'bigquery', 'snowflake', 'redshift')
+    # This is a mechanism for using dbt to run SQL against DuckDB that was written
+    # for another database.
+    emulate: Optional[str] = None
 
     @property
     def type(self):
@@ -100,6 +106,13 @@ class DuckDBConnectionManager(SQLConnectionManager):
 
     def __init__(self, profile: AdapterRequiredConfig):
         super().__init__(profile)
+        if profile.credentials.emulate is not None:
+            from sqlglot import transpile
+
+            read = profile.credentials.emulate
+            self.transpile = lambda sql: transpile(sql, read=read, write="duckdb")[0]
+        else:
+            self.transpile = lambda sql: sql
 
     @classmethod
     def open(cls, connection: Connection) -> Connection:

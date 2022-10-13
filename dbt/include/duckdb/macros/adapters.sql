@@ -36,7 +36,7 @@
   create {% if temporary: -%}temporary{%- endif %} table
     {{ relation.include(database=False, schema=(not temporary)) }}
   as (
-    {{ sql }}
+    {{ adapter.transpile(sql) }}
   );
 
 {% endmacro %}
@@ -46,7 +46,7 @@
 
   {{ sql_header if sql_header is not none }}
   create view {{ relation.include(database=False) }} as (
-    {{ sql }}
+    {{ adapter.transpile(sql) }}
   );
 {% endmacro %}
 
