@@ -33,6 +33,7 @@ class DuckDBCredentials(Credentials):
     s3_access_key_id: Optional[str] = None
     s3_secret_access_key: Optional[str] = None
     s3_session_token: Optional[str] = None
+    s3_endpoint: Optional[str] = None
 
     @property
     def type(self):
@@ -82,6 +83,8 @@ class DuckDBConnectionWrapper:
                 cursor.execute(
                     f"SET s3_session_token = '{credentials.s3_session_token}'"
                 )
+            if credentials.s3_endpoint is not None:
+                cursor.execute(f"SET s3_endpoint = '{credentials.s3_endpoint}'")
 
         self._cursor = DuckDBCursorWrapper(cursor)
 
