@@ -22,10 +22,29 @@ There is also a `database` field defined in the `DuckDBCredentials` class for co
 but it defaults to `main` and setting it to be something else will likely cause strange things to happen that I cannot fully predict,
 so, ya know, don't do that.
 
-As of version 1.2.0, dbt-duckdb also allows you to configure your S3 settings in your credentials, including `s3_region` and
-either `s3_session_token` or `s3_access_key_id` and `s3_secret_access_key`, so that you can use dbt-duckdb to read and transform
-data stored in S3 files. You can also specify an arbitrary number of [DuckDB extensions](https://duckdb.org/docs/extensions/overview) to
-load as part of your dbt-duckdb project using the `extensions: []` credentials field.
+As of version 1.2.3, you can load any supported [DuckDB extensions](https://duckdb.org/docs/extensions/overview) by listing them in
+the `extensions` field in your profile. You can also set any additional [DuckDB configuration options](https://duckdb.org/docs/sql/configuration)
+via the `settings` field, including options that are supported in any loaded extensions. For example, to be able to connect to S3 and read/write
+Parquet files using an AWS access key and secret, your profile would look something like this:
+
+```
+default:
+  outputs:
+    dev:
+      path: /tmp/dbt_test.db
+      schema: analytics
+      type: duckdb
+      threads: 4
+      extensions:
+        - httpfs
+        - parquet
+      settings:
+        s3_region: my-aws-region
+        s3_access_key_id: "{{ env_var('S3_ACCESS_KEY_ID') }}"
+        s3_secret_access_key: "{{ env_var('S3_SECRET_ACCESS_KEY') }}"
+  target: dev
+```
+
 
 ### Developer Workflow
 
