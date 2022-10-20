@@ -21,7 +21,7 @@ class DuckDBAdapter(SQLAdapter):
     @classmethod
     def is_cancelable(cls):
         return False
-    
+
     def get_columns_in_relation(self, relation):
         return super().get_columns_in_relation(relation)
 
@@ -80,7 +80,7 @@ class DuckDBAdapter(SQLAdapter):
                                 identifier=name,
                                 type=relation_type,
                             )
-                        ) 
+                        )
             return relations
         else:
             return super().list_relations_without_caching(schema_relation)
@@ -94,7 +94,7 @@ class DuckDBAdapter(SQLAdapter):
             return super().list_schemas(database)
 
     def check_schema_exists(self, database: str, schema: str) -> bool:
-        if util.util.is_filepath(database):
+        if util.is_filepath(database):
             return os.path.exists(os.path.join(database, schema))
         else:
             return super().check_schema_exists(database, schema)

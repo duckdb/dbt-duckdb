@@ -44,7 +44,8 @@ class DuckDBRelation(BaseRelation):
             pieces = [
                 (ComponentName.Database, self.database),
                 (ComponentName.Schema, self.schema),
-                (ComponentName.Identifier, self.identifier)] 
+                (ComponentName.Identifier, self.identifier),
+            ]
             filtered = []
             for key, value in pieces:
                 if self.include_policy.get_part(key):
