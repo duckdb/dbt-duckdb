@@ -50,6 +50,22 @@
   );
 {% endmacro %}
 
+{% macro duckdb__create_parquet_as(relation, sql) -%}
+  {%- set codec = config.get('codec', 'SNAPPY') -%}
+  COPY (
+    {{ sql }}
+  ) TO {{ relation }} (FORMAT 'PARQUET', CODEC '{{ codec }}');
+{% endmacro %}
+
+{% macro duckdb__create_csv_as(relation, sql) -%}
+  {%- set delim = config.get('delim', config.get('sep', ',')) -%}
+  {%- set header = config.get('header', 'TRUE') -%}
+
+  COPY (
+    {{ sql }}
+  ) TO {{ relation }} WITH (HEADER {{ header }}, DELIMITER '{{ delim }}');
+{% endmacro %}
+
 {% macro duckdb__get_columns_in_relation(relation) -%}
   {% call statement('get_columns_in_relation', fetch_result=True) %}
       select

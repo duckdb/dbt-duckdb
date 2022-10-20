@@ -1,40 +1,49 @@
 import os
-from typing import Optional
+from typing import Optional, Type
 
 from dataclasses import dataclass
 
 from dbt.adapters.base.relation import BaseRelation
-from dbt.exceptions import RuntimeException
+from dbt.dataclass_schema import StrEnum
+from dbt.utils import classproperty
+
+
+class DuckDBRelationType(StrEnum):
+    # Built-in materialization types.
+    Table = "table"
+    View = "view"
+    CTE = "cte"
+    External = "external"
+
+    # DuckDB-specific materialization types.
+    CSV = "csv"
+    Parquet = "parquet"
 
 
 @dataclass(frozen=True, eq=False, repr=False)
 class DuckDBRelation(BaseRelation):
-    def __post_init__(self):
-        # Check for length of Postgres table/view names.
-        # Check self.type to exclude test relation identifiers
-        if (
-            self.identifier is not None
-            and self.type is not None
-            and len(self.identifier) > self.relation_max_name_length()
-        ):
-            raise RuntimeException(
-                f"Relation name '{self.identifier}' "
-                f"is longer than {self.relation_max_name_length()} characters"
-            )
+    type: Optional[DuckDBRelationType] = None
 
-    def relation_max_name_length(self):
-        return 63
+    @classproperty
+    def get_relation_type(cls) -> Type[DuckDBRelationType]:
+        return DuckDBRelationType
 
-    @classmethod
-    def is_path(self, db: Optional[str]) -> bool:
-        # TODO: make this smarter on windows, handle S3 explicitly, etc.
-        return db is not None and os.path.sep in db
+    def is_file(self) -> bool:
+        return self.type in {DuckDBRelationType.CSV, DuckDBRelationType.Parquet}
+
+    def is_parquet(self) -> bool:
+        return self.type == DuckDBRelationType.Parquet
+
+    def is_csv(self) -> bool:
+        return self.type == DuckDBRelationType.CSV
 
     def render(self):
-        if DuckDBRelation.is_path(self.database):
-            # TODO: file extension?
+        if self.is_file() or (
+            self.database is not None and os.path.sep in self.database
+        ):
             identifier = self.identifier
-            # needs to be smarter about S3 on windows, etc.
+            if self.is_file():
+                identifier += f".{self.type.value}"
             path_str = os.path.join(self.database, self.schema, identifier)
             return f"'{path_str}'"
         else:
