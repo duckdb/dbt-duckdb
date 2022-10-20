@@ -1,8 +1,8 @@
 #!/usr/bin/env python
-from setuptools import find_packages
-from distutils.core import setup
 import os
 import re
+
+from setuptools import find_namespace_packages, setup
 
 this_directory = os.path.abspath(os.path.dirname(__file__))
 with open(os.path.join(this_directory, "README.md")) as f:
@@ -12,9 +12,7 @@ package_name = "dbt-duckdb"
 
 
 def _dbt_duckdb_version():
-    _version_path = os.path.join(
-        this_directory, "dbt", "adapters", "duckdb", "__version__.py"
-    )
+    _version_path = os.path.join(this_directory, "dbt", "adapters", "duckdb", "__version__.py")
     _version_pattern = r"""version\s*=\s*["'](.+)["']"""
     with open(_version_path) as f:
         match = re.search(_version_pattern, f.read().strip())
@@ -35,16 +33,10 @@ setup(
     author="Josh Wills",
     author_email="joshwills+dbt@gmail.com",
     url="https://github.com/jwills/dbt-duckdb",
-    packages=find_packages(),
-    package_data={
-        "dbt": [
-            "include/duckdb/dbt_project.yml",
-            "include/duckdb/macros/*.sql",
-            "include/duckdb/macros/**/*.sql",
-        ]
-    },
+    packages=find_namespace_packages(include=["dbt", "dbt.*"]),
+    include_package_data=True,
     install_requires=[
-        "dbt-core>=1.2.0",
-        "duckdb>=0.3.2",
+        "dbt-core~=1.2.0",
+        "duckdb~=0.5.0",
     ],
 )

@@ -76,3 +76,4 @@ target/
 
 # Vim
 *.sw*
+.DS_Store

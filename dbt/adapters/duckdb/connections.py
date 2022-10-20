@@ -1,22 +1,21 @@
 import atexit
 import threading
 from contextlib import contextmanager
-from typing import Any, Optional, Tuple
-
-import duckdb
+from dataclasses import dataclass
+from typing import Optional, Tuple
 
 import dbt.exceptions
 from dbt.adapters.base import Credentials
 from dbt.adapters.sql import SQLConnectionManager
 from dbt.contracts.connection import (
-    Connection,
     AdapterRequiredConfig,
-    ConnectionState,
     AdapterResponse,
+    Connection,
+    ConnectionState,
 )
 from dbt.logger import GLOBAL_LOGGER as logger
 
-from dataclasses import dataclass
+import duckdb
 
 
 @dataclass
@@ -72,16 +71,10 @@ class DuckDBConnectionWrapper:
             cursor.execute("LOAD 'httpfs'")
             cursor.execute(f"SET s3_region = '{credentials.s3_region}'")
             if credentials.s3_access_key_id is not None:
-                cursor.execute(
-                    f"SET s3_access_key_id = '{credentials.s3_access_key_id}'"
-                )
-                cursor.execute(
-                    f"SET s3_secret_access_key = '{credentials.s3_secret_access_key}'"
-                )
+                cursor.execute(f"SET s3_access_key_id = '{credentials.s3_access_key_id}'")
+                cursor.execute(f"SET s3_secret_access_key = '{credentials.s3_secret_access_key}'")
             else:
-                cursor.execute(
-                    f"SET s3_session_token = '{credentials.s3_session_token}'"
-                )
+                cursor.execute(f"SET s3_session_token = '{credentials.s3_session_token}'")
 
         self._cursor = DuckDBCursorWrapper(cursor)
 
@@ -128,16 +121,13 @@ class DuckDBConnectionManager(SQLConnectionManager):
                                 "You must specify either s3_session_token or s3_access_key_id and s3_secret_access_key"
                             )
 
-                connection.handle = DuckDBConnectionWrapper(
-                    cls.CONN.cursor(), credentials
-                )
+                connection.handle = DuckDBConnectionWrapper(cls.CONN.cursor(), credentials)
                 connection.state = ConnectionState.OPEN
                 cls.CONN_COUNT += 1
 
             except RuntimeError as e:
                 logger.debug(
-                    "Got an error when attempting to open a duckdb "
-                    "database: '{}'".format(e)
+                    "Got an error when attempting to open a duckdb " "database: '{}'".format(e)
                 )
 
                 connection.handle = None
@@ -157,7 +147,7 @@ class DuckDBConnectionManager(SQLConnectionManager):
         if connection.state == ConnectionState.CLOSED:
             with cls.LOCK:
                 cls.CONN_COUNT -= 1
-                if cls.CONN_COUNT == 0:
+                if cls.CONN_COUNT == 0 and cls.CONN:
                     cls.CONN.close()
                     cls.CONN = None
 
@@ -170,7 +160,7 @@ class DuckDBConnectionManager(SQLConnectionManager):
     def exception_handler(self, sql: str, connection_name="master"):
         try:
             yield
-        except dbt.exceptions.RuntimeException as dbte:
+        except dbt.exceptions.RuntimeException:
             raise
         except RuntimeError as e:
             logger.debug("duckdb error: {}".format(str(e)))
