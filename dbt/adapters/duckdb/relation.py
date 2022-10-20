@@ -1,9 +1,11 @@
 import os
-from typing import Optional, Type
+from typing import Optional, Type, Iterator, Tuple
 
 from dataclasses import dataclass
 
 from dbt.adapters.base.relation import BaseRelation
+from dbt.contracts.relation import ComponentName
+from dbt.adapters.duckdb import util
 from dbt.dataclass_schema import StrEnum
 from dbt.utils import classproperty
 
@@ -38,13 +40,24 @@ class DuckDBRelation(BaseRelation):
         return self.type == DuckDBRelationType.CSV
 
     def render(self):
-        if self.is_file() or (
-            self.database is not None and os.path.sep in self.database
-        ):
-            identifier = self.identifier
-            if self.is_file():
-                identifier += f".{self.type.value}"
-            path_str = os.path.join(self.database, self.schema, identifier)
+        if self.is_file() or util.is_filepath(self.database):
+            pieces = [
+                (ComponentName.Database, self.database),
+                (ComponentName.Schema, self.schema),
+                (ComponentName.Identifier, self.identifier)] 
+            filtered = []
+            for key, value in pieces:
+                if self.include_policy.get_part(key):
+                    filtered.append(value)
+            path_str = os.path.sep.join(filtered)
+            if not self.is_file():
+                # ugh, horrible hack up in here
+                if os.path.exists(path_str + ".parquet"):
+                    path_str += ".parquet"
+                elif os.path.exists(path_str + ".csv"):
+                    path_str += ".csv"
+            else:
+                path_str += ".parquet" if self.is_parquet() else ".csv"
             return f"'{path_str}'"
         else:
             return super().render()
