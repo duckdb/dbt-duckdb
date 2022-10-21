@@ -9,13 +9,12 @@ import dbt.exceptions
 from dbt.adapters.base import Credentials
 from dbt.adapters.sql import SQLConnectionManager
 from dbt.contracts.connection import (
-    Connection,
     AdapterRequiredConfig,
-    ConnectionState,
     AdapterResponse,
+    Connection,
+    ConnectionState,
 )
 from dbt.logger import GLOBAL_LOGGER as logger
-
 from dataclasses import dataclass
 
 
@@ -107,16 +106,13 @@ class DuckDBConnectionManager(SQLConnectionManager):
                         for extension in credentials.extensions:
                             cls.CONN.execute(f"INSTALL '{extension}'")
 
-                connection.handle = DuckDBConnectionWrapper(
-                    cls.CONN.cursor(), credentials
-                )
+                connection.handle = DuckDBConnectionWrapper(cls.CONN.cursor(), credentials)
                 connection.state = ConnectionState.OPEN
                 cls.CONN_COUNT += 1
 
             except RuntimeError as e:
                 logger.debug(
-                    "Got an error when attempting to open a duckdb "
-                    "database: '{}'".format(e)
+                    "Got an error when attempting to open a duckdb " "database: '{}'".format(e)
                 )
 
                 connection.handle = None
@@ -136,7 +132,7 @@ class DuckDBConnectionManager(SQLConnectionManager):
         if connection.state == ConnectionState.CLOSED:
             with cls.LOCK:
                 cls.CONN_COUNT -= 1
-                if cls.CONN_COUNT == 0:
+                if cls.CONN_COUNT == 0 and cls.CONN:
                     cls.CONN.close()
                     cls.CONN = None
 
@@ -149,7 +145,7 @@ class DuckDBConnectionManager(SQLConnectionManager):
     def exception_handler(self, sql: str, connection_name="master"):
         try:
             yield
-        except dbt.exceptions.RuntimeException as dbte:
+        except dbt.exceptions.RuntimeException:
             raise
         except RuntimeError as e:
             logger.debug("duckdb error: {}".format(str(e)))
