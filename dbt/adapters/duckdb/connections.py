@@ -106,13 +106,16 @@ class DuckDBConnectionManager(SQLConnectionManager):
                         for extension in credentials.extensions:
                             cls.CONN.execute(f"INSTALL '{extension}'")
 
-                connection.handle = DuckDBConnectionWrapper(cls.CONN.cursor(), credentials)
+                connection.handle = DuckDBConnectionWrapper(
+                    cls.CONN.cursor(), credentials
+                )
                 connection.state = ConnectionState.OPEN
                 cls.CONN_COUNT += 1
 
             except RuntimeError as e:
                 logger.debug(
-                    "Got an error when attempting to open a duckdb " "database: '{}'".format(e)
+                    "Got an error when attempting to open a duckdb "
+                    "database: '{}'".format(e)
                 )
 
                 connection.handle = None
@@ -130,9 +133,14 @@ class DuckDBConnectionManager(SQLConnectionManager):
         connection = super(SQLConnectionManager, cls).close(connection)
 
         if connection.state == ConnectionState.CLOSED:
+            credentials = cls.get_credentials(connection.credentials)
             with cls.LOCK:
                 cls.CONN_COUNT -= 1
-                if cls.CONN_COUNT == 0 and cls.CONN:
+                if (
+                    cls.CONN_COUNT == 0
+                    and cls.CONN
+                    and not credentials.path == ":memory:"
+                ):
                     cls.CONN.close()
                     cls.CONN = None
 
