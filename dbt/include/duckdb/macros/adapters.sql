@@ -28,7 +28,7 @@
   {{ return(run_query(sql)) }}
 {% endmacro %}
 
-{% macro duckdb__create_table_as(temporary, relation, sql) -%}
+{% macro duckdb__get_create_table_as_sql(temporary, relation, sql, language='sql') -%}
   {%- set sql_header = config.get('sql_header', none) -%}
 
   {{ sql_header if sql_header is not none }}
@@ -38,6 +38,44 @@
   as (
     {{ sql }}
   );
+
+{% endmacro %}
+
+{% macro get_create_table_as_python(relation, compiled_code, language='python') -%}
+{{- compiled_code }}
+
+extend_globals = {
+  "config": config,
+  "this": this,
+  "ref": ref,
+  "source": source
+}
+
+globals().update(extend_globals)
+
+dbt = dbtObj(load_df_function)
+df = model(dbt, con)
+
+# make sure pandas exists before using it
+try:
+  import pandas
+  pandas_available = True
+except ImportError:
+  pandas_available = False
+
+# make sure pyarrow exists before using it
+try:
+  import pyarrow
+  pyarrow_available = True
+except ImportError:
+  pyarrow_available = False
+
+if pandas_available and isinstance(df, pandas.core.frame.DataFrame):
+  con.execute('create table {{ relation.include(database=False, schema=(not temporary)) }} as select * from df')
+elif pyarrow_available and isinstance(df, pyarrow.Table):
+  con.execute('create table {{ relation.include(database=False, schema=(not temporary)) }} as select * from df')
+else:
+  raise Exception( str(type(df)) + " is not a supported type for dbt Python materialization")
 
 {% endmacro %}
 
