@@ -130,9 +130,10 @@ class DuckDBConnectionManager(SQLConnectionManager):
         connection = super(SQLConnectionManager, cls).close(connection)
 
         if connection.state == ConnectionState.CLOSED:
+            credentials = cls.get_credentials(connection.credentials)
             with cls.LOCK:
                 cls.CONN_COUNT -= 1
-                if cls.CONN_COUNT == 0 and cls.CONN:
+                if cls.CONN_COUNT == 0 and cls.CONN and not credentials.path == ":memory:":
                     cls.CONN.close()
                     cls.CONN = None
 
