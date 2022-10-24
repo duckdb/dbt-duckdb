@@ -129,3 +129,15 @@
 {% macro duckdb__snapshot_get_time() -%}
   {{ current_timestamp() }}::timestamp
 {%- endmacro %}
+
+{% macro duckdb__get_incremental_default_sql(arg_dict) %}
+  {% do return(get_incremental_delete_insert_sql(arg_dict)) %}
+{% endmacro %}
+
+{% macro duckdb__get_incremental_delete_insert_sql(arg_dict) %}
+  {% do return(get_delete_insert_merge_sql(arg_dict["target_relation"].include(database=False), arg_dict["temp_relation"], arg_dict["unique_key"], arg_dict["dest_columns"])) %}
+{% endmacro %}
+
+{% macro duckdb__get_incremental_append_sql(arg_dict) %}
+  {% do return(get_insert_into_sql(arg_dict["target_relation"].include(database=False), arg_dict["temp_relation"], arg_dict["dest_columns"])) %}
+{% endmacro %}
