@@ -1,17 +1,16 @@
-import pytest
-from dbt.tests.adapter.utils.base_utils import BaseUtils
 from dbt.tests.adapter.utils.test_any_value import BaseAnyValue
+from dbt.tests.adapter.utils.test_array_append import BaseArrayAppend
+from dbt.tests.adapter.utils.test_array_concat import BaseArrayConcat
+from dbt.tests.adapter.utils.test_array_construct import BaseArrayConstruct
 from dbt.tests.adapter.utils.test_bool_or import BaseBoolOr
 from dbt.tests.adapter.utils.test_cast_bool_to_text import BaseCastBoolToText
 from dbt.tests.adapter.utils.test_concat import BaseConcat
+from dbt.tests.adapter.utils.test_current_timestamp import BaseCurrentTimestampNaive
+from dbt.tests.adapter.utils.test_date_trunc import BaseDateTrunc
 from dbt.tests.adapter.utils.test_dateadd import BaseDateAdd
 from dbt.tests.adapter.utils.test_datediff import BaseDateDiff
-from dbt.tests.adapter.utils.test_date_trunc import BaseDateTrunc
 from dbt.tests.adapter.utils.test_escape_single_quotes import (
     BaseEscapeSingleQuotesQuote,
-)
-from dbt.tests.adapter.utils.test_escape_single_quotes import (
-    BaseEscapeSingleQuotesBackslash,
 )
 from dbt.tests.adapter.utils.test_except import BaseExcept
 from dbt.tests.adapter.utils.test_hash import BaseHash
@@ -104,4 +103,20 @@ class TestSplitPart(BaseSplitPart):
 
 
 class TestStringLiteral(BaseStringLiteral):
+    pass
+
+
+class TestArrayAppend(BaseArrayAppend):
+    pass
+
+
+class TestArrayConcat(BaseArrayConcat):
+    pass
+
+
+class TestArrayConcat(BaseArrayConstruct):
+    pass
+
+
+class TestCurrentTimestamp(BaseCurrentTimestampNaive):
     pass
