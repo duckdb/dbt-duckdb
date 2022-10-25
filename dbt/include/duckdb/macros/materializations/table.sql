@@ -28,15 +28,11 @@
   -- `BEGIN` happens here:
   {{ run_hooks(pre_hooks, inside_transaction=True) }}
 
-  {% if language == 'python' %}
-    {% set build_sql = get_create_table_as_python(intermediate_relation, compiled_code) %}
-  {% else %} {# SQL #}
-    {% set build_sql = get_create_table_as_sql(False, intermediate_relation, sql) %}
-  {% endif %}
+  {{ log(compiled_code, True) }}
 
   -- build model
   {% call statement('main', language=language) -%}
-    {{ build_sql }}
+    {{- create_table_as(False, intermediate_relation, compiled_code, language) }}
   {%- endcall %}
 
   -- cleanup
@@ -56,7 +52,7 @@
   {% do persist_docs(target_relation, model) %}
 
   -- `COMMIT` happens here
-  {% do adapter.commit() %}
+  {{ adapter.commit() }}
 
   -- finally, drop the existing/backup relation after the commit
   {{ drop_relation_if_exists(backup_relation) }}

@@ -28,21 +28,27 @@
   {{ return(run_query(sql)) }}
 {% endmacro %}
 
-{% macro duckdb__get_create_table_as_sql(temporary, relation, sql, language='sql') -%}
-  {%- set sql_header = config.get('sql_header', none) -%}
+{% macro duckdb__create_table_as(temporary, relation, compiled_code, language='sql') -%}
+  {%- if language == 'sql' -%}
+    {%- set sql_header = config.get('sql_header', none) -%}
 
-  {{ sql_header if sql_header is not none }}
+    {{ sql_header if sql_header is not none }}
 
-  create {% if temporary: -%}temporary{%- endif %} table
-    {{ relation.include(database=False, schema=(not temporary)) }}
-  as (
-    {{ sql }}
-  );
-
+    create {% if temporary: -%}temporary{%- endif %} table
+      {{ relation.include(database=False, schema=(not temporary)) }}
+    as (
+      {{ compiled_code }}
+    );
+  {%- elif language == 'python' -%}
+    {{ py_write_table(temporary=temporary, relation=relation, compiled_code=compiled_code) }}
+  {%- else -%}
+      {% do exceptions.raise_compiler_error("duckdb__create_table_as macro didn't get supported language, it got %s" % language) %}
+  {%- endif -%}
 {% endmacro %}
 
-{% macro get_create_table_as_python(relation, compiled_code, language='python') -%}
-{{- compiled_code }}
+{% macro py_write_table(temporary, relation, compiled_code) -%}
+# MODEL ----------
+{{ compiled_code }}
 
 extend_globals = {
   "config": config,
@@ -167,3 +173,15 @@ else:
 {% macro duckdb__snapshot_get_time() -%}
   {{ current_timestamp() }}::timestamp
 {%- endmacro %}
+
+{% macro duckdb__get_incremental_default_sql(arg_dict) %}
+  {% do return(get_incremental_delete_insert_sql(arg_dict)) %}
+{% endmacro %}
+
+{% macro duckdb__get_incremental_delete_insert_sql(arg_dict) %}
+  {% do return(get_delete_insert_merge_sql(arg_dict["target_relation"].include(database=False), arg_dict["temp_relation"], arg_dict["unique_key"], arg_dict["dest_columns"])) %}
+{% endmacro %}
+
+{% macro duckdb__get_incremental_append_sql(arg_dict) %}
+  {% do return(get_insert_into_sql(arg_dict["target_relation"].include(database=False), arg_dict["temp_relation"], arg_dict["dest_columns"])) %}
+{% endmacro %}

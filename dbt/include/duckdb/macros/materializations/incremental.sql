@@ -34,26 +34,18 @@
   {% set to_drop = [] %}
 
   {% if existing_relation is none %}
-    {% if language == 'python' %}
-      {% set build_sql = get_create_table_as_python(target_relation, compiled_code) %}
-    {% else %} {# SQL #}
-      {% set build_sql = get_create_table_as_sql(False, target_relation, sql) %}
-    {% endif %}
+    {% set build_sql = create_table_as(False, target_relation, compiled_code, language) %}
   {% elif full_refresh_mode %}
-    {% if language == 'python' %}
-      {% set build_sql = get_create_table_as_python(intermediate_relation, compiled_code) %}
-    {% else %} {# SQL #}
-      {% set build_sql = get_create_table_as_sql(False, intermediate_relation, sql) %}
-    {% endif %}
+    {% set build_sql = create_table_as(False, intermediate_relation, compiled_code, language) %}
     {% set need_swap = true %}
   {% else %}
     {% if language == 'python' %}
-      {% set build_sql = get_create_table_as_python(temp_relation, compiled_code) %}
+      {% set build_python = create_table_as(False, temp_relation, compiled_code, language) %}
       {% call statement("pre", language=language) %}
-        {{- build_sql }}
+        {{- build_python }}
       {% endcall %}
     {% else %} {# SQL #}
-      {% do run_query(get_create_table_as_sql(True, temp_relation, sql)) %}
+      {% do run_query(create_table_as(True, temp_relation, compiled_code, language)) %}
     {% endif %}
     {% do adapter.expand_target_column_types(
              from_relation=temp_relation,
@@ -70,7 +62,7 @@
     {% set strategy_sql_macro_func = adapter.get_incremental_strategy_macro(context, incremental_strategy) %}
     {% set strategy_arg_dict = ({'target_relation': target_relation, 'temp_relation': temp_relation, 'unique_key': unique_key, 'dest_columns': dest_columns, 'predicates': incremental_predicates }) %}
     {% set build_sql = strategy_sql_macro_func(strategy_arg_dict) %}
-    {%- set language = "sql" -%}
+    {% set language = "sql" %}
 
   {% endif %}
 
