@@ -1,11 +1,17 @@
-from dbt.adapters.duckdb.connections import DuckDBConnectionManager
+import os
+
 from dbt.adapters.sql import SQLAdapter
 from dbt.contracts.connection import AdapterResponse
 from dbt.exceptions import InternalException, RuntimeException
+from dbt.adapters.base.meta import available
+
+from dbt.adapters.duckdb import DuckDBRelation
+from dbt.adapters.duckdb.connections import DuckDBConnectionManager
 
 
 class DuckDBAdapter(SQLAdapter):
     ConnectionManager = DuckDBConnectionManager
+    Relation = DuckDBRelation
 
     @classmethod
     def date_function(cls) -> str:
@@ -50,3 +56,12 @@ class DuckDBAdapter(SQLAdapter):
         except Exception as err:
             raise RuntimeException(f"Python model failed:\n" f"{err}")
         return AdapterResponse(_message="OK")
+
+    @available
+    def rename_file(cls, from_file: str, to_file: str):
+        os.rename(from_file, to_file)
+
+    @available
+    def remove_file(cls, file_path: str):
+        if os.path.exists(file_path):
+            os.remove(file_path)
