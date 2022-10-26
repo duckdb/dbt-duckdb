@@ -133,9 +133,16 @@ else:
 {% endmacro %}
 
 {% macro duckdb__drop_relation(relation) -%}
+  {% set file_materializations = ['csv', 'parquet'] %}
+  {% if relation.type in file_materializations %}
+    {{ adapter.remove_file(
+        relation.identifier ~ '.' ~ relation.type
+    ) }}
+  {% else %}
   {% call statement('drop_relation', auto_begin=False) -%}
     drop {{ relation.type }} if exists {{ relation.include(database=False) }} cascade
   {%- endcall %}
+  {% endif %}
 {% endmacro %}
 
 {% macro duckdb__truncate_relation(relation) -%}
@@ -146,9 +153,17 @@ else:
 
 {% macro duckdb__rename_relation(from_relation, to_relation) -%}
   {% set target_name = adapter.quote_as_configured(to_relation.identifier, 'identifier') %}
+  {% set file_materializations = ['csv', 'parquet'] %}
+  {% if to_relation.type in file_materializations %}
+    {{ adapter.rename_file(
+        from_relation.identifier ~ '.' ~ to_relation.type,
+        to_relation.identifier ~ '.' ~ to_relation.type
+    ) }}
+  {% else %}
   {% call statement('rename_relation') -%}
     alter {{ to_relation.type }} {{ from_relation }} rename to {{ target_name }}
   {%- endcall %}
+  {% endif %}
 {% endmacro %}
 
 {% macro duckdb__make_temp_relation(base_relation, suffix) %}
@@ -185,3 +200,30 @@ else:
 {% macro duckdb__get_incremental_append_sql(arg_dict) %}
   {% do return(get_insert_into_sql(arg_dict["target_relation"].include(database=False), arg_dict["temp_relation"], arg_dict["dest_columns"])) %}
 {% endmacro %}
+
+{% macro duckdb__materialize_as_parquet(relation, sql) -%}
+{#
+  TODO:
+    - pass config into format... see https://duckdb.org/docs/data/parquet
+    - deal with db file path and schema properly
+    - s3?
+#}
+
+  copy (
+    {{ sql }}
+  ) to '{{ relation.name }}.parquet' (format 'parquet')
+;
+{%- endmacro %}
+
+{% macro duckdb__materialize_as_csv(relation, sql) -%}
+{#
+  TODO:
+    - pass config into format... see https://duckdb.org/docs/data/csv
+    - deal with db file path and schema properly
+    - s3?
+#}
+  copy (
+    {{ sql }}
+  ) to '{{ relation.name }}.csv' with (header 1, delimiter '|')
+;
+{%- endmacro %}
