@@ -1,7 +1,8 @@
 from dbt.adapters.duckdb.connections import DuckDBConnectionManager
 from dbt.adapters.sql import SQLAdapter
 from dbt.contracts.connection import AdapterResponse
-from dbt.exceptions import InternalException, RuntimeException
+from dbt.exceptions import InternalException
+from dbt.exceptions import RuntimeException
 
 
 class DuckDBAdapter(SQLAdapter):
