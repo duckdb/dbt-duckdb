@@ -1,21 +1,22 @@
 import atexit
 import threading
 from contextlib import contextmanager
-from typing import Any, Dict, Optional, Tuple
+from dataclasses import dataclass
+from typing import Any
+from typing import Dict
+from typing import Optional
+from typing import Tuple
 
 import duckdb
 
 import dbt.exceptions
 from dbt.adapters.base import Credentials
 from dbt.adapters.sql import SQLConnectionManager
-from dbt.contracts.connection import (
-    AdapterRequiredConfig,
-    AdapterResponse,
-    Connection,
-    ConnectionState,
-)
+from dbt.contracts.connection import AdapterRequiredConfig
+from dbt.contracts.connection import AdapterResponse
+from dbt.contracts.connection import Connection
+from dbt.contracts.connection import ConnectionState
 from dbt.logger import GLOBAL_LOGGER as logger
-from dataclasses import dataclass
 
 
 @dataclass
