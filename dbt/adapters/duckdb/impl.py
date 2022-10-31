@@ -1,10 +1,9 @@
-from typing import Sequence
-
-from dbt.adapters.base.meta import available
 from typing import List
 from typing import Optional
+from typing import Sequence
 
 from dbt.adapters.base import BaseRelation
+from dbt.adapters.base.meta import available
 from dbt.adapters.duckdb.connections import DuckDBConnectionManager
 from dbt.adapters.sql import SQLAdapter
 from dbt.contracts.connection import AdapterResponse
