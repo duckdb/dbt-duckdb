@@ -94,15 +94,6 @@ else:
   );
 {% endmacro %}
 
-{% macro create_view_loacation(relation, location) -%}
-  {%- set sql_header = config.get('sql_header', none) -%}
-
-  {{ sql_header if sql_header is not none }}
-  create view {{ relation.include(database=False) }} as (
-    select * from '{{ location }}'
-  );
-{% endmacro %}
-
 {% macro duckdb__get_columns_in_relation(relation) -%}
   {% call statement('get_columns_in_relation', fetch_result=True) %}
       select
