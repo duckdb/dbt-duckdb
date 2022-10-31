@@ -1,7 +1,7 @@
 {% materialization external, adapter="duckdb", supported_languages=['sql', 'python'] %}
 
-  {%- set location = config.require('location') -%}
   {%- set format = config.get('format', default='parquet') -%}
+  {%- set location = config.get('location', default=external_location(format)) -%}
   {%- set delimiter = config.get('delimiter', default=';') -%}
   -- set language - python or sql
   {%- set language = model['language'] -%}
