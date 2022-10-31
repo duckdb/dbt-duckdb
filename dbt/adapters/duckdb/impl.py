@@ -1,7 +1,9 @@
 from typing import List
 from typing import Optional
+from typing import Sequence
 
 from dbt.adapters.base import BaseRelation
+from dbt.adapters.base.meta import available
 from dbt.adapters.duckdb.connections import DuckDBConnectionManager
 from dbt.adapters.sql import SQLAdapter
 from dbt.contracts.connection import AdapterResponse
@@ -20,7 +22,19 @@ class DuckDBAdapter(SQLAdapter):
     def is_cancelable(cls) -> bool:
         return False
 
-    def valid_incremental_strategies(self):
+    @available
+    def location_exists(self, location: str) -> bool:
+        try:
+            self.execute(
+                f"select 1 from '{location}' where 1=0",
+                auto_begin=False,
+                fetch=False,
+            )
+            return True
+        except RuntimeException:
+            return False
+
+    def valid_incremental_strategies(self) -> Sequence[str]:
         """DuckDB does not currently support MERGE statement."""
         return ["append", "delete+insert"]
 

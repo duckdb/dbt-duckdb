@@ -94,6 +94,15 @@ else:
   );
 {% endmacro %}
 
+{% macro create_view_loacation(relation, location) -%}
+  {%- set sql_header = config.get('sql_header', none) -%}
+
+  {{ sql_header if sql_header is not none }}
+  create view {{ relation.include(database=False) }} as (
+    select * from '{{ location }}'
+  );
+{% endmacro %}
+
 {% macro duckdb__get_columns_in_relation(relation) -%}
   {% call statement('get_columns_in_relation', fetch_result=True) %}
       select
@@ -184,4 +193,28 @@ else:
 
 {% macro duckdb__get_incremental_append_sql(arg_dict) %}
   {% do return(get_insert_into_sql(arg_dict["target_relation"].include(database=False), arg_dict["temp_relation"], arg_dict["dest_columns"])) %}
+{% endmacro %}
+
+{% macro location_exists(location) -%}
+  {% do return(adapter.location_exists(location)) %}
+{% endmacro %}
+
+{% macro write_to_file(relation, location, format, delimiter=';') -%}
+  {% if format == 'parquet' %}
+    {% set copy_to %}
+      copy {{ relation }} to '{{ location }}' (FORMAT 'parquet');
+    {% endset %}
+
+  {% elif format == 'csv' %}
+    {% set copy_to %}
+      copy {{ relation }} to '{{ location }}' (HEADER 1, DELIMITER '{{ delimiter }}');
+    {% endset %}
+
+  {% else %}
+      {% do exceptions.raise_compiler_error("%s external format is not supported!" % format) %}
+  {% endif %}
+
+  {% call statement('write_to_file') -%}
+    {{ copy_to }}
+  {%- endcall %}
 {% endmacro %}

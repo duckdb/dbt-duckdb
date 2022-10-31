@@ -28,8 +28,6 @@
   -- `BEGIN` happens here:
   {{ run_hooks(pre_hooks, inside_transaction=True) }}
 
-  {{ log(compiled_code, True) }}
-
   -- build model
   {% call statement('main', language=language) -%}
     {{- create_table_as(False, intermediate_relation, compiled_code, language) }}
