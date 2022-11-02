@@ -71,9 +71,7 @@ def project_from_dict(project, profile, packages=None, selectors=None, cli_vars=
     return partial.render(renderer)
 
 
-def config_from_parts_or_dicts(
-    project, profile, packages=None, selectors=None, cli_vars="{}"
-):
+def config_from_parts_or_dicts(project, profile, packages=None, selectors=None, cli_vars="{}"):
     from copy import deepcopy
 
     from dbt.config import Profile, Project, RuntimeConfig

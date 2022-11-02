@@ -96,9 +96,7 @@ class BaseExternalMaterializations:
 
         # base table rowcount
         relation = relation_from_name(project.adapter, "base")
-        result = project.run_sql(
-            f"select count(*) as num_rows from {relation}", fetch="one"
-        )
+        result = project.run_sql(f"select count(*) as num_rows from {relation}", fetch="one")
         assert result[0] == 10
 
         # relations_equal
