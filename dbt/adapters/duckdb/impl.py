@@ -34,6 +34,10 @@ class DuckDBAdapter(SQLAdapter):
         except RuntimeException:
             return False
 
+    @available
+    def external_root(self) -> str:
+        return self.config.credentials.external_root
+
     def valid_incremental_strategies(self) -> Sequence[str]:
         """DuckDB does not currently support MERGE statement."""
         return ["append", "delete+insert"]

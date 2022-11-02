@@ -1,3 +1,3 @@
 {%- macro external_location(format) -%}
-  {{- this.schema }}/{{ this.identifier}}.{{ format }}
+  {{- adapter.external_root() }}/{{ this.identifier }}.{{ format }}
 {%- endmacro -%}
