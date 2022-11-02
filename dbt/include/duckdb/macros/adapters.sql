@@ -190,7 +190,7 @@ else:
   {% do return(adapter.location_exists(location)) %}
 {% endmacro %}
 
-{% macro write_to_file(relation, location, format, delimiter=';') -%}
+{% macro write_to_file(relation, location, format, delimiter=',') -%}
   {% if format == 'parquet' %}
     {% set copy_to %}
       copy {{ relation }} to '{{ location }}' (FORMAT 'parquet');
