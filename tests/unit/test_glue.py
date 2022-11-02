@@ -1,6 +1,7 @@
 from unittest.mock import call
 
 import pytest
+
 from dbt.adapters.duckdb.glue import create_or_update_table
 from dbt.tests.util import get_connection, relation_from_name
 
@@ -66,9 +67,11 @@ def test_create_glue_table(mocker, columns):
         database="test",
         table="test",
         column_list=columns,
-        s3_path="test",
+        s3_path="s3://test/aaa.parquet",
         file_format="parquet",
+        settings=None,
     )
+
     boto3.assert_has_calls(
         [
             call("glue"),
@@ -120,7 +123,7 @@ def test_create_glue_table(mocker, columns):
                             {"Name": "text", "Type": "string"},
                             {"Name": "string", "Type": "string"},
                         ],
-                        "Location": "test",
+                        "Location": "s3://test",
                         "InputFormat": "org.apache.hadoop.hive.ql.io.parquet.MapredParquetInputFormat",
                         "OutputFormat": "org.apache.hadoop.hive.ql.io.parquet.MapredParquetOutputFormat",
                         "Compressed": False,
@@ -169,8 +172,9 @@ def test_update_glue_table(mocker, columns):
         database="test",
         table="test",
         column_list=columns,
-        s3_path="test",
+        s3_path="s3://test/aaa.parquet",
         file_format="parquet",
+        settings=None,
     )
     boto3.assert_has_calls(
         [
@@ -223,7 +227,7 @@ def test_update_glue_table(mocker, columns):
                             {"Name": "text", "Type": "string"},
                             {"Name": "string", "Type": "string"},
                         ],
-                        "Location": "test",
+                        "Location": "s3://test",
                         "InputFormat": "org.apache.hadoop.hive.ql.io.parquet.MapredParquetInputFormat",
                         "OutputFormat": "org.apache.hadoop.hive.ql.io.parquet.MapredParquetOutputFormat",
                         "Compressed": False,
@@ -313,6 +317,7 @@ def test_without_update_glue_table(mocker, columns):
         column_list=columns,
         s3_path="test",
         file_format="parquet",
+        settings=None,
     )
     assert len(boto3.mock_calls) == 2
     boto3.has_calls([call("glue"), call().get_table(DatabaseName="test", Name="test")])
