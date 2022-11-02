@@ -2,7 +2,7 @@
 
   {%- set format = config.get('format', default='parquet') -%}
   {%- set location = config.get('location', default=external_location(format)) -%}
-  {%- set delimiter = config.get('delimiter', default=';') -%}
+  {%- set delimiter = config.get('delimiter', default=',') -%}
   {%- set glue_register = config.get('glue_register', default=false) -%}
   {%- set glue_database = config.get('glue_database', default='default') -%}
 
