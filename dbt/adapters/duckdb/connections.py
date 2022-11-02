@@ -34,6 +34,10 @@ class DuckDBCredentials(Credentials):
     # (and extensions may add their own pragmas as well)
     settings: Optional[Dict[str, Any]] = None
 
+    # the root path to use for any external materializations that are specified
+    # in this dbt project; defaults to "." (the current working directory)
+    external_root: str = "."
+
     @property
     def type(self):
         return "duckdb"
