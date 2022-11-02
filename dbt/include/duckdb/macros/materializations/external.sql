@@ -3,6 +3,9 @@
   {%- set format = config.get('format', default='parquet') -%}
   {%- set location = config.get('location', default=external_location(format)) -%}
   {%- set delimiter = config.get('delimiter', default=';') -%}
+  {%- set glue_register = config.get('glue_register', default=false) -%}
+  {%- set glue_database = config.get('glue_database', default='default') -%}
+
   -- set language - python or sql
   {%- set language = model['language'] -%}
 
@@ -75,6 +78,9 @@
     -- finally, drop the existing/backup relation after the commit
     {{ drop_relation_if_exists(backup_relation) }}
     {{ drop_relation_if_exists(temp_relation) }}
+
+    -- register table into glue
+    {% do register_glue_table(glue_register, glue_database, target_relation, location, format) %}
 
     {{ run_hooks(post_hooks, inside_transaction=False) }}
   {% else %}

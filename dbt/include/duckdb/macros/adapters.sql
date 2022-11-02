@@ -209,3 +209,10 @@ else:
     {{ copy_to }}
   {%- endcall %}
 {% endmacro %}
+
+{% macro register_glue_table(register, glue_database, relation, location, format) -%}
+  {% if location.startswith("s3://") and register == true %}
+    {%- set column_list = adapter.get_columns_in_relation(relation) -%}
+    {% do adapter.register_glue_table(glue_database, relation.identifier, column_list, location, format) %}
+  {% endif %}
+{% endmacro %}

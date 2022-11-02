@@ -19,6 +19,7 @@ pytest-dotenv
 pytest-logbook
 pytest-csv
 pytest-xdist
+pytest-mock
 pytz
 tox>=3.13
 twine
