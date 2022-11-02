@@ -105,7 +105,7 @@ def _get_parquet_table_def(
 
 
 def _get_csv_table_def(
-    table: str, s3_parent: str, columns: Sequence["ColumnTypeDef"], delimiter: str = ";"
+    table: str, s3_parent: str, columns: Sequence["ColumnTypeDef"], delimiter: str = ","
 ) -> "TableInputTypeDef":
     """Create table definition for Glue table. See https://docs.aws.amazon.com/glue/latest/webapi/API_CreateTable.html#API_CreateTable_RequestSyntax"""
     table_def = TableInputTypeDef(
@@ -176,7 +176,7 @@ def _get_table_def(
             table=table,
             s3_parent=s3_parent,
             columns=columns,
-            delimiter=kwargs.get("delimiter", ";"),
+            delimiter=kwargs.get("delimiter", ","),
         )
     elif file_format == "parquet":
         table_def = _get_parquet_table_def(table=table, s3_parent=s3_parent, columns=columns)
