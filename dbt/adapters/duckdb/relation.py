@@ -3,7 +3,6 @@ from typing import Any, Optional, Type
 from dataclasses import dataclass
 
 from dbt.adapters.base.relation import BaseRelation, Self
-from dbt.clients.jinja import get_environment
 from dbt.contracts.graph.parsed import ParsedSourceDefinition
 
 
@@ -13,13 +12,26 @@ class DuckDBRelation(BaseRelation):
 
     @classmethod
     def create_from_source(cls: Type[Self], source: ParsedSourceDefinition, **kwargs: Any) -> Self:
-        if "external_location" in source.meta or "external_location" in source.source_meta:
-            env = get_environment()
-            if "external_location" in source.meta:
-                template = env.from_string(source.meta["external_location"])
-            else:
-                template = env.from_string(source.source_meta["external_location"])
-            kwargs["external_location"] = template.render(source.to_dict())
+
+        # Some special handling here to allow sources that are external files to be specified
+        # via a `external_location` meta field. If the source's meta field is used, we include
+        # some logic to allow basic templating of the external location based on the individual
+        # name or identifier for the table itself to cut down on boilerplate.
+        ext_location = None
+        if "external_location" in source.meta:
+            ext_location = source.meta["external_location"]
+        elif "external_location" in source.source_meta:
+            # Use str.format here to allow for some basic templating outside of Jinja
+            ext_location = source.source_meta["external_location"].format(
+                name=source.name,
+                identifier=source.identifier,
+            )
+        if ext_location:
+            # If it's a function call or already has single quotes, don't add them
+            if not "(" in ext_location and not ext_location.startswith("'"):
+                ext_location = f"'{ext_location}'"
+            kwargs["external_location"] = ext_location
+
         return super().create_from_source(source, **kwargs)  # type: ignore
 
     def render(self) -> str:
