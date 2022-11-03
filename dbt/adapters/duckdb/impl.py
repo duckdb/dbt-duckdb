@@ -3,8 +3,10 @@ from typing import Optional
 from typing import Sequence
 
 from dbt.adapters.base import BaseRelation
+from dbt.adapters.base.column import Column
 from dbt.adapters.base.meta import available
 from dbt.adapters.duckdb.connections import DuckDBConnectionManager
+from dbt.adapters.duckdb.glue import create_or_update_table
 from dbt.adapters.sql import SQLAdapter
 from dbt.contracts.connection import AdapterResponse
 from dbt.exceptions import InternalException
@@ -33,6 +35,24 @@ class DuckDBAdapter(SQLAdapter):
             return True
         except RuntimeException:
             return False
+
+    @available
+    def register_glue_table(
+        self,
+        glue_database: str,
+        table: str,
+        column_list: Sequence[Column],
+        location: str,
+        file_format: str,
+    ) -> None:
+        create_or_update_table(
+            database=glue_database,
+            table=table,
+            column_list=column_list,
+            s3_path=location,
+            file_format=file_format,
+            settings=self.config.credentials.settings,
+        )
 
     @available
     def external_root(self) -> str:
