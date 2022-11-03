@@ -1,4 +1,6 @@
-from typing import List, Optional, Sequence
+from typing import List
+from typing import Optional
+from typing import Sequence
 
 from dbt.adapters.base import BaseRelation
 from dbt.adapters.base.column import Column
@@ -7,7 +9,8 @@ from dbt.adapters.duckdb.connections import DuckDBConnectionManager
 from dbt.adapters.duckdb.glue import create_or_update_table
 from dbt.adapters.sql import SQLAdapter
 from dbt.contracts.connection import AdapterResponse
-from dbt.exceptions import InternalException, RuntimeException
+from dbt.exceptions import InternalException
+from dbt.exceptions import RuntimeException
 
 
 class DuckDBAdapter(SQLAdapter):
@@ -66,9 +69,7 @@ class DuckDBAdapter(SQLAdapter):
         except InternalException:
             pass
 
-    def submit_python_job(
-        self, parsed_model: dict, compiled_code: str
-    ) -> AdapterResponse:
+    def submit_python_job(self, parsed_model: dict, compiled_code: str) -> AdapterResponse:
 
         connection = self.connections.get_if_exists()
         if not connection:
