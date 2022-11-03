@@ -308,6 +308,4 @@ class TestGlue:
             settings=None,
         )
         assert len(boto3.mock_calls) == 2
-        boto3.has_calls(
-            [call("glue"), call().get_table(DatabaseName="test", Name="test")]
-        )
+        boto3.has_calls([call("glue"), call().get_table(DatabaseName="test", Name="test")])

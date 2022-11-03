@@ -7,6 +7,7 @@ from dbt.adapters.base.column import Column
 from dbt.adapters.base.meta import available
 from dbt.adapters.duckdb.connections import DuckDBConnectionManager
 from dbt.adapters.duckdb.glue import create_or_update_table
+from dbt.adapters.duckdb.relation import DuckDBRelation
 from dbt.adapters.sql import SQLAdapter
 from dbt.contracts.connection import AdapterResponse
 from dbt.exceptions import InternalException
@@ -15,6 +16,7 @@ from dbt.exceptions import RuntimeException
 
 class DuckDBAdapter(SQLAdapter):
     ConnectionManager = DuckDBConnectionManager
+    Relation = DuckDBRelation
 
     @classmethod
     def date_function(cls) -> str:
