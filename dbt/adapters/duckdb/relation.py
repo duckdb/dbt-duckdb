@@ -24,11 +24,14 @@ class DuckDBRelation(BaseRelation):
             ext_location = source.meta["external_location"]
         elif "external_location" in source.source_meta:
             # Use str.format here to allow for some basic templating outside of Jinja
-            ext_location = source.source_meta["external_location"].format(
-                name=source.name,
-                identifier=source.identifier,
-            )
+            ext_location = source.source_meta["external_location"]
+
         if ext_location:
+            # Call str.format with the name and identifier for the source so that they
+            # can be injected into the string; this helps reduce boilerplate when all
+            # of the tables in the source have a similar location based on their name
+            # and/or identifier.
+            ext_location = ext_location.format(name=source.name, identifier=source.identifier)
             # If it's a function call or already has single quotes, don't add them
             if "(" not in ext_location and not ext_location.startswith("'"):
                 ext_location = f"'{ext_location}'"
