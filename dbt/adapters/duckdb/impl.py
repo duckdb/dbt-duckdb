@@ -1,6 +1,4 @@
-from typing import List
-from typing import Optional
-from typing import Sequence
+from typing import List, Optional, Sequence
 
 from dbt.adapters.base import BaseRelation
 from dbt.adapters.base.column import Column
@@ -9,8 +7,7 @@ from dbt.adapters.duckdb.connections import DuckDBConnectionManager
 from dbt.adapters.duckdb.glue import create_or_update_table
 from dbt.adapters.sql import SQLAdapter
 from dbt.contracts.connection import AdapterResponse
-from dbt.exceptions import InternalException
-from dbt.exceptions import RuntimeException
+from dbt.exceptions import InternalException, RuntimeException
 
 
 class DuckDBAdapter(SQLAdapter):
@@ -54,6 +51,10 @@ class DuckDBAdapter(SQLAdapter):
             settings=self.config.credentials.settings,
         )
 
+    @available
+    def external_root(self) -> str:
+        return self.config.credentials.external_root
+
     def valid_incremental_strategies(self) -> Sequence[str]:
         """DuckDB does not currently support MERGE statement."""
         return ["append", "delete+insert"]
@@ -65,7 +66,9 @@ class DuckDBAdapter(SQLAdapter):
         except InternalException:
             pass
 
-    def submit_python_job(self, parsed_model: dict, compiled_code: str) -> AdapterResponse:
+    def submit_python_job(
+        self, parsed_model: dict, compiled_code: str
+    ) -> AdapterResponse:
 
         connection = self.connections.get_if_exists()
         if not connection:
