@@ -1,7 +1,10 @@
 from dataclasses import dataclass
-from typing import Any, Optional, Type
+from typing import Any
+from typing import Optional
+from typing import Type
 
-from dbt.adapters.base.relation import BaseRelation, Self
+from dbt.adapters.base.relation import BaseRelation
+from dbt.adapters.base.relation import Self
 from dbt.contracts.graph.parsed import ParsedSourceDefinition
 
 
@@ -10,9 +13,7 @@ class DuckDBRelation(BaseRelation):
     external_location: Optional[str] = None
 
     @classmethod
-    def create_from_source(
-        cls: Type[Self], source: ParsedSourceDefinition, **kwargs: Any
-    ) -> Self:
+    def create_from_source(cls: Type[Self], source: ParsedSourceDefinition, **kwargs: Any) -> Self:
 
         # Some special handling here to allow sources that are external files to be specified
         # via a `external_location` meta field. If the source's meta field is used, we include
