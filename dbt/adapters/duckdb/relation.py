@@ -1,8 +1,11 @@
-from typing import Any, Optional, Type
 
 from dataclasses import dataclass
+from typing import Any
+from typing import Optional
+from typing import Type
 
-from dbt.adapters.base.relation import BaseRelation, Self
+from dbt.adapters.base.relation import BaseRelation
+from dbt.adapters.base.relation import Self
 from dbt.contracts.graph.parsed import ParsedSourceDefinition
 
 
