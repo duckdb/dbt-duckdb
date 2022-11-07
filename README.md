@@ -5,7 +5,7 @@ It is crazy fast and allows you to read and write data stored in CSV and Parquet
 them into the database first.
 
 [dbt](http://getdbt.com) is the best way to manage a collection of data transformations written in SQL or Python for analytics
-and data science. `dbt-duckdb` is the project that ties DuckDB and dbt together, allowing you to create a [Modern Data Stack In 
+and data science. `dbt-duckdb` is the project that ties DuckDB and dbt together, allowing you to create a [Modern Data Stack In
 A Box](https://duckdb.org/2022/10/12/modern-data-stack-in-a-box.html) or a simple and powerful data lakehouse- no Java or Scala
 required.
 
