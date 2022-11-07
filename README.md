@@ -70,7 +70,7 @@ them from the database first. In `dbt-duckdb`, we support creating models that a
 strategy:
 
 ```
-{{ config(materiaized='external', location='local/directory/file.parquet') }}
+{{ config(materialized='external', location='local/directory/file.parquet') }}
 SELECT m.*, s.id IS NOT NULL as has_source_id
 FROM {{ ref('upstream_model') }} m
 LEFT JOIN {{ source('upstream', 'source') }} s USING (id)
@@ -78,11 +78,11 @@ LEFT JOIN {{ source('upstream', 'source') }} s USING (id)
 
 | Option | Default | Description
 | :---:    |  :---:    | ---
-| location | `{{ this.identifier }}.{{ format }}` | The path to write the external materialization to. See below for more details.
+| location | `{{ identifier }}.{{ format }}` | The path to write the external materialization to. See below for more details.
 | format | parquet | The format of the external file, either `parquet` or `csv`.
 | delimiter | ,    | For CSV files, the delimiter to use for fields.
 | glue_register | false | If true, try to register the file created by this model with the AWS Glue Catalog.
-| glue_database | default | The AWS Glue database to register the model with.
+| glue_database | default | The name of the AWS Glue database to register the model with.
 
 If no `location` argument is specified, then the external file will be named after the model.sql (or model.py) file that defined it
 with an extension that matches the file format (either `.parquet` or `.csv`). By default, external materializations are created
@@ -120,9 +120,21 @@ sources:
 ```
 
 Here, the `meta` options on `external_source` defines `external_location` as an [f-string](https://peps.python.org/pep-0498/) that
-allows us to express a pattern that indicates the location of any of the tables defined for that source. When dbt compiles a model
-that references `{{ source('external_source', 'source1') }}`, the source will be rendered in the model as `'s3://my-bucket/my-sources/source1.parquet'`.
-If one of the source tables deviates from the pattern or needs some other special expression, its `external_location` can also be set on the `meta`
+allows us to express a pattern that indicates the location of any of the tables defined for that source. So a dbt model like:
+
+```
+SELECT *
+FROM {{ source('external_source', 'source1') }}
+```
+
+will be compiled as:
+
+```
+SELECT *
+FROM 's3://my-bucket/my-sources/source1.parquet'
+```
+
+If one of the source tables deviates from the pattern or needs some other special handling, then the `external_location` can also be set on the `meta`
 options for the table itself, for example:
 
 ```
