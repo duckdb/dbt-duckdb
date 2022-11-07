@@ -34,7 +34,7 @@ default:
 ````
 
 The `path` field should normally be the path to a local DuckDB file on your filesystem, but it can also be set equal to `:memory:` if you
-would like to run an in-memory only version of dbt-duckdb, just keep in mind that any models that you want to keep from the dbt run will
+would like to run an in-memory only version of dbt-duckdb. Keep in mind that any models that you want to keep from the dbt run will
 need to be persisted using one of the external materialization strategies described below.
 
 `dbt-duckdb` also supports standard profile settings including `threads` (to control how many concurrent models dbt will run at once) and
@@ -78,7 +78,7 @@ LEFT JOIN {{ source('upstream', 'source') }} s USING (id)
 
 | Option | Default | Description
 | :---:    |  :---:    | ---
-| location | `{{ identifier }}.{{ format }}` | The path to write the external materialization to. See below for more details.
+| location | `{{ name }}.{{ format }}` | The path to write the external materialization to. See below for more details.
 | format | parquet | The format of the external file, either `parquet` or `csv`.
 | delimiter | ,    | For CSV files, the delimiter to use for fields.
 | glue_register | false | If true, try to register the file created by this model with the AWS Glue Catalog.
