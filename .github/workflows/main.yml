@@ -171,7 +171,6 @@ jobs:
 
       - name: Install python dependencies
         run: |
-          pip install --user --upgrade pip
           pip install --upgrade setuptools wheel twine check-wheel-contents
           pip --version
       - name: Build distributions
@@ -213,7 +212,6 @@ jobs:
 
       - name: Install python dependencies
         run: |
-          pip install --user --upgrade pip
           pip install --upgrade wheel
           pip --version
       - uses: actions/download-artifact@v3
