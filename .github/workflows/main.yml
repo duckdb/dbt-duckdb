@@ -52,7 +52,6 @@ jobs:
 
       - name: Install python dependencies
         run: |
-          pip install --user --upgrade pip
           pip install pre-commit
           pip install mypy==0.782
           pip install -r dev-requirements.txt
