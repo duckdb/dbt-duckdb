@@ -10,8 +10,6 @@
   {%- set language = model['language'] -%}
 
   {%- set target_relation = this.incorporate(type='view') %}
-  -- check if the location exists
-  {%- set location_exists = location_exists(location) %}
 
   -- Continue as normal materialization
   {%- set existing_relation = load_cached_relation(this) -%}
