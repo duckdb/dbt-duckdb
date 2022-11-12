@@ -1,10 +1,10 @@
 {% materialization external, adapter="duckdb", supported_languages=['sql', 'python'] %}
 
-  {%- set format = config.get('format', default='parquet') -%}
-  {%- set location = config.get('location', default=external_location(format)) -%}
-  {%- set delimiter = config.get('delimiter', default=',') -%}
+  {%- set format = render(config.get('format', default='parquet')) -%}
+  {%- set location = render(config.get('location', default=external_location(format))) -%}
+  {%- set delimiter = render(config.get('delimiter', default=',')) -%}
   {%- set glue_register = config.get('glue_register', default=false) -%}
-  {%- set glue_database = config.get('glue_database', default='default') -%}
+  {%- set glue_database = render(config.get('glue_database', default='default')) -%}
 
   -- set language - python or sql
   {%- set language = model['language'] -%}
