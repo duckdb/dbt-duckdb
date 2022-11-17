@@ -8,7 +8,7 @@ from dbt.tests.adapter.python_model.test_python_model import (
     second_sql,
 )
 
-basic_python = """
+basic_python_template = """
 def model(dbt, _):
     dbt.config(
         materialized='table',
@@ -16,17 +16,37 @@ def model(dbt, _):
     df =  dbt.ref("my_sql_model")
     df2 = dbt.source('test_source', 'test_table')
     df = df.limit(2)
-    return df.df()
+    return df{extension}
 """
 
-
-class TestBasePythonModel(BasePythonModelTests):
+class TestBasePythonModelDuckDBPyRelation(BasePythonModelTests):
     @pytest.fixture(scope="class")
     def models(self):
         return {
             "schema.yml": schema_yml,
             "my_sql_model.sql": basic_sql,
-            "my_python_model.py": basic_python,
+            "my_python_model.py": basic_python_template.format(extension=""),
+            "second_sql_model.sql": second_sql,
+        }
+
+class TestBasePythonModelPandasDF(BasePythonModelTests):
+    @pytest.fixture(scope="class")
+    def models(self):
+        return {
+            "schema.yml": schema_yml,
+            "my_sql_model.sql": basic_sql,
+            "my_python_model.py": basic_python_template.format(extension=".df()"),
+            "second_sql_model.sql": second_sql,
+        }
+
+
+class TestBasePythonModelArrowTable(BasePythonModelTests):
+    @pytest.fixture(scope="class")
+    def models(self):
+        return {
+            "schema.yml": schema_yml,
+            "my_sql_model.sql": basic_sql,
+            "my_python_model.py": basic_python_template.format(extension=".arrow()"),
             "second_sql_model.sql": second_sql,
         }
 
