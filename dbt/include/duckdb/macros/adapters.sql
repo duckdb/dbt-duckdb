@@ -79,13 +79,14 @@ try:
 except ImportError:
   pyarrow_available = False
 
-if isinstance(df, duckdb.DuckDBPyRelation):
-  # convert to an Arrow table first if it's a DuckDBPyRelation
-  df = df.arrow()
+is_duckdb_relation = isinstance(df, duckdb.DuckDBPyRelation)
+if pyarrow_available and (is_duckdb_relation or isinstance(df, pyarrow.Table)):
+  if is_duckdb_relation:
+    df = df.arrow()
   con.execute('create table {{ relation.include(database=False, schema=(not temporary)) }} as select * from df')
-elif pandas_available and isinstance(df, pandas.core.frame.DataFrame):
-  con.execute('create table {{ relation.include(database=False, schema=(not temporary)) }} as select * from df')
-elif pyarrow_available and isinstance(df, pyarrow.Table):
+elif pandas_available and (is_duckdb_relation or isinstance(df, pandas.core.frame.DataFrame)):
+  if is_duckdb_relation:
+    df = df.df()
   con.execute('create table {{ relation.include(database=False, schema=(not temporary)) }} as select * from df')
 else:
   raise Exception( str(type(df)) + " is not a supported type for dbt Python materialization")
