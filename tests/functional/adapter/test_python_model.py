@@ -40,17 +40,6 @@ class TestBasePythonModelPandasDF(BasePythonModelTests):
         }
 
 
-class TestBasePythonModelArrowTable(BasePythonModelTests):
-    @pytest.fixture(scope="class")
-    def models(self):
-        return {
-            "schema.yml": schema_yml,
-            "my_sql_model.sql": basic_sql,
-            "my_python_model.py": basic_python_template.format(extension=".arrow()"),
-            "second_sql_model.sql": second_sql,
-        }
-
-
 incremental_python = """
 def model(dbt, session):
     dbt.config(materialized="incremental", unique_key='id')
