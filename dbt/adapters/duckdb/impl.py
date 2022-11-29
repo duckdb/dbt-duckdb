@@ -1,3 +1,5 @@
+import importlib.util
+import tempfile
 from typing import List
 from typing import Optional
 from typing import Sequence
@@ -86,14 +88,23 @@ class DuckDBAdapter(SQLAdapter):
             """
             return con.query(f"select * from {table_name}")
 
+        identifier = parsed_model["alias"]
+        mod_file = tempfile.NamedTemporaryFile(suffix=".py", delete=False)
+        mod_file.write(compiled_code.lstrip().encode("utf-8"))
+        mod_file.close()
         try:
-            exec(compiled_code, {}, {"load_df_function": load_df_function, "con": con})
-        except SyntaxError as err:
-            raise RuntimeException(
-                f"Python model has a syntactic error at line {err.lineno}:\n" f"{err}\n"
-            )
+            spec = importlib.util.spec_from_file_location(identifier, mod_file.name)
+            module = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(module)
+
+            # Do the actual work to run the code here
+            dbt = module.dbtObj(load_df_function)
+            df = module.model(dbt, con)
+            module.materialize(df, con)
         except Exception as err:
             raise RuntimeException(f"Python model failed:\n" f"{err}")
+        finally:
+            mod_file.close()
         return AdapterResponse(_message="OK")
 
     def get_rows_different_sql(
