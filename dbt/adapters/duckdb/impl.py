@@ -1,5 +1,5 @@
-import os
 import importlib.util
+import os
 import tempfile
 from typing import List
 from typing import Optional
@@ -95,8 +95,17 @@ class DuckDBAdapter(SQLAdapter):
         mod_file.close()
         try:
             spec = importlib.util.spec_from_file_location(identifier, mod_file.name)
+            if not spec:
+                raise RuntimeException(
+                    "Failed to load python model as module: {}".format(identifier)
+                )
             module = importlib.util.module_from_spec(spec)
-            spec.loader.exec_module(module)
+            if spec.loader:
+                spec.loader.exec_module(module)
+            else:
+                raise RuntimeException(
+                    "Python module spec is missing loader: {}".format(identifier)
+                )
 
             # Do the actual work to run the code here
             dbt = module.dbtObj(load_df_function)
