@@ -1,3 +1,4 @@
+import os
 import importlib.util
 import tempfile
 from typing import List
@@ -104,7 +105,7 @@ class DuckDBAdapter(SQLAdapter):
         except Exception as err:
             raise RuntimeException(f"Python model failed:\n" f"{err}")
         finally:
-            mod_file.close()
+            os.unlink(mod_file.name)
         return AdapterResponse(_message="OK")
 
     def get_rows_different_sql(
