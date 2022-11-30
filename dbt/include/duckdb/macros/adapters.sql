@@ -47,50 +47,37 @@
 {% endmacro %}
 
 {% macro py_write_table(temporary, relation, compiled_code) -%}
-# MODEL ----------
 {{ compiled_code }}
 
-extend_globals = {
-  "config": config,
-  "this": this,
-  "ref": ref,
-  "source": source
-}
+def materialize(df, con):
+    # For the DuckDBPyRelation checks
+    import duckdb
 
-globals().update(extend_globals)
+    # make sure pandas exists before using it
+    try:
+        import pandas
+        pandas_available = True
+    except ImportError:
+        pandas_available = False
 
-dbt = dbtObj(load_df_function)
-df = model(dbt, con)
+    # make sure pyarrow exists before using it
+    try:
+        import pyarrow
+        pyarrow_available = True
+    except ImportError:
+        pyarrow_available = False
 
-# For the DuckDBPyRelation checks
-import duckdb
+    if isinstance(df, duckdb.DuckDBPyRelation):
+        if pandas_available:
+            df = df.df()
+        elif pyarrow_available:
+            df = df.arrow()
+        else:
+            raise Exception("No pandas or pyarrow available to materialize DuckDBPyRelation")
+    elif not (isinstance(df, pandas.DataFrame) or isinstance(df, pyarrow.Table)):
+        raise Exception( str(type(df)) + " is not a supported type for dbt Python materialization")
 
-# make sure pandas exists before using it
-try:
-  import pandas
-  pandas_available = True
-except ImportError:
-  pandas_available = False
-
-# make sure pyarrow exists before using it
-try:
-  import pyarrow
-  pyarrow_available = True
-except ImportError:
-  pyarrow_available = False
-
-is_duckdb_relation = isinstance(df, duckdb.DuckDBPyRelation)
-if pandas_available and (is_duckdb_relation or isinstance(df, pandas.core.frame.DataFrame)):
-  if is_duckdb_relation:
-    df = df.df()
-  con.execute('create table {{ relation.include(database=False, schema=(not temporary)) }} as select * from df')
-elif pyarrow_available and (is_duckdb_relation or isinstance(df, pyarrow.Table)):
-  if is_duckdb_relation:
-    df = df.arrow()
-  con.execute('create table {{ relation.include(database=False, schema=(not temporary)) }} as select * from df')
-else:
-  raise Exception( str(type(df)) + " is not a supported type for dbt Python materialization")
-
+    con.execute('create table {{ relation.include(database=False) }} as select * from df')
 {% endmacro %}
 
 {% macro duckdb__create_view_as(relation, sql) -%}

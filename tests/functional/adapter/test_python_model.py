@@ -9,15 +9,19 @@ from dbt.tests.adapter.python_model.test_python_model import (
 )
 
 basic_python_template = """
+import pandas as pd
+
 def model(dbt, _):
     dbt.config(
         materialized='table',
     )
+    pdf = pd.DataFrame()
     df =  dbt.ref("my_sql_model")
     df2 = dbt.source('test_source', 'test_table')
     df = df.limit(2)
     return df{extension}
 """
+
 
 class TestBasePythonModelDuckDBPyRelation(BasePythonModelTests):
     @pytest.fixture(scope="class")
@@ -28,6 +32,7 @@ class TestBasePythonModelDuckDBPyRelation(BasePythonModelTests):
             "my_python_model.py": basic_python_template.format(extension=""),
             "second_sql_model.sql": second_sql,
         }
+
 
 class TestBasePythonModelPandasDF(BasePythonModelTests):
     @pytest.fixture(scope="class")
