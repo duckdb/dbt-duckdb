@@ -5,6 +5,8 @@ from typing import List
 from typing import Optional
 from typing import Sequence
 
+import agate
+
 from dbt.adapters.base import BaseRelation
 from dbt.adapters.base.column import Column
 from dbt.adapters.base.meta import available
@@ -28,6 +30,21 @@ class DuckDBAdapter(SQLAdapter):
     @classmethod
     def is_cancelable(cls) -> bool:
         return False
+
+    @available
+    def convert_datetimes_to_strs(self, table: agate.Table) -> agate.Table:
+        for column in table.columns:
+            if isinstance(column.data_type, agate.DateTime):
+                table = table.compute(
+                    [
+                        (
+                            column.name,
+                            agate.Formula(agate.Text(), lambda row: str(row[column.name])),
+                        )
+                    ],
+                    replace=True,
+                )
+        return table
 
     @available
     def location_exists(self, location: str) -> bool:
