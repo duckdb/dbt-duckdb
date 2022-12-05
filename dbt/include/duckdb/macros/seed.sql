@@ -1,4 +1,5 @@
 {% macro duckdb_load_csv_rows(model, batch_size, agate_table) %}
+    {% set agate_table = adapter.convert_datetimes_to_strs(agate_table) %}
     {% set cols_sql = get_seed_column_quoted_csv(model, agate_table.column_names) %}
     {% set bindings = [] %}
 
