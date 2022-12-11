@@ -1,18 +1,15 @@
 {% macro duckdb__listagg(measure, delimiter_text, order_by_clause, limit_num) -%}
-
     {% if limit_num -%}
-        regexp_replace(
-          trim(cast(
-            (array_agg(
-              {{ measure }}
-              {% if order_by_clause -%}
-              {{ order_by_clause }}
-              {%- endif %}
-            )[1:{{ limit_num }}])
-            as string), '[]'),
-        ', ',
-        {{ delimiter_text }},
-        'g')
+    list_aggr(
+        (array_agg(
+            {{ measure }}
+            {% if order_by_clause -%}
+            {{ order_by_clause }}
+            {%- endif %}
+        ))[1:{{ limit_num }}],
+        'string_agg',
+        {{ delimiter_text }}
+        )
     {%- else %}
     string_agg(
         {{ measure }},
@@ -22,5 +19,4 @@
         {%- endif %}
         )
     {%- endif %}
-
 {%- endmacro %}
