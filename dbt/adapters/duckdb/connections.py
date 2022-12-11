@@ -25,6 +25,9 @@ class DuckDBCredentials(Credentials):
     schema: str = "main"
     path: str = ":memory:"
 
+    host: Optional[str] = None
+    port: Optional[int] = None
+
     # any extensions we want to install and load (httpfs, parquet, etc.)
     extensions: Optional[Tuple[str, ...]] = None
 
@@ -101,30 +104,46 @@ class DuckDBConnectionManager(SQLConnectionManager):
             return connection
 
         credentials = cls.get_credentials(connection.credentials)
-        with cls.LOCK:
-            try:
-                if not cls.CONN:
-                    cls.CONN = duckdb.connect(credentials.path, read_only=False)
+        if credentials.host:
+            import psycopg2
 
-                    # install any extensions on the connection
-                    if credentials.extensions is not None:
-                        for extension in credentials.extensions:
-                            cls.CONN.execute(f"INSTALL '{extension}'")
+            connection.handle = psycopg2.connect(
+                dbname=credentials.database,
+                host=credentials.host,
+                port=credentials.port,
+            )
+            cursor = connection.handle.cursor()
+            for ext in credentials.extensions or []:
+                cursor.execute(f"LOAD '{ext}'")
+                for key, value in (credentials.settings or {}).items():
+                    # Okay to set these as strings because DuckDB will cast them
+                    # to the correct type
+                    cursor.execute(f"SET {key} = '{value}'")
+            cursor.close()
+        else:
+            with cls.LOCK:
+                try:
+                    if not cls.CONN:
+                        cls.CONN = duckdb.connect(credentials.path, read_only=False)
 
-                connection.handle = DuckDBConnectionWrapper(cls.CONN.cursor(), credentials)
-                connection.state = ConnectionState.OPEN
-                cls.CONN_COUNT += 1
+                        # install any extensions on the connection
+                        if credentials.extensions is not None:
+                            for extension in credentials.extensions:
+                                cls.CONN.execute(f"INSTALL '{extension}'")
 
-            except RuntimeError as e:
-                logger.debug(
-                    "Got an error when attempting to open a duckdb " "database: '{}'".format(e)
-                )
+                    connection.handle = DuckDBConnectionWrapper(cls.CONN.cursor(), credentials)
+                    connection.state = ConnectionState.OPEN
+                    cls.CONN_COUNT += 1
 
-                connection.handle = None
-                connection.state = ConnectionState.FAIL
+                except RuntimeError as e:
+                    logger.debug(
+                        "Got an error when attempting to open a duckdb " "database: '{}'".format(e)
+                    )
+                    connection.handle = None
+                    connection.state = ConnectionState.FAIL
+                    raise dbt.exceptions.FailedToConnectException(str(e))
 
-                raise dbt.exceptions.FailedToConnectException(str(e))
-            return connection
+        return connection
 
     @classmethod
     def close(cls, connection: Connection) -> Connection:
@@ -133,15 +152,14 @@ class DuckDBConnectionManager(SQLConnectionManager):
             return connection
 
         connection = super(SQLConnectionManager, cls).close(connection)
-
         if connection.state == ConnectionState.CLOSED:
             credentials = cls.get_credentials(connection.credentials)
-            with cls.LOCK:
-                cls.CONN_COUNT -= 1
-                if cls.CONN_COUNT == 0 and cls.CONN and not credentials.path == ":memory:":
-                    cls.CONN.close()
-                    cls.CONN = None
-
+            if not credentials.host:
+                with cls.LOCK:
+                    cls.CONN_COUNT -= 1
+                    if cls.CONN_COUNT == 0 and cls.CONN and not credentials.path == ":memory:":
+                        cls.CONN.close()
+                        cls.CONN = None
         return connection
 
     def cancel(self, connection):

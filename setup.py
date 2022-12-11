@@ -42,5 +42,6 @@ setup(
     ],
     extras_require={
         "glue": ["boto3", "mypy-boto3-glue"],
+        "server": ["psycopg2"],
     },
 )
