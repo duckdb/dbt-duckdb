@@ -47,6 +47,13 @@ class DuckDBAdapter(SQLAdapter):
         return table
 
     @available
+    def paramformat(self):
+        if self.config.credentials.host:
+            return "%s"
+        else:
+            return "?"
+
+    @available
     def location_exists(self, location: str) -> bool:
         try:
             self.execute(

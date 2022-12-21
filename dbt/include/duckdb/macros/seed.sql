@@ -16,7 +16,7 @@
             insert into {{ this.render() }} ({{ cols_sql }}) values
             {% for row in chunk -%}
                 ({%- for column in agate_table.column_names -%}
-                    ?
+                    {{ adapter.paramformat() }}
                     {%- if not loop.last%},{%- endif %}
                 {%- endfor -%})
                 {%- if not loop.last%},{%- endif %}

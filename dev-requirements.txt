@@ -16,6 +16,7 @@ ipdb
 mypy==0.991
 pip-tools
 pre-commit
+psycopg2-binary
 pytest
 pytest-dotenv
 pytest-logbook
