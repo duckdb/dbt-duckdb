@@ -1,4 +1,14 @@
-{% macro duckdb_load_csv_rows(model, batch_size, agate_table) %}
+
+{% macro duckdb__get_binding_char() %}
+  {{ return('?') }}
+{% endmacro %}
+
+{% macro duckdb__get_batch_size() %}
+  {{ return(10000) }}
+{% endmacro %}
+
+{% macro duckdb__load_csv_rows(model, agate_table) %}
+    {% set batch_size = get_batch_size() %}
     {% set agate_table = adapter.convert_datetimes_to_strs(agate_table) %}
     {% set cols_sql = get_seed_column_quoted_csv(model, agate_table.column_names) %}
     {% set bindings = [] %}
@@ -16,7 +26,7 @@
             insert into {{ this.render() }} ({{ cols_sql }}) values
             {% for row in chunk -%}
                 ({%- for column in agate_table.column_names -%}
-                    ?
+                    {{ get_binding_char() }}
                     {%- if not loop.last%},{%- endif %}
                 {%- endfor -%})
                 {%- if not loop.last%},{%- endif %}
@@ -32,9 +42,4 @@
 
     {# Return SQL so we can render it out into the compiled files #}
     {{ return(statements[0]) }}
-{% endmacro %}
-
-
-{% macro duckdb__load_csv_rows(model, agate_table) %}
-  {{ return(duckdb_load_csv_rows(model, 10000, agate_table) )}}
 {% endmacro %}
