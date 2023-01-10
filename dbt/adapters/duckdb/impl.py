@@ -96,7 +96,7 @@ class DuckDBAdapter(SQLAdapter):
         connection = self.connections.get_if_exists()
         if not connection:
             connection = self.connections.get_thread_connection()
-        con = connection.handle._conn
+        con = connection.handle.cursor()
 
         def load_df_function(table_name: str):
             """
