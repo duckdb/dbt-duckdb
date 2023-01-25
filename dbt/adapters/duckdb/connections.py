@@ -61,7 +61,7 @@ class DuckDBCursorWrapper:
             else:
                 return self._cursor.execute(sql, bindings)
         except RuntimeError as e:
-            raise dbt.exceptions.RuntimeException(str(e))
+            raise dbt.exceptions.DbtRuntimeError(str(e))
 
 
 class DuckDBConnectionWrapper:
@@ -123,7 +123,7 @@ class DuckDBConnectionManager(SQLConnectionManager):
                 connection.handle = None
                 connection.state = ConnectionState.FAIL
 
-                raise dbt.exceptions.FailedToConnectException(str(e))
+                raise dbt.exceptions.FailedToConnectError(str(e))
             return connection
 
     @classmethod
@@ -151,14 +151,14 @@ class DuckDBConnectionManager(SQLConnectionManager):
     def exception_handler(self, sql: str, connection_name="master"):
         try:
             yield
-        except dbt.exceptions.RuntimeException:
+        except dbt.exceptions.DbtRuntimeError:
             raise
         except RuntimeError as e:
             logger.debug("duckdb error: {}".format(str(e)))
         except Exception as exc:
             logger.debug("Error running SQL: {}".format(sql))
             logger.debug("Rolling back transaction.")
-            raise dbt.exceptions.RuntimeException(str(exc)) from exc
+            raise dbt.exceptions.DbtRuntimeError(str(exc)) from exc
 
     @classmethod
     def get_credentials(cls, credentials):

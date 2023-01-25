@@ -15,8 +15,8 @@ from dbt.adapters.duckdb.glue import create_or_update_table
 from dbt.adapters.duckdb.relation import DuckDBRelation
 from dbt.adapters.sql import SQLAdapter
 from dbt.contracts.connection import AdapterResponse
-from dbt.exceptions import InternalException
-from dbt.exceptions import RuntimeException
+from dbt.exceptions import DbtInternalError
+from dbt.exceptions import DbtRuntimeError
 
 
 class DuckDBAdapter(SQLAdapter):
@@ -55,7 +55,7 @@ class DuckDBAdapter(SQLAdapter):
                 fetch=False,
             )
             return True
-        except RuntimeException:
+        except DbtRuntimeError:
             return False
 
     @available
@@ -88,7 +88,7 @@ class DuckDBAdapter(SQLAdapter):
         """This is just a quick-fix. Python models do not execute begin function so the transaction_open is always false."""
         try:
             self.connections.commit_if_has_connection()
-        except InternalException:
+        except DbtInternalError:
             pass
 
     def submit_python_job(self, parsed_model: dict, compiled_code: str) -> AdapterResponse:
@@ -113,14 +113,14 @@ class DuckDBAdapter(SQLAdapter):
         try:
             spec = importlib.util.spec_from_file_location(identifier, mod_file.name)
             if not spec:
-                raise RuntimeException(
+                raise DbtRuntimeError(
                     "Failed to load python model as module: {}".format(identifier)
                 )
             module = importlib.util.module_from_spec(spec)
             if spec.loader:
                 spec.loader.exec_module(module)
             else:
-                raise RuntimeException(
+                raise DbtRuntimeError(
                     "Python module spec is missing loader: {}".format(identifier)
                 )
 
@@ -129,7 +129,7 @@ class DuckDBAdapter(SQLAdapter):
             df = module.model(dbt, con)
             module.materialize(df, con)
         except Exception as err:
-            raise RuntimeException(f"Python model failed:\n" f"{err}")
+            raise DbtRuntimeError(f"Python model failed:\n" f"{err}")
         finally:
             os.unlink(mod_file.name)
         return AdapterResponse(_message="OK")
