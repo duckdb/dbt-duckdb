@@ -1,3 +1,3 @@
-{%- macro external_location(format) -%}
-  {{- adapter.external_root() }}/{{ this.identifier }}.{{ format }}
+{%- macro external_location(relation, format) -%}
+  {{- adapter.external_root() }}/{{ relation.identifier }}.{{ format }}
 {%- endmacro -%}

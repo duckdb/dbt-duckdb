@@ -1,7 +1,7 @@
 {% materialization external, adapter="duckdb", supported_languages=['sql', 'python'] %}
 
   {%- set format = render(config.get('format', default='parquet')) -%}
-  {%- set location = render(config.get('location', default=external_location(format))) -%}
+  {%- set location = render(config.get('location', default=external_location(this, format))) -%}
   {%- set delimiter = render(config.get('delimiter', default=',')) -%}
   {%- set glue_register = config.get('glue_register', default=false) -%}
   {%- set glue_database = render(config.get('glue_database', default='default')) -%}
@@ -34,6 +34,9 @@
   {{ drop_relation_if_exists(preexisting_intermediate_relation) }}
   {{ drop_relation_if_exists(preexisting_temp_relation) }}
   {{ drop_relation_if_exists(preexisting_backup_relation) }}
+
+  -- Register upstream external materialized models as views
+  {%- do register_external_upstream() -%}
 
   {{ run_hooks(pre_hooks, inside_transaction=False) }}
 
