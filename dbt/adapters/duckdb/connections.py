@@ -38,6 +38,9 @@ class DuckDBCredentials(Credentials):
     # in this dbt project; defaults to "." (the current working directory)
     external_root: str = "."
 
+    # identify whether to use the credential provider chain for AWS/Gcloud instead of static environment variables
+    use_credential_provider_chain: str = ""
+
     @property
     def type(self):
         return "duckdb"
@@ -72,7 +75,16 @@ class DuckDBConnectionWrapper:
         cursor = conn.cursor()
         for ext in credentials.extensions or []:
             cursor.execute(f"LOAD '{ext}'")
-        for key, value in (credentials.settings or {}).items():
+
+        all_connection_settings = credentials.settings or {}
+
+        if credentials.use_credential_provider_chain == 'aws':
+            logger.debug('fetch aws credentials using credential provider chain')
+            from dbt.adapters.duckdb.aws_session import get_credentials_from_context
+            aws_credentials = get_credentials_from_context()
+            all_connection_settings.update(aws_credentials)
+
+        for key, value in all_connection_settings.items():
             # Okay to set these as strings because DuckDB will cast them
             # to the correct type
             cursor.execute(f"SET {key} = '{value}'")
