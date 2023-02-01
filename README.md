@@ -63,6 +63,13 @@ default:
   target: dev
 ```
 
+#### Fetching credentials from context
+
+Instead of specifying the credentials through the settings block, you can also use the `use_credential_provider` property.
+If you set this to `aws` (currently the only supported implementation) and you have boto3 installed in your python environment, 
+we will fetch your AWS credentials using the credential provider chain as described [here](https://boto3.amazonaws.com/v1/documentation/api/latest/guide/credentials.html).
+This means you can use any supported mechanism of AWS to obtain credentials (e.g. web identity tokens).
+
 ### External Materializations and Sources
 
 One of DuckDB's most powerful features is its ability to read and write CSV and Parquet files directly, without needing to import/export
