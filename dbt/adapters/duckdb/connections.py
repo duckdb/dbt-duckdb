@@ -10,6 +10,7 @@ from typing import Tuple
 import duckdb
 
 import dbt.exceptions
+from dbt.adapters.duckdb.credentials.s3_credential_provider import get_s3_credentials
 from dbt.adapters.base import Credentials
 from dbt.adapters.sql import SQLConnectionManager
 from dbt.contracts.connection import AdapterRequiredConfig
@@ -76,15 +77,9 @@ class DuckDBConnectionWrapper:
         for ext in credentials.extensions or []:
             cursor.execute(f"LOAD '{ext}'")
 
-        all_connection_settings = credentials.settings or {}
+        connection_settings = get_s3_credentials(credentials)
 
-        if credentials.use_credential_provider != '':
-            logger.debug('fetch credentials using specified credential provider')
-            from dbt.adapters.duckdb.credential_provider import get_credentials_from_context
-            provider_credentials = get_credentials_from_context(credentials.use_credential_provider)
-            all_connection_settings.update(provider_credentials)
-
-        for key, value in all_connection_settings.items():
+        for key, value in connection_settings.to_dict().items():
             # Okay to set these as strings because DuckDB will cast them
             # to the correct type
             cursor.execute(f"SET {key} = '{value}'")
