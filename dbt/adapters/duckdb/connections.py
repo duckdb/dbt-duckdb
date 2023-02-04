@@ -10,7 +10,6 @@ from typing import Tuple
 import duckdb
 
 import dbt.exceptions
-
 from dbt.adapters.base import Credentials
 from dbt.adapters.sql import SQLConnectionManager
 from dbt.contracts.connection import AdapterRequiredConfig
