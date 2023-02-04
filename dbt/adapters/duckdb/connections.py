@@ -10,6 +10,7 @@ from typing import Tuple
 import duckdb
 
 import dbt.exceptions
+
 from dbt.adapters.base import Credentials
 from dbt.adapters.sql import SQLConnectionManager
 from dbt.contracts.connection import AdapterRequiredConfig
@@ -38,12 +39,41 @@ class DuckDBCredentials(Credentials):
     # in this dbt project; defaults to "." (the current working directory)
     external_root: str = "."
 
+    # identify whether to use the default credential provider chain for AWS/GCloud
+    # instead of statically defined environment variables
+    use_credential_provider: Optional[str] = None
+
     @property
     def type(self):
         return "duckdb"
 
     def _connection_keys(self):
         return ("database", "schema", "path")
+
+    def load_settings(self) -> Dict[str, str]:
+        settings = self.settings or {}
+        if self.use_credential_provider:
+            if self.use_credential_provider == "aws":
+                settings.update(_load_aws_credentials())
+            else:
+                raise ValueError(
+                    "Unsupported value for use_credential_provider: "
+                    + self.use_credential_provider
+                )
+        return settings
+
+
+def _load_aws_credentials() -> Dict[str, Any]:
+    import boto3.session
+
+    session = boto3.session.Session()
+    aws_creds = session.get_credentials().get_frozen_credentials()
+    return {
+        "s3_access_key_id": aws_creds.access_key,
+        "s3_secret_access_key": aws_creds.secret_key,
+        "s3_session_token": aws_creds.token,
+        "s3_region": session.region,
+    }
 
 
 class DuckDBCursorWrapper:
@@ -72,7 +102,7 @@ class DuckDBConnectionWrapper:
         cursor = conn.cursor()
         for ext in credentials.extensions or []:
             cursor.execute(f"LOAD '{ext}'")
-        for key, value in (credentials.settings or {}).items():
+        for key, value in credentials.load_settings().items():
             # Okay to set these as strings because DuckDB will cast them
             # to the correct type
             cursor.execute(f"SET {key} = '{value}'")
