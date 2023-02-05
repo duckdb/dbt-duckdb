@@ -66,6 +66,13 @@ def _load_aws_credentials() -> Dict[str, Any]:
     import boto3.session
 
     session = boto3.session.Session()
+
+    # use STS to verify that the credentials are valid; we will
+    # raise a helpful error here if they are not
+    sts = session.client("sts")
+    sts.get_caller_identity()
+
+    # now extract/return them
     aws_creds = session.get_credentials().get_frozen_credentials()
     return {
         "s3_access_key_id": aws_creds.access_key,
