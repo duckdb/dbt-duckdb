@@ -78,7 +78,7 @@ def _load_aws_credentials() -> Dict[str, Any]:
         "s3_access_key_id": aws_creds.access_key,
         "s3_secret_access_key": aws_creds.secret_key,
         "s3_session_token": aws_creds.token,
-        "s3_region": session.region,
+        "s3_region": session.region_name,
     }
 
 
