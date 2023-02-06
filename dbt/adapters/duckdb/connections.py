@@ -1,7 +1,9 @@
 import atexit
 import threading
+import time
 from contextlib import contextmanager
 from dataclasses import dataclass
+from functools import lru_cache
 from typing import Any
 from typing import Dict
 from typing import Optional
@@ -53,7 +55,7 @@ class DuckDBCredentials(Credentials):
         settings = self.settings or {}
         if self.use_credential_provider:
             if self.use_credential_provider == "aws":
-                settings.update(_load_aws_credentials())
+                settings.update(_load_aws_credentials(ttl=_get_ttl_hash()))
             else:
                 raise ValueError(
                     "Unsupported value for use_credential_provider: "
@@ -62,7 +64,14 @@ class DuckDBCredentials(Credentials):
         return settings
 
 
-def _load_aws_credentials() -> Dict[str, Any]:
+def _get_ttl_hash(seconds=300):
+    """Return the same value withing `seconds` time period"""
+    return round(time.time() / seconds)
+
+
+@lru_cache()
+def _load_aws_credentials(ttl=None) -> Dict[str, Any]:
+    del ttl  # make mypy happy
     import boto3.session
 
     session = boto3.session.Session()
