@@ -78,18 +78,13 @@ def model(dbt, con):
 """
 
 
-# class must begin with 'Test'
 class TestEmptyPythonModel:
     """
-    This test ensures that Python models are created with the correct schema even when empty.
-
-    Pandas dataframes are not strongly typed. DuckDB uses inference for strings (objects) 
-    to determine the actual types when converting from Pandas. For an empty dataframe this 
-    will incorrectly result in the default (INTEGER) type. Previously, Python models by 
-    default were materialized using Pandas dataframes, so this test ensures `pyarrow` is the 
-    first choice for materialization.
+    This test ensures that Python models returning a DuckDBPyRelation are materialized
+    with the correct schema, even when empty. I.e. ensure pyarrow is being used instead
+    of pandas.
     """
-    
+
     @pytest.fixture(scope="class")
     def models(self):
         return {
@@ -105,4 +100,4 @@ class TestEmptyPythonModel:
             """,
             fetch="all",
         )
-        assert result == [('a', 'VARCHAR'), ('b', 'BOOLEAN')]
+        assert result == [("a", "VARCHAR"), ("b", "BOOLEAN")]
