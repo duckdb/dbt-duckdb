@@ -35,9 +35,6 @@
   {{ drop_relation_if_exists(preexisting_temp_relation) }}
   {{ drop_relation_if_exists(preexisting_backup_relation) }}
 
-  -- Register upstream external materialized models as views
-  {%- do register_external_upstream() -%}
-
   {{ run_hooks(pre_hooks, inside_transaction=False) }}
 
   -- `BEGIN` happens here:
