@@ -8,11 +8,13 @@ from typing import Any
 from typing import Dict
 from typing import Optional
 from typing import Tuple
+from typing import Union
 
 import duckdb
 
 import dbt.exceptions
 from dbt.adapters.base import Credentials
+from dbt.adapters.duckdb.extension import ExtensionFactory
 from dbt.adapters.sql import SQLConnectionManager
 from dbt.contracts.connection import AdapterRequiredConfig
 from dbt.contracts.connection import AdapterResponse
@@ -28,7 +30,7 @@ class DuckDBCredentials(Credentials):
     path: str = ":memory:"
 
     # any extensions we want to install and load (httpfs, parquet, etc.)
-    extensions: Optional[Tuple[str, ...]] = None
+    extensions: Optional[Tuple[Union[str, Dict[str, Dict[str, str]]], ...]] = None
 
     # any additional pragmas we want to configure on our DuckDB connections;
     # a list of the built-in pragmas can be found here:
@@ -116,7 +118,9 @@ class DuckDBConnectionWrapper:
         # Extensions/settings need to be configured per cursor
         cursor = conn.cursor()
         for ext in credentials.extensions or []:
-            cursor.execute(f"LOAD '{ext}'")
+            extension = ExtensionFactory.register_extension(extension_info=ext, connection=cursor)
+            extension.load()
+            extension.configure()
         for key, value in credentials.load_settings().items():
             # Okay to set these as strings because DuckDB will cast them
             # to the correct type
@@ -154,7 +158,10 @@ class DuckDBConnectionManager(SQLConnectionManager):
                     # install any extensions on the connection
                     if credentials.extensions is not None:
                         for extension in credentials.extensions:
-                            cls.CONN.execute(f"INSTALL '{extension}'")
+                            extension = ExtensionFactory.register_extension(
+                                extension_info=extension, connection=cls.CONN
+                            )
+                            extension.install()
 
                 connection.handle = DuckDBConnectionWrapper(cls.CONN.cursor(), credentials)
                 connection.state = ConnectionState.OPEN
