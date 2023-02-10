@@ -7,6 +7,7 @@ from dbt.tests.adapter.python_model.test_python_model import (
     schema_yml,
     second_sql,
 )
+from dbt.tests.util import run_dbt
 
 basic_python_template = """
 import pandas as pd
@@ -64,3 +65,44 @@ class TestBasePythonIncremental(BasePythonIncrementalTests):
     @pytest.fixture(scope="class")
     def models(self):
         return {"m_1.sql": m_1, "incremental.py": incremental_python}
+
+
+empty_upstream_model_python = """
+import duckdb
+
+def model(dbt, con):
+    dbt.config(
+        materialized='table',
+    )
+    return con.query("select 'a'::varchar as a, 0::boolean as b limit 0")
+"""
+
+
+# class must begin with 'Test'
+class TestEmptyPythonModel:
+    """
+    This test ensures that Python models are created with the correct schema even when empty.
+
+    Pandas dataframes are not strongly typed. DuckDB uses inference for strings (objects) 
+    to determine the actual types when converting from Pandas. For an empty dataframe this 
+    will incorrectly result in the default (INTEGER) type. Previously, Python models by 
+    default were materialized using Pandas dataframes, so this test ensures `pyarrow` is the 
+    first choice for materialization.
+    """
+    
+    @pytest.fixture(scope="class")
+    def models(self):
+        return {
+            "upstream_model.py": empty_upstream_model_python,
+        }
+
+    def test_run(self, project):
+        run_dbt(["run"])
+        result = project.run_sql(
+            f"""
+            select column_name, data_type from information_schema.columns 
+            where table_name='upstream_model' order by column_name
+            """,
+            fetch="all",
+        )
+        assert result == [('a', 'VARCHAR'), ('b', 'BOOLEAN')]
