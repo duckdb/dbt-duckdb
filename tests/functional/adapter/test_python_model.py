@@ -68,8 +68,6 @@ class TestBasePythonIncremental(BasePythonIncrementalTests):
 
 
 empty_upstream_model_python = """
-import duckdb
-
 def model(dbt, con):
     dbt.config(
         materialized='table',
