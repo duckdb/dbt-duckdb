@@ -49,7 +49,7 @@ class DuckDBCredentials(Credentials):
     def __pre_deserialize__(cls, data: Dict[Any, Any]) -> Dict[Any, Any]:
         data = super().__pre_deserialize__(data)
         path = data["path"]
-        if duckdb.__version__ >= '0.7.0':
+        if duckdb.__version__ >= "0.7.0":
             if path == ":memory:":
                 data["database"] = "memory"
             else:
