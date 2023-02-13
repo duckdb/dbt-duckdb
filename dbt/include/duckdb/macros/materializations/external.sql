@@ -50,12 +50,8 @@
 
   -- write an temp relation into file
   {{ write_to_file(temp_relation, location, format, delimiter) }}
-  -- create a view on top of the location
-  {% call statement('main', language='sql') -%}
-    create or replace view {{ intermediate_relation.include(database=False) }} as (
-        select * from '{{ location }}'
-    );
-  {%- endcall %}
+
+  {{ create_external_relation(intermediate_relation, location) }}
 
   -- cleanup
   {% if existing_relation is not none %}

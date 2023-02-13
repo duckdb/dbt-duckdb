@@ -214,3 +214,11 @@ def materialize(df, con):
     {% do adapter.register_glue_table(glue_database, relation.identifier, column_list, location, format) %}
   {% endif %}
 {% endmacro %}
+
+{% macro create_external_relation(relation, location, stmt='main') %}
+  {% call statement(stmt, auto_begin=(stmt == 'main')) -%}
+    create or replace view {{ relation.include(database=False) }} as (
+      select * from '{{ location }}'
+    )
+  {%- endcall %}
+{% endmacro %}

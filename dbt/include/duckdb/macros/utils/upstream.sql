@@ -9,15 +9,11 @@
         identifier=upstream['alias']
       ) -%}
       {%- if upstream.config.materialized=='external' and not load_cached_relation(upstream_rel) -%}
-        {%- set format = render(upstream.config.get('format', 'parquet')) -%}
-        {%- set upstream_location = render(
+          {%- set format = render(upstream.config.get('format', 'parquet')) -%}
+          {%- set upstream_location = render(
             upstream.config.get('location', external_location(upstream_rel, format)))
-        -%}
-        {% call statement('main', language='sql') -%}
-          create or replace view {{ upstream_rel.include(database=False) }} as (
-            select * from '{{ upstream_location }}'
-          );
-        {%- endcall %}
+          -%}
+          {{ adapter.create_external_upstream_relation(upstream_rel, upstream_location) }}
       {%- endif %}
     {% endif %}
   {% endfor %}

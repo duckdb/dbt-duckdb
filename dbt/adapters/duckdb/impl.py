@@ -1,6 +1,9 @@
 import importlib.util
 import os
 import tempfile
+import threading
+from typing import Any
+from typing import Dict
 from typing import List
 from typing import Optional
 from typing import Sequence
@@ -17,6 +20,8 @@ from dbt.adapters.sql import SQLAdapter
 from dbt.contracts.connection import AdapterResponse
 from dbt.exceptions import DbtInternalError
 from dbt.exceptions import DbtRuntimeError
+
+_EXTERNAL_UPSTREAM_LOCK = threading.Lock()
 
 
 class DuckDBAdapter(SQLAdapter):
@@ -79,6 +84,13 @@ class DuckDBAdapter(SQLAdapter):
     @available
     def external_root(self) -> str:
         return self.config.credentials.external_root
+
+    @available
+    def create_external_upstream_relation(self, rel: Relation, location: str):
+        with _EXTERNAL_UPSTREAM_LOCK:
+            if not self.get_relation(rel.database, rel.schema, rel.identifier):
+                kwargs = {"relation": rel, "location": location, "stmt": "external"}
+                self.execute_macro("create_external_relation", kwargs=kwargs)
 
     def valid_incremental_strategies(self) -> Sequence[str]:
         """DuckDB does not currently support MERGE statement."""
