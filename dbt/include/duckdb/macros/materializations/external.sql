@@ -3,7 +3,7 @@
   {%- set format = render(config.get('format', default='parquet')) -%}
   {%- set location = render(config.get('location', default=external_location(this, format))) -%}
   {%- set delimiter = render(config.get('delimiter', default=',')) -%}
-  {%- set partition_by = render(config.get("partition_by")) -%}
+  {%- set partition_by = render(config.get("partition_by", default='')) -%}
   {%- set glue_register = config.get('glue_register', default=false) -%}
   {%- set glue_database = render(config.get('glue_database', default='default')) -%}
 
@@ -48,10 +48,22 @@
 
   -- write an temp relation into file
   {{ write_to_file(temp_relation, location, format, delimiter, partition_by) }}
+
+  {% if partition_by|length %}
+    {% set cols = partition_by.split(",") %}
+    {% if format == 'parquet' %}
+      {% set rel_location = "read_parquet('" ~ location ~ "/*/*/*.parquet')" %}
+    {% else %}
+      {% set rel_location = "read_csv_auto('" ~ location ~ "/**/*.csv')" %}
+    {% endif %}
+  {% else %}
+    {% set rel_location -%}'{{ location }}'{%- endset %}
+  {% endif %}
+
   -- create a view on top of the location
   {% call statement('main', language='sql') -%}
     create or replace view {{ intermediate_relation.include(database=adapter.use_database()) }} as (
-        select * from '{{ location }}'
+        select * from {{ rel_location }}
     );
   {%- endcall %}
 

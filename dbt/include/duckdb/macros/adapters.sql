@@ -188,13 +188,6 @@ def materialize(df, con):
   {% do return(adapter.location_exists(location)) %}
 {% endmacro %}
 
-{% macro is_list(var) -%}
-  {% if var is iterable and (var is not string and var is not mapping) %}
-    {% do return(true) %}
-  {% endif %}
-  {% do return(false) %}
-{% endmacro %}
-
 {% macro write_to_file(relation, location, format, delimiter, partition_by) -%}
 
   {% if format == 'parquet' %}
@@ -207,12 +200,9 @@ def materialize(df, con):
       {% do exceptions.raise_compiler_error("%s external format is not supported!" % format) %}
   {% endif %}
 
-  {% if partition_by %}
-    {% if is_list(partition_by) %}
-      {% set partition_by = partition_by|join(",") %}
-    {% endif %}
+  {% if partition_by|length %}
     {% set external_format -%}
-      {{ external_format}}, PARTITION BY ({{partition_by}})
+      {{ external_format}}, PARTITION_BY ({{partition_by}})
     {%- endset %}
   {% endif %}
 

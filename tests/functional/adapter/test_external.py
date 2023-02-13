@@ -29,11 +29,20 @@ config_materialized_csv_delim = """
   {{ config(materialized="external", format="csv", location="test_delim.csv", delimiter="|") }}
 """
 
+config_materialized_partition_by_str = """
+  {{ config(materialized="external", format="parquet", location="test_partition_str", partition_by="id") }}
+"""
+
+config_materialized_partition_by_list = """
+  {{ config(materialized="external", format="parquet", location="test_partition_list", partition_by="id,name") }}
+"""
+
 default_external_sql = config_materialized_default + model_base
 parquet_table_location_sql = config_materialized_parquet_with_location + model_base
 csv_table_sql = config_materialized_csv + model_base
 csv_table_delim_sql = config_materialized_csv_delim + model_base
-
+csv_table_partition_str_sql = config_materialized_partition_by_str + model_base
+csv_table_partition_list_sql = config_materialized_partition_by_list + model_base
 
 class BaseExternalMaterializations:
     @pytest.fixture(scope="class")
@@ -44,6 +53,8 @@ class BaseExternalMaterializations:
             "table_parquet.sql": parquet_table_location_sql,
             "table_csv.sql": csv_table_sql,
             "table_csv_delim.sql": csv_table_delim_sql,
+            "table_csv_partition_str.sql": csv_table_partition_str_sql,
+            "table_csv_partition_list.sql": csv_table_partition_list_sql,
             "schema.yml": schema_base_yml,
         }
 
@@ -69,7 +80,7 @@ class BaseExternalMaterializations:
         # run command
         results = run_dbt()
         # run result length
-        assert len(results) == 5
+        assert len(results) == 7
 
         # names exist in result nodes
         check_result_nodes_by_name(
@@ -80,6 +91,8 @@ class BaseExternalMaterializations:
                 "table_parquet",
                 "table_csv",
                 "table_csv_delim",
+                "table_csv_partition_str",
+                "table_csv_partition_list",
             ],
         )
 
@@ -91,6 +104,8 @@ class BaseExternalMaterializations:
             "table_model": "table",
             "table_csv": "view",
             "table_csv_delim": "view",
+            "table_csv_partition_str": "view",
+            "table_csv_partition_list": "view",
         }
         check_relation_types(project.adapter, expected)
 
@@ -109,12 +124,14 @@ class BaseExternalMaterializations:
                 "table_model",
                 "table_csv",
                 "table_csv_delim",
+                "table_csv_partition_str",
+                "table_csv_partition_list",
             ],
         )
 
         # check relations in catalog
         catalog = run_dbt(["docs", "generate"])
-        assert len(catalog.nodes) == 6
+        assert len(catalog.nodes) == 8
         assert len(catalog.sources) == 1
 
 
