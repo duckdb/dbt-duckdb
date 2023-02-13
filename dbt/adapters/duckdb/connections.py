@@ -1,4 +1,5 @@
 import atexit
+import os
 import threading
 import time
 from contextlib import contextmanager
@@ -43,6 +44,17 @@ class DuckDBCredentials(Credentials):
     # identify whether to use the default credential provider chain for AWS/GCloud
     # instead of statically defined environment variables
     use_credential_provider: Optional[str] = None
+
+    @classmethod
+    def __pre_deserialize__(cls, data: Dict[Any, Any]) -> Dict[Any, Any]:
+        data = super().__pre_deserialize__(data)
+        path = data["path"]
+        if duckdb.__version__ >= "0.7.0":
+            if path == ":memory:":
+                data["database"] = "memory"
+            else:
+                data["database"] = os.path.splitext(os.path.basename(path))[0]
+        return data
 
     @property
     def type(self):
