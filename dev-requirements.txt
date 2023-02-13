@@ -14,7 +14,7 @@ flake8
 flaky
 freezegun==1.2.2
 ipdb
-mypy==0.991
+mypy==1.0.0
 pip-tools
 pre-commit
 pytest
