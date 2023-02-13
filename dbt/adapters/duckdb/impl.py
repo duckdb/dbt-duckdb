@@ -6,6 +6,7 @@ from typing import Optional
 from typing import Sequence
 
 import agate
+import duckdb
 
 from dbt.adapters.base import BaseRelation
 from dbt.adapters.base.column import Column
@@ -79,6 +80,10 @@ class DuckDBAdapter(SQLAdapter):
     @available
     def external_root(self) -> str:
         return self.config.credentials.external_root
+
+    @available
+    def use_database(self) -> bool:
+        return duckdb.__version__ >= "0.7.0"
 
     def valid_incremental_strategies(self) -> Sequence[str]:
         """DuckDB does not currently support MERGE statement."""

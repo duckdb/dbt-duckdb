@@ -29,7 +29,7 @@ class Attachment:
     path: str
 
     # The type of the attached database (defaults to duckdb, but may be supported by an extension)
-    type: str = "duckdb"
+    type: Optional[str] = None
 
     # An optional alias for the attached database
     alias: Optional[str] = None
@@ -43,7 +43,7 @@ class Attachment:
             base += f" AS {self.alias}"
         options = []
         if self.type:
-            options.append("TYPE {self.type}")
+            options.append(f"TYPE {self.type}")
         if self.read_only:
             options.append("READ_ONLY")
         if options:

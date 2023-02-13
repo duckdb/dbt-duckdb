@@ -31,7 +31,7 @@ class TestEphemeralMulti(BaseEphemeralMulti):
 
         sql_file = re.sub(r"\d+", "", sql_file)
         expected_sql = (
-            'create view "test_test_ephemeral"."double_dependent__dbt_tmp" as ('
+            'create view "memory"."test_test_ephemeral"."double_dependent__dbt_tmp" as ('
             "with __dbt__cte__base as ("
             "select * from test_test_ephemeral.seed"
             "),  __dbt__cte__base_copy as ("
@@ -67,9 +67,9 @@ class TestEphemeralNested(BaseEphemeral):
 
         sql_file = re.sub(r"\d+", "", sql_file)
         expected_sql = (
-            'create view "test_test_ephemeral"."root_view__dbt_tmp" as ('
+            'create view "memory"."test_test_ephemeral"."root_view__dbt_tmp" as ('
             "with __dbt__cte__ephemeral_level_two as ("
-            'select * from "dbt_test"."test_test_ephemeral"."source_table"'
+            'select * from "memory"."test_test_ephemeral"."source_table"'
             "),  __dbt__cte__ephemeral as ("
             "select * from __dbt__cte__ephemeral_level_two"
             ")select * from __dbt__cte__ephemeral"
