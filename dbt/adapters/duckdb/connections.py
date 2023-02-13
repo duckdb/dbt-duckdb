@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from functools import lru_cache
 from typing import Any
 from typing import Dict
+from typing import List
 from typing import Optional
 from typing import Tuple
 
@@ -20,6 +21,35 @@ from dbt.contracts.connection import AdapterResponse
 from dbt.contracts.connection import Connection
 from dbt.contracts.connection import ConnectionState
 from dbt.logger import GLOBAL_LOGGER as logger
+
+
+@dataclass
+class Attachment:
+    # The path to the database to be attached; may be a URL
+    path: str
+
+    # The type of the attached database (defaults to duckdb, but may be supported by an extension)
+    type: str = "duckdb"
+
+    # An optional alias for the attached database
+    alias: Optional[str] = None
+
+    # Whether the attached database is read-only or read/write
+    read_only: bool = False
+
+    def to_sql(self) -> str:
+        base = f"ATTACH '{self.path}'"
+        if self.alias:
+            base += f" AS {self.alias}"
+        options = []
+        if self.type:
+            options.append("TYPE {self.type}")
+        if self.read_only:
+            options.append("READ_ONLY")
+        if options:
+            joined = ",".join(options)
+            base += f"({joined})"
+        return base
 
 
 @dataclass
@@ -44,6 +74,11 @@ class DuckDBCredentials(Credentials):
     # identify whether to use the default credential provider chain for AWS/GCloud
     # instead of statically defined environment variables
     use_credential_provider: Optional[str] = None
+
+    # A list of additional databases that should be attached to the running
+    # DuckDB instance to make them available for use in models; see the
+    # schema for the Attachment dataclass above for what fields it can contain
+    attach: Optional[List[Dict[str, Any]]] = None
 
     @classmethod
     def __pre_deserialize__(cls, data: Dict[Any, Any]) -> Dict[Any, Any]:
@@ -167,6 +202,12 @@ class DuckDBConnectionManager(SQLConnectionManager):
                     if credentials.extensions is not None:
                         for extension in credentials.extensions:
                             cls.CONN.execute(f"INSTALL '{extension}'")
+
+                    # attach any databases that we will be using
+                    if credentials.attach:
+                        for entry in credentials.attach:
+                            attachment = Attachment(**entry)
+                            cls.CONN.execute(attachment.to_sql())
 
                 connection.handle = DuckDBConnectionWrapper(cls.CONN.cursor(), credentials)
                 connection.state = ConnectionState.OPEN
