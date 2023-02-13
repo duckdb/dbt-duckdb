@@ -2,8 +2,6 @@ import importlib.util
 import os
 import tempfile
 import threading
-from typing import Any
-from typing import Dict
 from typing import List
 from typing import Optional
 from typing import Sequence
@@ -86,7 +84,7 @@ class DuckDBAdapter(SQLAdapter):
         return self.config.credentials.external_root
 
     @available
-    def create_external_upstream_relation(self, rel: Relation, location: str):
+    def create_external_upstream_relation(self, rel: DuckDBRelation, location: str):
         with _EXTERNAL_UPSTREAM_LOCK:
             if not self.get_relation(rel.database, rel.schema, rel.identifier):
                 kwargs = {"relation": rel, "location": location, "stmt": "external"}
