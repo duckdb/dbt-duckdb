@@ -69,7 +69,7 @@ class TestEphemeralNested(BaseEphemeral):
         expected_sql = (
             'create view "test_test_ephemeral"."root_view__dbt_tmp" as ('
             "with __dbt__cte__ephemeral_level_two as ("
-            'select * from "main"."test_test_ephemeral"."source_table"'
+            'select * from "dbt_test"."test_test_ephemeral"."source_table"'
             "),  __dbt__cte__ephemeral as ("
             "select * from __dbt__cte__ephemeral_level_two"
             ")select * from __dbt__cte__ephemeral"

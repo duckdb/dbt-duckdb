@@ -2,7 +2,7 @@
 {% macro duckdb__get_catalog(information_schema, schemas) -%}
   {%- call statement('catalog', fetch_result=True) -%}
     select
-        'main' as table_database,
+        '{{ database }}' as table_database,
         t.table_schema,
         t.table_name,
         t.table_type,
