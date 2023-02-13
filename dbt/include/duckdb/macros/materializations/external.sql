@@ -3,6 +3,7 @@
   {%- set format = render(config.get('format', default='parquet')) -%}
   {%- set location = render(config.get('location', default=external_location(this, format))) -%}
   {%- set delimiter = render(config.get('delimiter', default=',')) -%}
+  {%- set partition_by = render(config.get("partition_by")) -%}
   {%- set glue_register = config.get('glue_register', default=false) -%}
   {%- set glue_database = render(config.get('glue_database', default='default')) -%}
 
@@ -46,7 +47,7 @@
   {%- endcall %}
 
   -- write an temp relation into file
-  {{ write_to_file(temp_relation, location, format, delimiter) }}
+  {{ write_to_file(temp_relation, location, format, delimiter, partition_by) }}
   -- create a view on top of the location
   {% call statement('main', language='sql') -%}
     create or replace view {{ intermediate_relation.include(database=adapter.use_database()) }} as (

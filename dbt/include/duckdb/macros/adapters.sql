@@ -188,24 +188,38 @@ def materialize(df, con):
   {% do return(adapter.location_exists(location)) %}
 {% endmacro %}
 
-{% macro write_to_file(relation, location, format, delimiter=',') -%}
+{% macro is_list(var) -%}
+  {% if var is iterable and (var is not string and var is not mapping) %}
+    {% do return(true) %}
+  {% endif %}
+  {% do return(false) %}
+{% endmacro %}
+
+{% macro write_to_file(relation, location, format, delimiter, partition_by) -%}
+
   {% if format == 'parquet' %}
-    {% set copy_to %}
-      copy {{ relation }} to '{{ location }}' (FORMAT 'parquet');
-    {% endset %}
-
+    {% set external_format = "FORMAT 'parquet'" %}
   {% elif format == 'csv' %}
-    {% set copy_to %}
-      copy {{ relation }} to '{{ location }}' (HEADER 1, DELIMITER '{{ delimiter }}');
-    {% endset %}
-
+    {% set external_format -%}
+      HEADER 1, DELIMITER '{{ delimiter }}'
+    {%- endset %}
   {% else %}
       {% do exceptions.raise_compiler_error("%s external format is not supported!" % format) %}
   {% endif %}
 
+  {% if partition_by %}
+    {% if is_list(partition_by) %}
+      {% set partition_by = partition_by|join(",") %}
+    {% endif %}
+    {% set external_format -%}
+      {{ external_format}}, PARTITION BY ({{partition_by}})
+    {%- endset %}
+  {% endif %}
+
   {% call statement('write_to_file') -%}
-    {{ copy_to }}
+      copy {{ relation }} to '{{ location }}' ({{external_format}})
   {%- endcall %}
+
 {% endmacro %}
 
 {% macro register_glue_table(register, glue_database, relation, location, format) -%}
