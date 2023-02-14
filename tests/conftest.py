@@ -13,5 +13,4 @@ def dbt_profile_target():
         "type": "duckdb",
         "threads": 1,
         "path": ":memory:",
-        "attach": [{"path": "/tmp/dbt_test.duckdb"}],
     }
