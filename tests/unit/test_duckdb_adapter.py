@@ -15,7 +15,7 @@ class TestDuckDBAdapter(unittest.TestCase):
             "outputs": {
                 "test": {
                     "type": "duckdb",
-                    "path": "test.duckdb",
+                    "path": ":memory:",
                 }
             },
             "target": "test",

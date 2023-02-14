@@ -12,5 +12,5 @@ def dbt_profile_target():
     return {
         "type": "duckdb",
         "threads": 1,
-        "path": "/tmp/dbt_test.duckdb",
+        "path": ":memory:",
     }

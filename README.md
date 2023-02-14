@@ -34,15 +34,18 @@ default:
 ````
 
 The `path` field should normally be the path to a local DuckDB file on your filesystem, but it can also be set equal to `:memory:` if you
-would like to run an in-memory only version of dbt-duckdb. Keep in mind that any models that you want to keep from the dbt run will
-need to be persisted using one of the external materialization strategies described below.
+would like to run an in-memory only version of dbt-duckdb. Keep in mind that if you are using the in-memory mode,
+any models that you want to keep from the dbt run will need to be persisted using one of the external materialization strategies described below.
 
-`dbt-duckdb` also supports standard profile settings including `threads` (to control how many concurrent models dbt will run at once) and
-`schema` (to control the default schema that models will be materialized in.)
+The `database` property is special: prior to DuckDB `0.7.0` and dbt-duckdb `1.4.0`, it was always set to `main`,
+because DuckDB did not have the concept of multiple databases accessible from a single connection.
+As of dbt-duckdb `1.4.0` and DuckDB `0.7.0`, the value of the `database` property is automatically set to the basename of the
+file in the `path` argument with the suffix removed (so for example if the `path` is `/tmp/a/dbfile.duckdb` the `database` argument will be
+automatically set to `dbfile`). If you are running with the `path` equal to `:memory:`, then the name of the database will be `memory`.
 
 ### DuckDB Extensions and Settings
 
-As of version 1.2.3, you can load any supported [DuckDB extensions](https://duckdb.org/docs/extensions/overview) by listing them in
+You can load any supported [DuckDB extensions](https://duckdb.org/docs/extensions/overview) by listing them in
 the `extensions` field in your profile. You can also set any additional [DuckDB configuration options](https://duckdb.org/docs/sql/configuration)
 via the `settings` field, including options that are supported in any loaded extensions. For example, to be able to connect to S3 and read/write
 Parquet files using an AWS access key and secret, your profile would look something like this:
@@ -65,6 +68,35 @@ default:
 
 #### Fetching credentials from context
 Instead of specifying the credentials through the settings block, you can also use the use_credential_provider property. If you set this to `aws` (currently the only supported implementation) and you have `boto3` installed in your python environment, we will fetch your AWS credentials using the credential provider chain as described [here](https://boto3.amazonaws.com/v1/documentation/api/latest/guide/credentials.html). This means that you can use any supported mechanism from AWS to obtain credentials (e.g., web identity tokens).
+
+### Attaching Additional Databases
+
+DuckDB version `0.7.0` and dbt-duckdb version `1.4.0` support [attaching additional databases](https://duckdb.org/docs/sql/statements/attach.html) to your dbt-duckdb run so that you can read
+and write from multiple databases. Additional databases may be configured using [dbt run hooks](https://docs.getdbt.com/docs/build/hooks-operations) or via the `attach` argument
+in your profile:
+
+```
+default:
+  outputs:
+    dev:
+      type: duckdb
+      path: /tmp/dbt.duckdb
+      attach:
+        - path: /tmp/other.duckdb
+        - path: ./yet/another.duckdb
+          alias: yet_another
+        - path: s3://yep/even/this/works.duckdb
+          read_only: true
+        - path: sqlite.db
+          type: sqlite
+```
+
+The attached databases may be referred to in your dbt sources and models by either the basename of the database file minus its suffix (e.g., `/tmp/other.duckdb` is the `other` database
+and `s3://yep/even/this/works.duckdb` is the `works` database) or by an alias that you specify (so the `./yet/another.duckdb` database in the above configuration is referred to
+as `yet_another` instead of `another`.) Note that these additional databases do not necessarily have to be DuckDB files: DuckDB's storage and catalog engines are pluggable, and
+DuckDB `0.7.0` ships with support for reading and writing from attached SQLite databases. You can indicate the type of the database you are connecting to via the `type` argument,
+which currently supports `duckdb` and `sqlite`.
+
 
 ### External Materializations and Sources
 

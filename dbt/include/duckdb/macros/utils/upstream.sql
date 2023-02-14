@@ -27,7 +27,7 @@
           {% do upstream_schemas.update({upstream_rel.schema: None}) %}
         {% endif %}
         {% call statement('main', language='sql') -%}
-          create or replace view {{ upstream_rel.include(database=False) }} as (
+          create or replace view {{ upstream_rel.include(database=adapter.use_database()) }} as (
             select * from '{{ upstream_location }}'
           );
         {%- endcall %}

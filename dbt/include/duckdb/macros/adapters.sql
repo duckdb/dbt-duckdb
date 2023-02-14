@@ -1,13 +1,13 @@
 
 {% macro duckdb__create_schema(relation) -%}
   {%- call statement('create_schema') -%}
-    create schema if not exists {{ relation.without_identifier().include(database=False) }}
+    create schema if not exists {{ relation.without_identifier().include(database=adapter.use_database()) }}
   {%- endcall -%}
 {% endmacro %}
 
 {% macro duckdb__drop_schema(relation) -%}
   {%- call statement('drop_schema') -%}
-    drop schema if exists {{ relation.without_identifier().include(database=False) }} cascade
+    drop schema if exists {{ relation.without_identifier().include(database=adapter.use_database()) }} cascade
   {%- endcall -%}
 {% endmacro %}
 
@@ -35,7 +35,7 @@
     {{ sql_header if sql_header is not none }}
 
     create {% if temporary: -%}temporary{%- endif %} table
-      {{ relation.include(database=False, schema=(not temporary)) }}
+      {{ relation.include(database=(not temporary and adapter.use_database()), schema=(not temporary)) }}
     as (
       {{ compiled_code }}
     );
@@ -80,14 +80,14 @@ def materialize(df, con):
     ):
         raise Exception( str(type(df)) + " is not a supported type for dbt Python materialization")
 
-    con.execute('create table {{ relation.include(database=False) }} as select * from df')
+    con.execute('create table {{ relation.include(database=adapter.use_database()) }} as select * from df')
 {% endmacro %}
 
 {% macro duckdb__create_view_as(relation, sql) -%}
   {%- set sql_header = config.get('sql_header', none) -%}
 
   {{ sql_header if sql_header is not none }}
-  create view {{ relation.include(database=False) }} as (
+  create view {{ relation.include(database=adapter.use_database()) }} as (
     {{ sql }}
   );
 {% endmacro %}
@@ -132,13 +132,13 @@ def materialize(df, con):
 
 {% macro duckdb__drop_relation(relation) -%}
   {% call statement('drop_relation', auto_begin=False) -%}
-    drop {{ relation.type }} if exists {{ relation.include(database=False) }} cascade
+    drop {{ relation.type }} if exists {{ relation.include(database=adapter.use_database()) }} cascade
   {%- endcall %}
 {% endmacro %}
 
 {% macro duckdb__truncate_relation(relation) -%}
   {% call statement('truncate_relation') -%}
-    DELETE FROM {{ relation.include(database=False) }} WHERE 1=1
+    DELETE FROM {{ relation.include(database=adapter.use_database()) }} WHERE 1=1
   {%- endcall %}
 {% endmacro %}
 
@@ -177,11 +177,11 @@ def materialize(df, con):
 {% endmacro %}
 
 {% macro duckdb__get_incremental_delete_insert_sql(arg_dict) %}
-  {% do return(get_delete_insert_merge_sql(arg_dict["target_relation"].include(database=False), arg_dict["temp_relation"], arg_dict["unique_key"], arg_dict["dest_columns"])) %}
+  {% do return(get_delete_insert_merge_sql(arg_dict["target_relation"].include(database=adapter.use_database()), arg_dict["temp_relation"], arg_dict["unique_key"], arg_dict["dest_columns"])) %}
 {% endmacro %}
 
 {% macro duckdb__get_incremental_append_sql(arg_dict) %}
-  {% do return(get_insert_into_sql(arg_dict["target_relation"].include(database=False), arg_dict["temp_relation"], arg_dict["dest_columns"])) %}
+  {% do return(get_insert_into_sql(arg_dict["target_relation"].include(database=adapter.use_database()), arg_dict["temp_relation"], arg_dict["dest_columns"])) %}
 {% endmacro %}
 
 {% macro location_exists(location) -%}

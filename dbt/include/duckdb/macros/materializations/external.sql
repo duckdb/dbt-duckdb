@@ -49,7 +49,7 @@
   {{ write_to_file(temp_relation, location, format, delimiter) }}
   -- create a view on top of the location
   {% call statement('main', language='sql') -%}
-    create or replace view {{ intermediate_relation.include(database=False) }} as (
+    create or replace view {{ intermediate_relation.include(database=adapter.use_database()) }} as (
         select * from '{{ location }}'
     );
   {%- endcall %}
