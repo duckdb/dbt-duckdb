@@ -2,7 +2,7 @@ from unittest import mock
 
 from botocore.credentials import Credentials
 
-from dbt.adapters.duckdb.connections import DuckDBCredentials
+from dbt.adapters.duckdb.connections import Attachment, DuckDBCredentials
 
 
 def test_load_basic_settings():
@@ -36,3 +36,26 @@ def test_load_aws_creds(mock_session_class):
     assert settings["s3_secret_access_key"] == "secret_key"
     assert settings["s3_session_token"] == "token"
     assert settings["some_other_setting"] == 1
+
+
+def test_attachments():
+    creds = DuckDBCredentials()
+    creds.attach = [
+        {"path": "/tmp/f1234.db"},
+        {"path": "/tmp/g1234.db", "alias": "g"},
+        {"path": "/tmp/h5678.db", "read_only": 1},
+        {"path": "/tmp/i9101.db", "type": "sqlite"},
+        {"path": "/tmp/jklm.db", "alias": "jk", "read_only": 1, "type": "sqlite"},
+    ]
+
+    expected_sql = [
+        "ATTACH '/tmp/f1234.db'",
+        "ATTACH '/tmp/g1234.db' AS g",
+        "ATTACH '/tmp/h5678.db' (READ_ONLY)",
+        "ATTACH '/tmp/i9101.db' (TYPE sqlite)",
+        "ATTACH '/tmp/jklm.db' AS jk (TYPE sqlite, READ_ONLY)",
+    ]
+
+    for i, a in enumerate(creds.attach):
+        attachment = Attachment(**a)
+        assert expected_sql[i] == attachment.to_sql()

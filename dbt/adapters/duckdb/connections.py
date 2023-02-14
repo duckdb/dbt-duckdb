@@ -47,8 +47,8 @@ class Attachment:
         if self.read_only:
             options.append("READ_ONLY")
         if options:
-            joined = ",".join(options)
-            base += f"({joined})"
+            joined = ", ".join(options)
+            base += f" ({joined})"
         return base
 
 
