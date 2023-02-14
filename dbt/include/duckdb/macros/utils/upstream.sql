@@ -19,3 +19,12 @@
   {% endfor %}
 {% endif %}
 {%- endmacro -%}
+
+
+{% macro create_external_relation(relation, location) %}
+  {% call statement('external') -%}
+    create or replace view {{ relation.include(database=False) }} as (
+      select * from '{{ location }}'
+    )
+  {%- endcall %}
+{% endmacro %}
