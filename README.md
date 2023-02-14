@@ -109,6 +109,16 @@ default:
   target: dev
 ```
 
+### Re-running external models with an in-memory version of dbt-duckdb
+When using `:memory:` as the DuckDB database, subsequent dbt runs can fail when selecting a subset of models that depend on external tables. This is because external Parquet or CSV files are only registered as  DuckDB views when they are created, not when they are referenced. To overcome this issue we have provided the `register_upstream_external_models` macro that can be triggered at the beginning of a run. To enable this automatic registration, place the following in your `dbt_project.yml` file:
+
+```yaml
+on-run-start:
+  - "{{ register_upstream_external_models() }}"
+```
+
+### External sources
+
 `dbt-duckdb` also includes support for referencing external CSV and Parquet files as dbt `source`s via the `external_location`
 meta option:
 

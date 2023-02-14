@@ -11,6 +11,10 @@ downstream_model_sql = """
 select range * 2 from {{ ref('upstream_model') }}
 """
 
+other_downstream_model_sql = """
+select range * 5 from {{ ref('upstream_model') }}
+"""
+
 # class must begin with 'Test'
 class TestRematerializeDownstreamExternalModel:
     """
@@ -30,13 +34,18 @@ class TestRematerializeDownstreamExternalModel:
 
     @pytest.fixture(scope="class")
     def project_config_update(self):
-        return {"name": "base", "models": {"+materialized": "external"}}
+        return {
+            "name": "base",
+            "models": {"+materialized": "external"},
+            "on-run-start": ["{{ register_upstream_external_models() }}"],
+        }
 
     @pytest.fixture(scope="class")
     def models(self):
         return {
             "upstream_model.sql": upstream_model_sql,
             "downstream_model.sql": downstream_model_sql,
+            "other_downstream_model.sql": other_downstream_model_sql,
         }
 
     def test_run(self, project):
@@ -44,4 +53,4 @@ class TestRematerializeDownstreamExternalModel:
 
         # Force close the :memory: connection
         DuckDBConnectionManager.close_all_connections()
-        run_dbt(["run", "--select", "downstream_model"])
+        run_dbt(["run", "--select", "downstream_model,other_downstream_model"])
