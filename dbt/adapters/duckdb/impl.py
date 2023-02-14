@@ -87,7 +87,7 @@ class DuckDBAdapter(SQLAdapter):
     def create_external_upstream_relation(self, rel: DuckDBRelation, location: str):
         with _EXTERNAL_UPSTREAM_LOCK:
             if not self.get_relation(rel.database, rel.schema, rel.identifier):
-                kwargs = {"relation": rel, "location": location, "stmt": "external"}
+                kwargs = {"relation": rel, "location": location}
                 self.execute_macro("create_external_relation", kwargs=kwargs)
 
     def valid_incremental_strategies(self) -> Sequence[str]:
