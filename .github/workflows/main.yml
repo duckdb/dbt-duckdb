@@ -199,7 +199,7 @@ jobs:
         with:
           name: fsspec_results_${{ matrix.python-version }}-${{ steps.date.outputs.date }}.csv
           path: fsspec_results.csv
-  
+
   build:
     name: build packages
 
