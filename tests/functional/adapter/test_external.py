@@ -30,11 +30,11 @@ config_materialized_csv_delim = """
 """
 
 config_materialized_partition_by_str = """
-  {{ config(materialized="external", format="parquet", location="test_partition_str", partition_by="id") }}
+  {{ config(materialized="external", location="test_partition_str", partition_by="id") }}
 """
 
 config_materialized_partition_by_list = """
-  {{ config(materialized="external", format="parquet", location="test_partition_list", partition_by="id,name") }}
+  {{ config(materialized="external", location="test_partition_list", partition_by="id,name") }}
 """
 
 default_external_sql = config_materialized_default + model_base
@@ -43,6 +43,7 @@ csv_table_sql = config_materialized_csv + model_base
 csv_table_delim_sql = config_materialized_csv_delim + model_base
 csv_table_partition_str_sql = config_materialized_partition_by_str + model_base
 csv_table_partition_list_sql = config_materialized_partition_by_list + model_base
+
 
 class BaseExternalMaterializations:
     @pytest.fixture(scope="class")

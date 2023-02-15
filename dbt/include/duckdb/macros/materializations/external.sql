@@ -50,12 +50,12 @@
   {{ write_to_file(temp_relation, location, format, delimiter, partition_by) }}
 
   {% if partition_by|length %}
-    {% set cols = partition_by.split(",") %}
-    {% if format == 'parquet' %}
-      {% set rel_location = "read_parquet('" ~ location ~ "/*/*/*.parquet')" %}
-    {% else %}
-      {% set rel_location = "read_csv_auto('" ~ location ~ "/**/*.csv')" %}
-    {% endif %}
+    {%- set cols = partition_by.split(",") -%}
+    {%- set globs = ["*"] -%}
+    {%- for col in cols -%}
+      {%- do globs.append("*") -%}
+    {%- endfor -%}
+    {% set rel_location -%}'{{location}}/{{globs|join("/")}}.{{format}}'{%- endset %}
   {% else %}
     {% set rel_location -%}'{{ location }}'{%- endset %}
   {% endif %}
