@@ -221,6 +221,7 @@ class DuckDBConnectionManager(SQLConnectionManager):
                             fsimpl = curr.pop("fs")
                             fs = fsspec.filesystem(fsimpl, **curr)
                             cls.CONN.register_filesystem(fs)
+
                     # attach any databases that we will be using
                     if credentials.attach:
                         for entry in credentials.attach:
