@@ -80,6 +80,15 @@ class DuckDBCredentials(Credentials):
     # schema for the Attachment dataclass above for what fields it can contain
     attach: Optional[List[Dict[str, Any]]] = None
 
+    # A list of filesystems to attach to the DuckDB database via the fsspec
+    # interface; see https://duckdb.org/docs/guides/python/filesystems.html
+    #
+    # Each dictionary entry must have a "fs" entry to indicate which
+    # fsspec implementation should be loaded, and then an arbitrary additional
+    # number of key-value pairs that will be passed as arguments to the fsspec
+    # registry method.
+    filesystems: Optional[List[Dict[str, Any]]] = None
+
     @classmethod
     def __pre_deserialize__(cls, data: Dict[Any, Any]) -> Dict[Any, Any]:
         data = super().__pre_deserialize__(data)
@@ -203,6 +212,20 @@ class DuckDBConnectionManager(SQLConnectionManager):
                         for extension in credentials.extensions:
                             cls.CONN.execute(f"INSTALL '{extension}'")
 
+                    # Attach any fsspec filesystems on the database
+                    if credentials.filesystems:
+                        import fsspec
+
+                        for spec in credentials.filesystems:
+                            if "fs" not in spec:
+                                raise Exception("filesystem spec missing required 'fs' argument")
+                            fsimpl = spec["fs"]
+                            del spec["fs"]
+                            if spec:
+                                fs = fsspec.filesystem(fsimpl, **spec)
+                            else:
+                                fs = fsspec.filesystem(fsimpl)
+                            cls.CONN.register_filesystem(fs)
                     # attach any databases that we will be using
                     if credentials.attach:
                         for entry in credentials.attach:
