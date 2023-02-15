@@ -217,10 +217,9 @@ class DuckDBConnectionManager(SQLConnectionManager):
                         import fsspec
 
                         for spec in credentials.filesystems:
-                            if "fs" not in spec:
-                                raise Exception("filesystem spec missing required 'fs' argument")
-                            fsimpl = spec.pop("fs")
-                            fs = fsspec.filesystem(fsimpl, **spec)
+                            curr = spec.copy()
+                            fsimpl = curr.pop("fs")
+                            fs = fsspec.filesystem(fsimpl, **curr)
                             cls.CONN.register_filesystem(fs)
                     # attach any databases that we will be using
                     if credentials.attach:
