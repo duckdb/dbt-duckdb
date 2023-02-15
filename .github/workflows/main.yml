@@ -122,7 +122,7 @@ jobs:
 
     env:
       TOXENV: "functional"
-      PYTEST_ADDOPTS: "-v --color=yes --csv unit_results.csv"
+      PYTEST_ADDOPTS: "-v --color=yes --csv functional_results.csv"
 
     steps:
       - name: Check out the repository
@@ -154,6 +154,51 @@ jobs:
         with:
           name: functional_results_${{ matrix.python-version }}-${{ steps.date.outputs.date }}.csv
           path: functional_results.csv
+
+  fsspec:
+    name: fsspec test / python ${{ matrix.python-version }}
+
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ['3.9']
+
+    env:
+      TOXENV: "fsspec"
+      PYTEST_ADDOPTS: "-v --color=yes --csv fsspec_results.csv"
+
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v3
+        with:
+          persist-credentials: false
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install python dependencies
+        run: |
+          python -m pip install tox
+          python -m pip --version
+          tox --version
+
+      - name: Run tox
+        run: tox
+
+      - name: Get current date
+        if: always()
+        id: date
+        run: echo "date=$(date +'%Y-%m-%dT%H_%M_%S')" >> $GITHUB_OUTPUT #no colons allowed for artifacts
+
+      - uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: fsspec_results_${{ matrix.python-version }}-${{ steps.date.outputs.date }}.csv
+          path: fsspec_results.csv
 
   build:
     name: build packages

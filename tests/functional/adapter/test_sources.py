@@ -8,7 +8,7 @@ sources_schema_yml = """version: 2
 sources:
   - name: external_source
     meta:
-      external_location: "./seeds/{name}.csv"
+      external_location: "/tmp/{name}.csv"
     tables:
       - name: seeds_source
         description: "A source table"
@@ -21,7 +21,7 @@ sources:
       - name: seeds_ost
         identifier: "seeds_other_source_table"
         meta:
-          external_location: "read_csv_auto('./seeds/{identifier}.csv')"
+          external_location: "read_csv_auto('/tmp/{identifier}.csv')"
 """
 
 models_source_model_sql = """select * from {{ source('external_source', 'seeds_source') }}
@@ -56,15 +56,22 @@ class TestExternalSources:
         cmd.extend(["--vars", yaml.safe_dump(vars_dict)])
         return run_dbt(cmd, *args, **kwargs)
 
-    def test_external_sources(self, project):
-        # abusing the 'seeds' directory a little bit here, but it works
-        with open("seeds/seeds_source.csv", "w") as f:
+    @pytest.fixture(scope="class")
+    def seeds_source_file(self):
+        with open("/tmp/seeds_source.csv", "w") as f:
             f.write("id,a,b\n1,2,3\n4,5,6\n7,8,9")
-        with open("seeds/seeds_other_source_table.csv", "w") as f:
-            f.write("id,c,d\n1,2,3\n4,5,6\n7,8,9")
+        yield
+        os.unlink("/tmp/seeds_source.csv")
 
+    @pytest.fixture(scope="class")
+    def ost_file(self):
+        with open("/tmp/seeds_other_source_table.csv", "w") as f:
+            f.write("id,c,d\n1,2,3\n4,5,6\n7,8,9")
+        yield
+        os.unlink("/tmp/seeds_other_source_table.csv")
+
+    def test_external_sources(self, seeds_source_file, ost_file, project):
         results = self.run_dbt_with_vars(project, ["run"])
         assert len(results) == 2
-
         test_results = self.run_dbt_with_vars(project, ["test"])
         assert len(test_results) == 2
