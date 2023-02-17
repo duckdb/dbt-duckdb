@@ -85,6 +85,48 @@ class DuckDBAdapter(SQLAdapter):
     def use_database(self) -> bool:
         return duckdb.__version__ >= "0.7.0"
 
+    @available
+    def external_write_location(self, identifier: str, rendered_config: dict) -> str:
+        if rendered_config.get("location"):
+            return rendered_config.get("location")
+        else:
+            format = rendered_config.get("format", "parquet")
+            return os.path.join([self.external_root(), f"{identifier}.{format}"])
+
+    @available
+    def external_write_options(self, write_location: str, rendered_config: dict) -> str:
+        options = {}
+        for k in rendered_config:
+            if k not in ("materialized", "location", "glue_register", "glue_database"):
+                options[k.lower()] = rendered_config[k]
+
+        if "format" not in options:
+            ext = os.path.splitext(write_location)[1].lower()
+            if ext:
+                options["format"] = ext
+            else:
+                options["format"] = "parquet"
+
+        if options["format"] == "csv":
+            if "header" not in options:
+                options["header"] = 1
+
+        rendered = []
+        for k, v in options.items():
+            if isinstance(v, str):
+                rendered.append(f"{k} '{v}'")
+            else:
+                rendered.append(f"{k} {v}")
+        return ",".join(rendered)
+
+    @available
+    def external_read_location(self, write_location: str, rendered_config: dict) -> str:
+        if rendered_config.get("partition_by"):
+            globs = [write_location, "*"]
+            globs.extend(["*"] * len(rendered_config.get("partition_by").split(",")))
+            return os.path.join(globs)
+        return write_location
+
     def valid_incremental_strategies(self) -> Sequence[str]:
         """DuckDB does not currently support MERGE statement."""
         return ["append", "delete+insert"]

@@ -188,7 +188,7 @@ def materialize(df, con):
   {% do return(adapter.location_exists(location)) %}
 {% endmacro %}
 
-{% macro write_to_file(relation, location, format, delimiter=',') -%}
+{% macro write_to_file(relation, location, options) -%}
   {% if format == 'parquet' %}
     {% set copy_to %}
       copy {{ relation }} to '{{ location }}' (FORMAT 'parquet');
@@ -214,3 +214,14 @@ def materialize(df, con):
     {% do adapter.register_glue_table(glue_database, relation.identifier, column_list, location, format) %}
   {% endif %}
 {% endmacro %}
+
+{% macro render_config(config) -%}
+  {% set ret = {} %}
+  {% for k in config %}
+    {% if config[k] is string %}
+      {% set ret[k] = render(config[k]) %}
+    {% else %}
+      {% set ret[k] = config[k] %}
+  {% endfor %}
+  {% return ret %}
+{%- endmacro}
