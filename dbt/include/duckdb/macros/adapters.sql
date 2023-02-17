@@ -189,22 +189,8 @@ def materialize(df, con):
 {% endmacro %}
 
 {% macro write_to_file(relation, location, options) -%}
-  {% if format == 'parquet' %}
-    {% set copy_to %}
-      copy {{ relation }} to '{{ location }}' (FORMAT 'parquet');
-    {% endset %}
-
-  {% elif format == 'csv' %}
-    {% set copy_to %}
-      copy {{ relation }} to '{{ location }}' (HEADER 1, DELIMITER '{{ delimiter }}');
-    {% endset %}
-
-  {% else %}
-      {% do exceptions.raise_compiler_error("%s external format is not supported!" % format) %}
-  {% endif %}
-
   {% call statement('write_to_file') -%}
-    {{ copy_to }}
+    copy {{ relation }} to '{{ location }}' ({{ options }})
   {%- endcall %}
 {% endmacro %}
 
@@ -215,13 +201,23 @@ def materialize(df, con):
   {% endif %}
 {% endmacro %}
 
-{% macro render_config(config) -%}
-  {% set ret = {} %}
-  {% for k in config %}
-    {% if config[k] is string %}
-      {% set ret[k] = render(config[k]) %}
+{% macro render_write_options(config) -%}
+  {% set options = config.get('options', {}) %}
+  {% for k in options %}
+    {% if options[k] is string %}
+      {% set _ = options.update({k: render(config[k])}) %}
     {% else %}
-      {% set ret[k] = config[k] %}
+      {% set _ = options.update({k: config[k]}) %}
+    {% endif %}
   {% endfor %}
-  {% return ret %}
-{%- endmacro}
+
+  {# legacy top-level write options #}
+  {% if config.get('format') %}
+    {% set _ = options.update({'format': render(config.get('format'))}) %}
+  {% endif %}
+  {% if config.get('delimiter') %}
+    {% set _ = options.update({'delimiter': render(config.get('delimiter'))}) %}
+  {% endif %}
+
+  {% do return(options) %}
+{%- endmacro %}
