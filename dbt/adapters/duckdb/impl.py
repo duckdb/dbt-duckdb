@@ -98,9 +98,14 @@ class DuckDBAdapter(SQLAdapter):
             if "header" not in rendered_options:
                 rendered_options["header"] = 1
 
+        if "partition_by" in rendered_options:
+            v = rendered_options["partition_by"]
+            if "," in v and not v.startswith("("):
+                rendered_options["partition_by"] = f"({v})"
+
         ret = []
         for k, v in rendered_options.items():
-            if isinstance(v, str):
+            if k == "delimiter":
                 ret.append(f"{k} '{v}'")
             else:
                 ret.append(f"{k} {v}")
@@ -111,7 +116,7 @@ class DuckDBAdapter(SQLAdapter):
         if rendered_options.get("partition_by"):
             globs = [write_location, "*"]
             globs.extend(["*"] * len(rendered_options.get("partition_by").split(",")))
-            return os.path.join(globs)
+            return ".".join(["/".join(globs), rendered_options.get("format", "parquet")])
         return write_location
 
     def valid_incremental_strategies(self) -> Sequence[str]:

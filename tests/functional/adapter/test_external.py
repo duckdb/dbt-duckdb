@@ -17,22 +17,32 @@ config_materialized_default = """
   {{ config(materialized='external') }}
 """
 
-config_materialized_parquet_with_location = """
-  {{ config(materialized="external", location="test.parquet") }}
-"""
-
 config_materialized_csv = """
-  {{ config(materialized="external", format="csv", location="test.csv") }}
+  {{ config(materialized='external', format='csv') }}
 """
 
 config_materialized_csv_delim = """
-  {{ config(materialized="external", format="csv", location="test_delim.csv", delimiter="|") }}
+  {{ config(materialized="external", delim="|") }}
+"""
+
+config_materialized_parquet_location = """
+  {{ config(materialized="external", location="test.parquet") }}
+"""
+
+config_materialized_csv_location = """
+  {{ config(materialized="external", location="test.csv") }}
+"""
+
+config_materialized_csv_location_delim = """
+  {{ config(materialized="external", location="test_delim.csv", delimiter="|") }}
 """
 
 default_external_sql = config_materialized_default + model_base
-parquet_table_location_sql = config_materialized_parquet_with_location + model_base
-csv_table_sql = config_materialized_csv + model_base
-csv_table_delim_sql = config_materialized_csv_delim + model_base
+csv_external_sql = config_materialized_csv + model_base
+csv_delim_sql = config_materialized_csv_delim + model_base
+parquet_table_location_sql = config_materialized_parquet_location + model_base
+csv_location_sql = config_materialized_csv_location + model_base
+csv_location_delim_sql = config_materialized_csv_location_delim + model_base
 
 
 class BaseExternalMaterializations:
@@ -41,9 +51,10 @@ class BaseExternalMaterializations:
         return {
             "table_model.sql": base_table_sql,
             "table_default.sql": default_external_sql,
-            "table_parquet.sql": parquet_table_location_sql,
-            "table_csv.sql": csv_table_sql,
-            "table_csv_delim.sql": csv_table_delim_sql,
+            "table_csv.sql": csv_external_sql,
+            "table_csv_delim.sql": csv_delim_sql,
+            "table_parquet_location.sql": parquet_table_location_sql,
+            "table_csv_location_delim.sql": csv_location_delim_sql,
             "schema.yml": schema_base_yml,
         }
 
@@ -69,7 +80,7 @@ class BaseExternalMaterializations:
         # run command
         results = run_dbt()
         # run result length
-        assert len(results) == 5
+        assert len(results) == 6
 
         # names exist in result nodes
         check_result_nodes_by_name(
@@ -77,20 +88,22 @@ class BaseExternalMaterializations:
             [
                 "table_model",
                 "table_default",
-                "table_parquet",
                 "table_csv",
                 "table_csv_delim",
+                "table_parquet_location",
+                "table_csv_location_delim",
             ],
         )
 
         # check relation types
         expected = {
             "base": "table",
-            "table_default": "view",
-            "table_parquet": "view",
             "table_model": "table",
+            "table_default": "view",
+            "table_parquet_location": "view",
             "table_csv": "view",
             "table_csv_delim": "view",
+            "table_csv_location_delim": "view",
         }
         check_relation_types(project.adapter, expected)
 
@@ -105,16 +118,17 @@ class BaseExternalMaterializations:
             [
                 "base",
                 "table_default",
-                "table_parquet",
+                "table_parquet_location",
                 "table_model",
                 "table_csv",
                 "table_csv_delim",
+                "table_csv_location_delim",
             ],
         )
 
         # check relations in catalog
         catalog = run_dbt(["docs", "generate"])
-        assert len(catalog.nodes) == 6
+        assert len(catalog.nodes) == 7
         assert len(catalog.sources) == 1
 
 
