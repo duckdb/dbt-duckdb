@@ -6,6 +6,10 @@ upstream_model_sql = """
 select range from range(3)
 """
 
+upstream_partition_by_model = """
+{{ config(materialized='external', options={"partition_by": "a"}) }}
+select range as a, 'foo' as b from range(5)
+"""
 
 downstream_model_sql = """
 select range * 2 from {{ ref('upstream_model') }}
@@ -13,6 +17,10 @@ select range * 2 from {{ ref('upstream_model') }}
 
 other_downstream_model_sql = """
 select range * 5 from {{ ref('upstream_model') }}
+"""
+
+downstream_of_partition_model = """
+select a * 3 from {{ ref('upstream_partition_by_model') }}
 """
 
 # class must begin with 'Test'
@@ -45,8 +53,10 @@ class TestRematerializeDownstreamExternalModel:
     def models(self):
         return {
             "upstream_model.sql": upstream_model_sql,
+            "upstream_partition_by_model.sql": upstream_partition_by_model,
             "downstream_model.sql": downstream_model_sql,
             "other_downstream_model.sql": other_downstream_model_sql,
+            "downstream_of_partition_model.sql": downstream_of_partition_model,
         }
 
     def test_run(self, project):
@@ -54,4 +64,10 @@ class TestRematerializeDownstreamExternalModel:
 
         # Force close the :memory: connection
         DuckDBConnectionManager.close_all_connections()
-        run_dbt(["run", "--select", "downstream_model other_downstream_model"])
+        run_dbt(
+            [
+                "run",
+                "--select",
+                "downstream_model other_downstream_model downstream_of_partition_model",
+            ]
+        )

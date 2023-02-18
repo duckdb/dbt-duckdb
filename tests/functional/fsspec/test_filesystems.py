@@ -11,20 +11,11 @@ WHERE conf = 'West'
 
 class TestFilesystems:
     @pytest.fixture(scope="class")
-    def profiles_config_update(self):
+    def dbt_profile_target(self):
         return {
-            "test": {
-                "outputs": {
-                    "dev": {
-                        "type": "duckdb",
-                        "path": ":memory:",
-                        "filesystems": [
-                            {"fs": "github", "org": "jwills", "repo": "nba_monte_carlo"}
-                        ],
-                    }
-                },
-                "target": "dev",
-            }
+            "type": "duckdb",
+            "path": ":memory:",
+            "filesystems": [{"fs": "github", "org": "jwills", "repo": "nba_monte_carlo"}],
         }
 
     @pytest.fixture(scope="class")

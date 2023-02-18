@@ -105,7 +105,7 @@ class DuckDBAdapter(SQLAdapter):
 
         ret = []
         for k, v in rendered_options.items():
-            if k == "delimiter":
+            if k in {"delimiter", "quote", "escape", "null"} and not v.startswith("'"):
                 ret.append(f"{k} '{v}'")
             else:
                 ret.append(f"{k} {v}")
