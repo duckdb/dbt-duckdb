@@ -6,6 +6,9 @@
   {%- set glue_register = config.get('glue_register', default=false) -%}
   {%- set glue_database = render(config.get('glue_database', default='default')) -%}
 
+  -- inherit format from defined location when it is not passed
+  {% set format = location.split('.') | last if not config.get('format')%}
+
   -- set language - python or sql
   {%- set language = model['language'] -%}
 
