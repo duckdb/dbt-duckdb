@@ -194,6 +194,20 @@ sources:
           external_location: "read_parquet(['s3://my-bucket/my-sources/source2a.parquet', 's3://my-bucket/my-sources/source2b.parquet'])"
 ```
 
+Similarly, if one of the source tables need any kind of special handling in reading, the `external_location` can be provided the necessary explicit function call, for example:
+
+```
+sources:
+  - name: external_source
+    meta:
+      external_location: "s3://my-bucket/my-sources/{name}.csv"
+    tables:
+      - name: source1
+      - name: source2
+        meta:
+          external_location: "read_csv('s3://my-bucket/my-sources/source2.csv', delim='|', header=True, columns={'createdAt': 'DATE', 'id': 'VARCHAR', 'name': 'VARCHAR'})"
+```
+
 ### Python Support
 
 dbt added support for [Python models in version 1.3.0](https://docs.getdbt.com/docs/build/python-models). For most data platforms,
