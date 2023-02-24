@@ -101,8 +101,11 @@ which currently supports `duckdb` and `sqlite`.
 ### External Materializations and Sources
 
 One of DuckDB's most powerful features is its ability to read and write CSV and Parquet files directly, without needing to import/export
-them from the database first. In `dbt-duckdb`, we support creating models that are backed by external files via the `external` materialization
-strategy:
+them from the database first.
+
+#### Writing to external files
+
+In `dbt-duckdb`, creating models that are backed by external files is supported via the `external` materialization strategy:
 
 ```
 {{ config(materialized='external', location='local/directory/file.parquet') }}
@@ -113,16 +116,15 @@ LEFT JOIN {{ source('upstream', 'source') }} s USING (id)
 
 | Option | Default | Description
 | :---:    |  :---:    | ---
-| location | `{{ name }}.{{ format }}` | The path to write the external materialization to. See below for more details.
+| location | `{{ name }}.{{ format }}` | The path to write/read the external materialization to/from. See below for more details.
 | format | parquet | The format of the external file, either `parquet` or `csv`.
 | delimiter | ,    | For CSV files, the delimiter to use for fields.
 | glue_register | false | If true, try to register the file created by this model with the AWS Glue Catalog.
 | glue_database | default | The name of the AWS Glue database to register the model with.
 
-If no `location` argument is specified, then the external file will be named after the model.sql (or model.py) file that defined it
-with an extension that matches the file format (either `.parquet` or `.csv`). By default, external materializations are created
-relative to the current working directory, but you can change the default directory (or S3 bucket/prefix) by specifying the
-`external_root` setting in your DuckDB profile:
+If no `location` argument is specified, then the external file will be named after the model.sql (or model.py) file that defined it with an extension that matches the file format (either `.parquet` or `.csv`). 
+
+By default, external materializations are created in a local file relative to the current working directory, but you can change the default directory (or S3 bucket/prefix) by specifying the `external_root` setting in your DuckDB profile:
 
 ```
 default:
@@ -141,18 +143,9 @@ default:
   target: dev
 ```
 
-### Re-running external models with an in-memory version of dbt-duckdb
-When using `:memory:` as the DuckDB database, subsequent dbt runs can fail when selecting a subset of models that depend on external tables. This is because external Parquet or CSV files are only registered as  DuckDB views when they are created, not when they are referenced. To overcome this issue we have provided the `register_upstream_external_models` macro that can be triggered at the beginning of a run. To enable this automatic registration, place the following in your `dbt_project.yml` file:
+#### Reading from external files
 
-```yaml
-on-run-start:
-  - "{{ register_upstream_external_models() }}"
-```
-
-### External sources
-
-`dbt-duckdb` also includes support for referencing external CSV and Parquet files as dbt `source`s via the `external_location`
-meta option:
+`dbt-duckdb` also includes support for referencing external CSV and Parquet files as dbt `source`s via the `external_location` meta option:
 
 ```
 sources:
@@ -164,8 +157,7 @@ sources:
       - name: source2
 ```
 
-Here, the `meta` options on `external_source` defines `external_location` as an [f-string](https://peps.python.org/pep-0498/) that
-allows us to express a pattern that indicates the location of any of the tables defined for that source. So a dbt model like:
+Here, the `meta` options on `external_source` defines `external_location` as an [f-string](https://peps.python.org/pep-0498/) that allows us to express a pattern that indicates the location of any of the tables defined for that source. So a dbt model like:
 
 ```
 SELECT *
@@ -180,21 +172,7 @@ FROM 's3://my-bucket/my-sources/source1.parquet'
 ```
 
 If one of the source tables deviates from the pattern or needs some other special handling, then the `external_location` can also be set on the `meta`
-options for the table itself, for example:
-
-```
-sources:
-  - name: external_source
-    meta:
-      external_location: "s3://my-bucket/my-sources/{name}.parquet"
-    tables:
-      - name: source1
-      - name: source2
-        meta:
-          external_location: "read_parquet(['s3://my-bucket/my-sources/source2a.parquet', 's3://my-bucket/my-sources/source2b.parquet'])"
-```
-
-Similarly, if one of the source tables need any kind of special handling in reading, the `external_location` can be provided the necessary explicit function call, for example:
+options for the table itself and also be provided the necessary explicit function call, for example:
 
 ```
 sources:
@@ -205,7 +183,29 @@ sources:
       - name: source1
       - name: source2
         meta:
-          external_location: "read_csv('s3://my-bucket/my-sources/source2.csv', delim='|', header=True, columns={'createdAt': 'DATE', 'id': 'VARCHAR', 'name': 'VARCHAR'})"
+          external_location: "read_csv('s3://my-bucket/my-sources/{name}.csv', delim='|', header=True, columns={'createdAt': 'DATE', 'id': 'VARCHAR', 'name': 'VARCHAR'})"
+```
+
+In this case, a dbt model like:
+
+```
+SELECT * 
+FROM {{ source('external_source', 'source2') }}
+```
+
+will be compiled as:
+
+```
+SELECT *
+FROM read_csv('s3://my-bucket/my-sources/source2.csv', delim='|', header=True, columns={'createdAt': 'DATE', 'id': 'VARCHAR', 'name': 'VARCHAR'})
+```
+
+#### Re-running external models with an in-memory version of dbt-duckdb
+When using `:memory:` as the DuckDB database, subsequent dbt runs can fail when selecting a subset of models that depend on external tables. This is because external Parquet or CSV files are only registered as DuckDB views when they are created, not when they are referenced. To overcome this issue we have provided the `register_upstream_external_models` macro that can be triggered at the beginning of a run. To enable this automatic registration, place the following in your `dbt_project.yml` file:
+
+```yaml
+on-run-start:
+  - "{{ register_upstream_external_models() }}"
 ```
 
 ### Python Support
