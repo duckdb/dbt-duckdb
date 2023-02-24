@@ -116,7 +116,7 @@ LEFT JOIN {{ source('upstream', 'source') }} s USING (id)
 
 | Option | Default | Description
 | :---:    |  :---:    | ---
-| location | `{{ name }}.{{ format }}` | The path to write/read the external materialization to/from. See below for more details.
+| location | `{{ name }}.{{ format }}` | The path to write the external materialization to. See below for more details.
 | format | parquet | The format of the external file, either `parquet` or `csv`.
 | delimiter | ,    | For CSV files, the delimiter to use for fields.
 | glue_register | false | If true, try to register the file created by this model with the AWS Glue Catalog.
