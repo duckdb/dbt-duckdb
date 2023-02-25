@@ -35,5 +35,6 @@
     {% endif %}
   {% endfor %}
 {% endfor %}
+{% do adapter.commit() %}
 {% endif %}
 {%- endmacro -%}
