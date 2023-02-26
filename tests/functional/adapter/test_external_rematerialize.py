@@ -30,6 +30,7 @@ class TestRematerializeDownstreamExternalModel:
         return {
             "type": "duckdb",
             "path": ":memory:",
+            "threads": 3,
         }
 
     @pytest.fixture(scope="class")
@@ -53,4 +54,4 @@ class TestRematerializeDownstreamExternalModel:
 
         # Force close the :memory: connection
         DuckDBConnectionManager.close_all_connections()
-        run_dbt(["run", "--select", "downstream_model,other_downstream_model"])
+        run_dbt(["run", "--select", "downstream_model other_downstream_model"])
