@@ -54,6 +54,10 @@ class Attachment:
 
 @dataclass
 class DuckDBCredentials(Credentials):
+    # Override this class-level property to prevent typos in the config
+    # options from silently failing during runtime
+    ADDITIONAL_PROPERTIES = False
+
     database: str = "main"
     schema: str = "main"
     path: str = ":memory:"
