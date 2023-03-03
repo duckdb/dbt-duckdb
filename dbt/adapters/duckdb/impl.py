@@ -115,8 +115,9 @@ class DuckDBAdapter(SQLAdapter):
     def external_read_location(self, write_location: str, rendered_options: dict) -> str:
         if rendered_options.get("partition_by"):
             globs = [write_location, "*"]
-            globs.extend(["*"] * len(rendered_options.get("partition_by").split(",")))
-            return ".".join(["/".join(globs), rendered_options.get("format", "parquet")])
+            partition_by = str(rendered_options.get("partition_by"))
+            globs.extend(["*"] * len(partition_by.split(",")))
+            return ".".join(["/".join(globs), str(rendered_options.get("format", "parquet"))])
         return write_location
 
     def valid_incremental_strategies(self) -> Sequence[str]:
