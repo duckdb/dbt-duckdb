@@ -68,6 +68,6 @@ class TestRematerializeDownstreamExternalModel:
             [
                 "run",
                 "--select",
-                "downstream_model other_downstream_model downstream_of_partition_model",
+                "downstream_model,other_downstream_model,downstream_of_partition_model",
             ]
         )

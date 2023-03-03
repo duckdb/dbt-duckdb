@@ -16,7 +16,7 @@
           schema=upstream['schema'],
           identifier=upstream['alias']
         ) -%}
-        {%- set location = upstream.config.get('location', default=external_location(upstream, upstream.config)) -%}
+        {%- set location = upstream.config.get('location', external_location(upstream, upstream.config)) -%}
         {%- set rendered_options = render_write_options(config) -%}
         {%- set upstream_location = adapter.external_read_location(location, rendered_options) -%}
         {% if upstream_rel.schema not in upstream_schemas %}
