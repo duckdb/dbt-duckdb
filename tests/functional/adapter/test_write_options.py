@@ -14,19 +14,19 @@ from dbt.tests.util import (
 )
 
 config_write_csv_delim_options = """
-  {{ config(materialized='external', format="csv", options={"delimiter": "|"}) }}
+  {{ config(materialized="external", format="csv", options={"delimiter": "|"}) }}
 """
 
 config_write_codec_options = """
-  {{ config(materialized='external', options={"codec": "zstd"}) }}
+  {{ config(materialized="external", options={"codec": "zstd"}) }}
 """
 
 config_write_partition_by_id = """
-    {{ config(materialized='external', options={"partition_by": "id"}) }}
+    {{ config(materialized="external", options={"partition_by": "id", "codec": "zstd"}) }}
 """
 
 config_write_partition_by_id_name = """
-    {{ config(materialized='external', options={"partition_by": "id, name"}) }}
+    {{ config(materialized="external", options={"partition_by": "id, name"}) }}
 """
 
 csv_delim_options_sql = config_write_csv_delim_options + model_base
