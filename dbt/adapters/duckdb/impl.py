@@ -91,6 +91,8 @@ class DuckDBAdapter(SQLAdapter):
             ext = os.path.splitext(write_location)[1].lower()
             if ext:
                 rendered_options["format"] = ext[1:]
+            elif "delimiter" in rendered_options:
+                rendered_options["format"] = "csv"
             else:
                 rendered_options["format"] = "parquet"
 
@@ -109,7 +111,7 @@ class DuckDBAdapter(SQLAdapter):
                 ret.append(f"{k} '{v}'")
             else:
                 ret.append(f"{k} {v}")
-        return ",".join(ret)
+        return ", ".join(ret)
 
     @available
     def external_read_location(self, write_location: str, rendered_options: dict) -> str:
