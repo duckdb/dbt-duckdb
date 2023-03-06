@@ -85,6 +85,43 @@ class DuckDBAdapter(SQLAdapter):
     def use_database(self) -> bool:
         return duckdb.__version__ >= "0.7.0"
 
+    @available
+    def external_write_options(self, write_location: str, rendered_options: dict) -> str:
+        if "format" not in rendered_options:
+            ext = os.path.splitext(write_location)[1].lower()
+            if ext:
+                rendered_options["format"] = ext[1:]
+            elif "delimiter" in rendered_options:
+                rendered_options["format"] = "csv"
+            else:
+                rendered_options["format"] = "parquet"
+
+        if rendered_options["format"] == "csv":
+            if "header" not in rendered_options:
+                rendered_options["header"] = 1
+
+        if "partition_by" in rendered_options:
+            v = rendered_options["partition_by"]
+            if "," in v and not v.startswith("("):
+                rendered_options["partition_by"] = f"({v})"
+
+        ret = []
+        for k, v in rendered_options.items():
+            if k.lower() in {"delimiter", "quote", "escape", "null"} and not v.startswith("'"):
+                ret.append(f"{k} '{v}'")
+            else:
+                ret.append(f"{k} {v}")
+        return ", ".join(ret)
+
+    @available
+    def external_read_location(self, write_location: str, rendered_options: dict) -> str:
+        if rendered_options.get("partition_by"):
+            globs = [write_location, "*"]
+            partition_by = str(rendered_options.get("partition_by"))
+            globs.extend(["*"] * len(partition_by.split(",")))
+            return ".".join(["/".join(globs), str(rendered_options.get("format", "parquet"))])
+        return write_location
+
     def valid_incremental_strategies(self) -> Sequence[str]:
         """DuckDB does not currently support MERGE statement."""
         return ["append", "delete+insert"]

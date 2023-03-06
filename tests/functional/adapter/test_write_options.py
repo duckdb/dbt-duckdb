@@ -13,31 +13,26 @@ from dbt.tests.util import (
     run_dbt,
 )
 
-config_materialized_default = """
-  {{ config(materialized="external") }}
+config_write_csv_delim_options = """
+  {{ config(materialized="external", format="csv", options={"delimiter": "|"}) }}
 """
 
-config_materialized_csv = """
-  {{ config(materialized="external", format="csv") }}
+config_write_codec_options = """
+  {{ config(materialized="external", options={"codec": "zstd"}) }}
 """
 
-config_materialized_parquet_location = """
-  {{ config(materialized="external", location="test.parquet") }}
+config_write_partition_by_id = """
+    {{ config(materialized="external", options={"partition_by": "id", "codec": "zstd"}) }}
 """
 
-config_materialized_csv_location = """
-  {{ config(materialized="external", location="test.csv") }}
+config_write_partition_by_id_name = """
+    {{ config(materialized="external", options={"partition_by": "id, name"}) }}
 """
 
-config_materialized_csv_location_delim = """
-  {{ config(materialized="external", location="test_delim.csv", delimiter="|") }}
-"""
-
-default_external_sql = config_materialized_default + model_base
-csv_external_sql = config_materialized_csv + model_base
-parquet_table_location_sql = config_materialized_parquet_location + model_base
-csv_location_sql = config_materialized_csv_location + model_base
-csv_location_delim_sql = config_materialized_csv_location_delim + model_base
+csv_delim_options_sql = config_write_csv_delim_options + model_base
+write_codec_options = config_write_codec_options + model_base
+config_write_partition_by_id_sql = config_write_partition_by_id + model_base
+config_write_partition_by_id_name_sql = config_write_partition_by_id_name + model_base
 
 
 class BaseExternalMaterializations:
@@ -45,10 +40,10 @@ class BaseExternalMaterializations:
     def models(self):
         return {
             "table_model.sql": base_table_sql,
-            "table_default.sql": default_external_sql,
-            "table_csv.sql": csv_external_sql,
-            "table_parquet_location.sql": parquet_table_location_sql,
-            "table_csv_location_delim.sql": csv_location_delim_sql,
+            "csv_delim_options.sql": csv_delim_options_sql,
+            "write_codec_options.sql": write_codec_options,
+            "config_write_partition_by_id.sql": config_write_partition_by_id_sql,
+            "config_write_partition_by_id_name.sql": config_write_partition_by_id_name_sql,
             "schema.yml": schema_base_yml,
         }
 
@@ -81,10 +76,10 @@ class BaseExternalMaterializations:
             results,
             [
                 "table_model",
-                "table_default",
-                "table_csv",
-                "table_parquet_location",
-                "table_csv_location_delim",
+                "csv_delim_options",
+                "write_codec_options",
+                "config_write_partition_by_id",
+                "config_write_partition_by_id_name",
             ],
         )
 
@@ -92,10 +87,10 @@ class BaseExternalMaterializations:
         expected = {
             "base": "table",
             "table_model": "table",
-            "table_default": "view",
-            "table_parquet_location": "view",
-            "table_csv": "view",
-            "table_csv_location_delim": "view",
+            "csv_delim_options": "view",
+            "write_codec_options": "view",
+            "config_write_partition_by_id": "view",
+            "config_write_partition_by_id_name": "view",
         }
         check_relation_types(project.adapter, expected)
 
@@ -109,11 +104,10 @@ class BaseExternalMaterializations:
             project.adapter,
             [
                 "base",
-                "table_default",
-                "table_parquet_location",
-                "table_model",
-                "table_csv",
-                "table_csv_location_delim",
+                "csv_delim_options",
+                "write_codec_options",
+                "config_write_partition_by_id",
+                "config_write_partition_by_id_name",
             ],
         )
 
