@@ -1,5 +1,6 @@
 import pytest
 from dbt.tests.util import run_dbt
+from dbt.adapters.duckdb.connections import DuckDBConnectionManager
 
 models_file_model_sql = """
 {{ config(materialized='table') }}
@@ -34,5 +35,6 @@ class TestFilesystems:
         }
 
     def test_filesystems(self, project):
+        DuckDBConnectionManager.close_all_connections()
         results = run_dbt()
         assert len(results) == 1
