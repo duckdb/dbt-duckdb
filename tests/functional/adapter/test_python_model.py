@@ -99,3 +99,35 @@ class TestEmptyPythonModel:
             fetch="all",
         )
         assert result == [("a", "VARCHAR"), ("b", "BOOLEAN")]
+
+
+python_pyarrow_model = """
+import pyarrow as pa
+
+def model(dbt, con):
+    return pa.Table.from_pydict({"a": [1,2,3]})
+"""
+
+class TestMultiThreadedImports:
+    """
+    This test ensures that multiple pyarrow models can run concurrently with threads > 1
+    and not suffer import issues
+    """
+
+    @pytest.fixture(scope="class")
+    def dbt_profile_target(self):
+        return {
+            "type": "duckdb",
+            "path": ":memory:",
+            "threads": 2,
+        }
+
+    
+    @pytest.fixture(scope="class")
+    def models(self):
+        return {
+            f"model_{i}.py": python_pyarrow_model for i in range(3)
+        }
+    
+    def test_run(self, project):
+        run_dbt(["run"])

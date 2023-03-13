@@ -50,36 +50,14 @@
 {{ compiled_code }}
 
 def materialize(df, con):
-    # For the DuckDBPyRelation checks
-    import duckdb
-
-    # make sure pandas exists before using it
-    try:
-        import pandas
-        pandas_available = True
-    except ImportError:
-        pandas_available = False
-
-    # make sure pyarrow exists before using it
     try:
         import pyarrow
-        pyarrow_available = True
     except ImportError:
-        pyarrow_available = False
-
-    if isinstance(df, duckdb.DuckDBPyRelation):
-        if pyarrow_available:
-            df = df.arrow()
-        elif pandas_available:
-            df = df.df()
-        else:
-            raise Exception("No pandas or pyarrow available to materialize DuckDBPyRelation")
-    elif not (
-      (pandas_available and isinstance(df, pandas.DataFrame))
-      or (pyarrow_available and isinstance(df, pyarrow.Table))
-    ):
-        raise Exception( str(type(df)) + " is not a supported type for dbt Python materialization")
-
+        pass
+    finally:
+        if isinstance(df, pyarrow.Table):
+            # https://github.com/duckdb/duckdb/issues/6584
+            import pyarrow.dataset
     con.execute('create table {{ relation.include(database=adapter.use_database()) }} as select * from df')
 {% endmacro %}
 
