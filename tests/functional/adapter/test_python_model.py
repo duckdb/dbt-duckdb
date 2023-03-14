@@ -101,12 +101,21 @@ class TestEmptyPythonModel:
         assert result == [("a", "VARCHAR"), ("b", "BOOLEAN")]
 
 
-python_pyarrow_model = """
+python_pyarrow_table_model = """
 import pyarrow as pa
 
 def model(dbt, con):
     return pa.Table.from_pydict({"a": [1,2,3]})
 """
+
+python_pyarrow_dataset_model = """
+import pyarrow as pa
+import pyarrow.dataset as ds
+
+def model(dbt, con):
+    return ds.dataset(pa.Table.from_pydict({"b": [4, 5, 6]}))
+"""
+
 
 class TestMultiThreadedImports:
     """
@@ -122,12 +131,16 @@ class TestMultiThreadedImports:
             "threads": 2,
         }
 
-    
     @pytest.fixture(scope="class")
     def models(self):
         return {
-            f"model_{i}.py": python_pyarrow_model for i in range(3)
+            "model_table1.py": python_pyarrow_table_model,
+            "model_table2.py": python_pyarrow_table_model,
+            "model_table3.py": python_pyarrow_table_model,
+            "model_dataset1.py": python_pyarrow_dataset_model,
+            "model_dataset2.py": python_pyarrow_dataset_model,
+            "model_dataset3.py": python_pyarrow_dataset_model,
         }
-    
+
     def test_run(self, project):
         run_dbt(["run"])
