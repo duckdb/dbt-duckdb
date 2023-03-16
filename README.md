@@ -43,7 +43,7 @@ As of dbt-duckdb `1.4.0` and DuckDB `0.7.0`, the value of the `database` propert
 file in the `path` argument with the suffix removed (so for example if the `path` is `/tmp/a/dbfile.duckdb` the `database` argument will be
 automatically set to `dbfile`). If you are running with the `path` equal to `:memory:`, then the name of the database will be `memory`.
 
-### DuckDB Extensions and Settings
+#### DuckDB Extensions, Settings, and Filesystems
 
 You can load any supported [DuckDB extensions](https://duckdb.org/docs/extensions/overview) by listing them in
 the `extensions` field in your profile. You can also set any additional [DuckDB configuration options](https://duckdb.org/docs/sql/configuration)
@@ -66,10 +66,36 @@ default:
   target: dev
 ```
 
+As of verion `1.4.1`, we have added (experimental!) support for DuckDB's (experimental!) support for filesystems
+implemented via [fsspec](https://duckdb.org/docs/guides/python/filesystems.html). The `fsspec` library provides
+support for reading and writing files from a [variety of cloud data storage systems](https://filesystem-spec.readthedocs.io/en/latest/api.html#other-known-implementations)
+including S3, GCS, and Azure Blob Storage. You can configure a list of fsspec-compatible implementations for use with your dbt-duckdb project by installing the relevant Python modules
+and configuring your profile like this:
+
+```
+default:
+  outputs:
+    dev:
+      type: duckdb
+      path: /tmp/dbt.duckdb
+      filesystems:
+        - fs: s3
+          anon: false
+          key: "{{ env_var('S3_ACCESS_KEY_ID') }}"
+          secret: "{{ env_var('S3_SECRET_ACCESS_KEY') }}"
+          client_kwargs:
+            endpoint_url: "http://localhost:4566"
+  target: dev
+```
+
+Here, the `filesystems` property takes a list of configurations, where each entry must have a property named `fs` that indicates which `fsspec` implementation
+to load and then an arbitrary set of other key-value pairs that are used to configure the `fsspec` implementation. You can see a simple example project that
+illustrates the usage of this feature [here](https://github.com/jwills/s3-demo).
+
 #### Fetching credentials from context
 Instead of specifying the credentials through the settings block, you can also use the use_credential_provider property. If you set this to `aws` (currently the only supported implementation) and you have `boto3` installed in your python environment, we will fetch your AWS credentials using the credential provider chain as described [here](https://boto3.amazonaws.com/v1/documentation/api/latest/guide/credentials.html). This means that you can use any supported mechanism from AWS to obtain credentials (e.g., web identity tokens).
 
-### Attaching Additional Databases
+#### Attaching Additional Databases
 
 DuckDB version `0.7.0` and dbt-duckdb version `1.4.0` support [attaching additional databases](https://duckdb.org/docs/sql/statements/attach.html) to your dbt-duckdb run so that you can read
 and write from multiple databases. Additional databases may be configured using [dbt run hooks](https://docs.getdbt.com/docs/build/hooks-operations) or via the `attach` argument
@@ -98,7 +124,7 @@ DuckDB `0.7.0` ships with support for reading and writing from attached SQLite d
 which currently supports `duckdb` and `sqlite`.
 
 
-### External Materializations and Sources
+### Reading and Writing External Files
 
 One of DuckDB's most powerful features is its ability to read and write CSV and Parquet files directly, without needing to import/export
 them from the database first.
@@ -191,7 +217,7 @@ with an extension that matches the `format` argument (either `parquet` or `csv`)
 relative to the current working directory, but you can change the default directory (or S3 bucket/prefix) by specifying the
 `external_root` setting in your DuckDB profile.
 
-### Re-running external models with an in-memory version of dbt-duckdb
+#### Re-running external models with an in-memory version of dbt-duckdb
 When using `:memory:` as the DuckDB database, subsequent dbt runs can fail when selecting a subset of models that depend on external tables. This is because external Parquet or CSV files are only registered as  DuckDB views when they are created, not when they are referenced. To overcome this issue we have provided the `register_upstream_external_models` macro that can be triggered at the beginning of a run. To enable this automatic registration, place the following in your `dbt_project.yml` file:
 
 ```yaml
