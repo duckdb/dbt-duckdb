@@ -1,7 +1,7 @@
 ## dbt-duckdb
 
 [DuckDB](http://duckdb.org) is an embedded database, similar to SQLite, but designed for OLAP-style analytics.
-It is crazy fast and allows you to read and write data stored in CSV and Parquet files directly, without requiring you to load
+It is crazy fast and allows you to read and write data stored in CSV, JSON, and Parquet files directly, without requiring you to load
 them into the database first.
 
 [dbt](http://getdbt.com) is the best way to manage a collection of data transformations written in SQL or Python for analytics
@@ -126,7 +126,7 @@ which currently supports `duckdb` and `sqlite`.
 
 ### Reading and Writing External Files
 
-One of DuckDB's most powerful features is its ability to read and write CSV and Parquet files directly, without needing to import/export
+One of DuckDB's most powerful features is its ability to read and write CSV, JSON, and Parquet files directly, without needing to import/export
 them from the database first.
 
 #### Reading from external files
@@ -202,7 +202,7 @@ LEFT JOIN {{ source('upstream', 'source') }} s USING (id)
 | Option | Default | Description
 | :---:    |  :---:    | ---
 | location | `{{ name }}.{{ format }}` | The path to write the external materialization to. See below for more details.
-| format | parquet | The format of the external file, either `parquet` or `csv`.
+| format | parquet | The format of the external file (parquet, csv, or json)
 | delimiter | ,    | For CSV files, the delimiter to use for fields.
 | options | None | Any other options to pass to DuckDB's `COPY` operation (e.g., `partition_by`, `codec`, etc.)
 | glue_register | false | If true, try to register the file created by this model with the AWS Glue Catalog.
@@ -213,12 +213,12 @@ the `format` argument from the file extension of the `location` if the `format` 
 added in version 1.4.1.)
 
 If the `location` argument is _not_ specified, then the external file will be named after the model.sql (or model.py) file that defined it
-with an extension that matches the `format` argument (either `parquet` or `csv`). By default, the external files are created
+with an extension that matches the `format` argument (`parquet`, `csv`, or `json`). By default, the external files are created
 relative to the current working directory, but you can change the default directory (or S3 bucket/prefix) by specifying the
 `external_root` setting in your DuckDB profile.
 
 #### Re-running external models with an in-memory version of dbt-duckdb
-When using `:memory:` as the DuckDB database, subsequent dbt runs can fail when selecting a subset of models that depend on external tables. This is because external Parquet or CSV files are only registered as  DuckDB views when they are created, not when they are referenced. To overcome this issue we have provided the `register_upstream_external_models` macro that can be triggered at the beginning of a run. To enable this automatic registration, place the following in your `dbt_project.yml` file:
+When using `:memory:` as the DuckDB database, subsequent dbt runs can fail when selecting a subset of models that depend on external tables. This is because external files are only registered as  DuckDB views when they are created, not when they are referenced. To overcome this issue we have provided the `register_upstream_external_models` macro that can be triggered at the beginning of a run. To enable this automatic registration, place the following in your `dbt_project.yml` file:
 
 ```yaml
 on-run-start:
