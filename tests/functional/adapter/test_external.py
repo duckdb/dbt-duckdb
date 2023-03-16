@@ -33,11 +33,16 @@ config_materialized_csv_location_delim = """
   {{ config(materialized="external", location="test_delim.csv", delimiter="|") }}
 """
 
+config_json = """
+  {{ config(materialized="external", format="json") }}
+"""
+
 default_external_sql = config_materialized_default + model_base
 csv_external_sql = config_materialized_csv + model_base
 parquet_table_location_sql = config_materialized_parquet_location + model_base
 csv_location_sql = config_materialized_csv_location + model_base
 csv_location_delim_sql = config_materialized_csv_location_delim + model_base
+json_sql = config_json + model_base
 
 
 class BaseExternalMaterializations:
@@ -49,6 +54,7 @@ class BaseExternalMaterializations:
             "table_csv.sql": csv_external_sql,
             "table_parquet_location.sql": parquet_table_location_sql,
             "table_csv_location_delim.sql": csv_location_delim_sql,
+            "table_json.sql": json_sql,
             "schema.yml": schema_base_yml,
         }
 
@@ -74,7 +80,7 @@ class BaseExternalMaterializations:
         # run command
         results = run_dbt()
         # run result length
-        assert len(results) == 5
+        assert len(results) == 6
 
         # names exist in result nodes
         check_result_nodes_by_name(
@@ -85,6 +91,7 @@ class BaseExternalMaterializations:
                 "table_csv",
                 "table_parquet_location",
                 "table_csv_location_delim",
+                "table_json",
             ],
         )
 
@@ -96,6 +103,7 @@ class BaseExternalMaterializations:
             "table_parquet_location": "view",
             "table_csv": "view",
             "table_csv_location_delim": "view",
+            "table_json": "view",
         }
         check_relation_types(project.adapter, expected)
 
@@ -114,12 +122,13 @@ class BaseExternalMaterializations:
                 "table_model",
                 "table_csv",
                 "table_csv_location_delim",
+                "table_json",
             ],
         )
 
         # check relations in catalog
         catalog = run_dbt(["docs", "generate"])
-        assert len(catalog.nodes) == 6
+        assert len(catalog.nodes) == 7
         assert len(catalog.sources) == 1
 
 
