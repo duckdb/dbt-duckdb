@@ -6,8 +6,7 @@ them into the database first.
 
 [dbt](http://getdbt.com) is the best way to manage a collection of data transformations written in SQL or Python for analytics
 and data science. `dbt-duckdb` is the project that ties DuckDB and dbt together, allowing you to create a [Modern Data Stack In
-A Box](https://duckdb.org/2022/10/12/modern-data-stack-in-a-box.html) or a simple and powerful data lakehouse- no Java or Scala
-required.
+A Box](https://duckdb.org/2022/10/12/modern-data-stack-in-a-box.html) or a simple and powerful data lakehouse with Python.
 
 ### Installation
 
@@ -37,11 +36,9 @@ The `path` field should normally be the path to a local DuckDB file on your file
 would like to run an in-memory only version of dbt-duckdb. Keep in mind that if you are using the in-memory mode,
 any models that you want to keep from the dbt run will need to be persisted using one of the external materialization strategies described below.
 
-The `database` property is special: prior to DuckDB `0.7.0` and dbt-duckdb `1.4.0`, it was always set to `main`,
-because DuckDB did not have the concept of multiple databases accessible from a single connection.
-As of dbt-duckdb `1.4.0` and DuckDB `0.7.0`, the value of the `database` property is automatically set to the basename of the
-file in the `path` argument with the suffix removed (so for example if the `path` is `/tmp/a/dbfile.duckdb` the `database` argument will be
-automatically set to `dbfile`). If you are running with the `path` equal to `:memory:`, then the name of the database will be `memory`.
+`dbt-duckdb` also supports common profile fields like `schema` and `threads`, but the `database` property is special: it's value is automatically set
+to the basename of the file in the `path` argument with the suffix removed. For example, if the `path` is `/tmp/a/dbfile.duckdb`, the `database`
+field will be set to `dbfile`. If you are running with the `path` equal to `:memory:`, then the name of the database will be `memory`.
 
 #### DuckDB Extensions, Settings, and Filesystems
 
@@ -70,7 +67,7 @@ As of verion `1.4.1`, we have added (experimental!) support for DuckDB's (experi
 implemented via [fsspec](https://duckdb.org/docs/guides/python/filesystems.html). The `fsspec` library provides
 support for reading and writing files from a [variety of cloud data storage systems](https://filesystem-spec.readthedocs.io/en/latest/api.html#other-known-implementations)
 including S3, GCS, and Azure Blob Storage. You can configure a list of fsspec-compatible implementations for use with your dbt-duckdb project by installing the relevant Python modules
-and configuring your profile like this:
+and configuring your profile like so:
 
 ```
 default:
@@ -88,9 +85,9 @@ default:
   target: dev
 ```
 
-Here, the `filesystems` property takes a list of configurations, where each entry must have a property named `fs` that indicates which `fsspec` implementation
-to load and then an arbitrary set of other key-value pairs that are used to configure the `fsspec` implementation. You can see a simple example project that
-illustrates the usage of this feature [here](https://github.com/jwills/s3-demo).
+Here, the `filesystems` property takes a list of configurations, where each entry must have a property named `fs` that indicates which `fsspec` protocol
+to load (so `s3`, `gcs`, `abfs`, etc.) and then an arbitrary set of other key-value pairs that are used to configure the `fsspec` implementation. You can see a simple example project that
+illustrates the usage of this feature to connect to a Localstack instance running S3 from dbt-duckdb [here](https://github.com/jwills/s3-demo).
 
 #### Fetching credentials from context
 Instead of specifying the credentials through the settings block, you can also use the use_credential_provider property. If you set this to `aws` (currently the only supported implementation) and you have `boto3` installed in your python environment, we will fetch your AWS credentials using the credential provider chain as described [here](https://boto3.amazonaws.com/v1/documentation/api/latest/guide/credentials.html). This means that you can use any supported mechanism from AWS to obtain credentials (e.g., web identity tokens).
@@ -132,7 +129,7 @@ them from the database first.
 #### Reading from external files
 
 You may reference external files in your dbt model's either directly or as dbt `source`s by configuring the `external_location`
-meta option:
+meta option on the source:
 
 ```
 sources:
@@ -188,6 +185,19 @@ SELECT *
 FROM read_parquet(['s3://my-bucket/my-sources/source2a.parquet', 's3://my-bucket/my-sources/source2b.parquet'])
 ```
 
+Note that the value of the `external_location` property does not need to be a path-like string; it can also be a function
+call, which is helpful in the case that you have an external source that is a CSV file which requires special handling for DuckDB
+to load it correctly:
+
+```
+sources:
+  - name: flights_source
+    tables:
+      - name: flights
+        meta:
+          external_location: "read_csv('flights.csv', types={'FlightDate': 'DATE'}, names=['FlightDate', 'UniqueCarrier'])"
+```
+
 #### Writing to external files
 
 We support creating dbt models that are backed by external files via the `external` materialization strategy:
@@ -233,7 +243,7 @@ data platform supports. However, in `dbt-duckdb`, the local machine *is* the dat
 code that will run on your machine via an [exec](https://realpython.com/python-exec/) call. The value of the `dbt.ref` and `dbt.source`
 functions will be a [DuckDB Relation](https://duckdb.org/docs/api/python/reference/) object that can be easily converted into a
 Pandas DataFrame or Arrow table, and the return value of the `def models` function can be _any_ Python object that DuckDB knows how
-to turn into a relation, including a Pandas `DataFrame`, a DuckDB `Relation`, or an Arrow `Table`, `Dataset`, `RecordBatchReader`, or
+to turn into a relation, including a Pandas or Polars `DataFrame`, a DuckDB `Relation`, or an Arrow `Table`, `Dataset`, `RecordBatchReader`, or
 `Scanner`.
 
 ### Roadmap
