@@ -50,36 +50,14 @@
 {{ compiled_code }}
 
 def materialize(df, con):
-    # For the DuckDBPyRelation checks
-    import duckdb
-
-    # make sure pandas exists before using it
-    try:
-        import pandas
-        pandas_available = True
-    except ImportError:
-        pandas_available = False
-
-    # make sure pyarrow exists before using it
     try:
         import pyarrow
-        pyarrow_available = True
     except ImportError:
-        pyarrow_available = False
-
-    if isinstance(df, duckdb.DuckDBPyRelation):
-        if pyarrow_available:
-            df = df.arrow()
-        elif pandas_available:
-            df = df.df()
-        else:
-            raise Exception("No pandas or pyarrow available to materialize DuckDBPyRelation")
-    elif not (
-      (pandas_available and isinstance(df, pandas.DataFrame))
-      or (pyarrow_available and isinstance(df, pyarrow.Table))
-    ):
-        raise Exception( str(type(df)) + " is not a supported type for dbt Python materialization")
-
+        pass
+    finally:
+        if isinstance(df, pyarrow.Table):
+            # https://github.com/duckdb/duckdb/issues/6584
+            import pyarrow.dataset
     con.execute('create table {{ relation.include(database=adapter.use_database()) }} as select * from df')
 {% endmacro %}
 
@@ -188,23 +166,9 @@ def materialize(df, con):
   {% do return(adapter.location_exists(location)) %}
 {% endmacro %}
 
-{% macro write_to_file(relation, location, format, delimiter=',') -%}
-  {% if format == 'parquet' %}
-    {% set copy_to %}
-      copy {{ relation }} to '{{ location }}' (FORMAT 'parquet');
-    {% endset %}
-
-  {% elif format == 'csv' %}
-    {% set copy_to %}
-      copy {{ relation }} to '{{ location }}' (HEADER 1, DELIMITER '{{ delimiter }}');
-    {% endset %}
-
-  {% else %}
-      {% do exceptions.raise_compiler_error("%s external format is not supported!" % format) %}
-  {% endif %}
-
+{% macro write_to_file(relation, location, options) -%}
   {% call statement('write_to_file') -%}
-    {{ copy_to }}
+    copy {{ relation }} to '{{ location }}' ({{ options }})
   {%- endcall %}
 {% endmacro %}
 
@@ -214,3 +178,24 @@ def materialize(df, con):
     {% do adapter.register_glue_table(glue_database, relation.identifier, column_list, location, format) %}
   {% endif %}
 {% endmacro %}
+
+{% macro render_write_options(config) -%}
+  {% set options = config.get('options', {}) %}
+  {% for k in options %}
+    {% if options[k] is string %}
+      {% set _ = options.update({k: render(options[k])}) %}
+    {% else %}
+      {% set _ = options.update({k: render(options[k])}) %}
+    {% endif %}
+  {% endfor %}
+
+  {# legacy top-level write options #}
+  {% if config.get('format') %}
+    {% set _ = options.update({'format': render(config.get('format'))}) %}
+  {% endif %}
+  {% if config.get('delimiter') %}
+    {% set _ = options.update({'delimiter': render(config.get('delimiter'))}) %}
+  {% endif %}
+
+  {% do return(options) %}
+{%- endmacro %}

@@ -1,10 +1,9 @@
 {% materialization external, adapter="duckdb", supported_languages=['sql', 'python'] %}
 
-  {%- set format = render(config.get('format', default='parquet')) -%}
-  {%- set location = render(config.get('location', default=external_location(this, format))) -%}
-  {%- set delimiter = render(config.get('delimiter', default=',')) -%}
-  {%- set glue_register = config.get('glue_register', default=false) -%}
-  {%- set glue_database = render(config.get('glue_database', default='default')) -%}
+  {%- set location = render(config.get('location', default=external_location(this, config))) -%})
+  {%- set rendered_options = render_write_options(config) -%}
+  {%- set write_options = adapter.external_write_options(location, rendered_options) -%}
+  {%- set read_location = adapter.external_read_location(location, rendered_options) -%}
 
   -- set language - python or sql
   {%- set language = model['language'] -%}
@@ -46,11 +45,11 @@
   {%- endcall %}
 
   -- write an temp relation into file
-  {{ write_to_file(temp_relation, location, format, delimiter) }}
+  {{ write_to_file(temp_relation, location, write_options) }}
   -- create a view on top of the location
   {% call statement('main', language='sql') -%}
     create or replace view {{ intermediate_relation.include(database=adapter.use_database()) }} as (
-        select * from '{{ location }}'
+        select * from '{{ read_location }}'
     );
   {%- endcall %}
 
@@ -76,6 +75,8 @@
   {{ drop_relation_if_exists(temp_relation) }}
 
   -- register table into glue
+  {%- set glue_register = config.get('glue_register', default=false) -%}
+  {%- set glue_database = render(config.get('glue_database', default='default')) -%}
   {% do register_glue_table(glue_register, glue_database, target_relation, location, format) %}
 
   {{ run_hooks(post_hooks, inside_transaction=False) }}

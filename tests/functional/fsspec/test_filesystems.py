@@ -1,5 +1,6 @@
 import pytest
 from dbt.tests.util import run_dbt
+from dbt.adapters.duckdb.connections import DuckDBConnectionManager
 
 models_file_model_sql = """
 {{ config(materialized='table') }}
@@ -11,20 +12,11 @@ WHERE conf = 'West'
 
 class TestFilesystems:
     @pytest.fixture(scope="class")
-    def profiles_config_update(self):
+    def dbt_profile_target(self):
         return {
-            "test": {
-                "outputs": {
-                    "dev": {
-                        "type": "duckdb",
-                        "path": ":memory:",
-                        "filesystems": [
-                            {"fs": "github", "org": "jwills", "repo": "nba_monte_carlo"}
-                        ],
-                    }
-                },
-                "target": "dev",
-            }
+            "type": "duckdb",
+            "path": ":memory:",
+            "filesystems": [{"fs": "github", "org": "jwills", "repo": "nba_monte_carlo"}],
         }
 
     @pytest.fixture(scope="class")
@@ -34,5 +26,6 @@ class TestFilesystems:
         }
 
     def test_filesystems(self, project):
+        DuckDBConnectionManager.close_all_connections()
         results = run_dbt()
         assert len(results) == 1

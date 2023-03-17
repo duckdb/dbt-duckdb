@@ -3,6 +3,7 @@ from unittest import mock
 
 import dbt.flags as flags
 from dbt.adapters.duckdb import DuckDBAdapter
+from dbt.adapters.duckdb.connections import DuckDBConnectionManager
 from tests.unit.utils import config_from_parts_or_dicts, mock_connection
 
 
@@ -44,6 +45,7 @@ class TestDuckDBAdapter(unittest.TestCase):
 
     @mock.patch("dbt.adapters.duckdb.connections.duckdb")
     def test_acquire_connection(self, connector):
+        DuckDBConnectionManager.close_all_connections()
         connection = self.adapter.acquire_connection("dummy")
 
         connector.connect.assert_not_called()
