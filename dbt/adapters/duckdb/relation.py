@@ -7,6 +7,16 @@ from dbt.adapters.base.relation import BaseRelation
 from dbt.adapters.base.relation import Self
 from dbt.contracts.graph.nodes import SourceDefinition
 
+from .connections import DuckDBConnectionManager
+
+
+def _meta_helper(field: str, source: SourceDefinition) -> Optional[Any]:
+    if field in source.meta:
+        return source.meta[field]
+    elif field in source.source_meta:
+        return source.source_meta[field]
+    return None
+
 
 @dataclass(frozen=True, eq=False, repr=False)
 class DuckDBRelation(BaseRelation):
@@ -19,13 +29,7 @@ class DuckDBRelation(BaseRelation):
         # via a `external_location` meta field. If the source's meta field is used, we include
         # some logic to allow basic templating of the external location based on the individual
         # name or identifier for the table itself to cut down on boilerplate.
-        ext_location = None
-        if "external_location" in source.meta:
-            ext_location = source.meta["external_location"]
-        elif "external_location" in source.source_meta:
-            # Use str.format here to allow for some basic templating outside of Jinja
-            ext_location = source.source_meta["external_location"]
-
+        ext_location = _meta_helper("external_location", source)
         if ext_location:
             # Call str.format with the schema, name and identifier for the source so that they
             # can be injected into the string; this helps reduce boilerplate when all
@@ -38,6 +42,19 @@ class DuckDBRelation(BaseRelation):
             if "(" not in ext_location and not ext_location.startswith("'"):
                 ext_location = f"'{ext_location}'"
             kwargs["external_location"] = ext_location
+
+        # Logic for handling sources defined in external catalogs
+        ext_catalog = _meta_helper("external_catalog", source)
+        if ext_catalog:
+            catalog = DuckDBConnectionManager.CATALOGS.get(ext_catalog)
+            if not catalog:
+                raise Exception("Rarrrr external catalog not found: " + ext_catalog)
+            pyarrow_obj = catalog.load(source.database, source.identifier)
+            if not pyarrow_obj:
+                raise Exception("Rarrrr pyarrow object not found in catalog")
+            registered_name = f"{catalog.name}__{source.database}_{source.identifier}"
+            DuckDBConnectionManager.register_pyarrow_as(pyarrow_obj, registered_name)
+            kwargs["external_location"] = registered_name
 
         return super().create_from_source(source, **kwargs)  # type: ignore
 

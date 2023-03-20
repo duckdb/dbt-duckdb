@@ -8,6 +8,7 @@ from functools import lru_cache
 from typing import Any
 from typing import Dict
 from typing import List
+from typing import Literal
 from typing import Optional
 from typing import Tuple
 
@@ -53,6 +54,27 @@ class Attachment:
 
 
 @dataclass
+class Catalog:
+    name: str
+    type: Literal["delta", "iceberg"]
+    config: Optional[Dict[str, Any]] = None
+    _delegate: Optional[Any] = None
+
+    def initialize(self):
+        if self.type == "delta":
+            from . import delta
+
+            self._delegate = delta.create(self.name, self.config)
+        elif self.type == "iceberg":
+            from . import iceberg
+
+            self._delegate = iceberg.create(self.name, self.config)
+
+    def load(self, database: str, table: str):
+        return self._delegate.load(database, table)
+
+
+@dataclass
 class DuckDBCredentials(Credentials):
     database: str = "main"
     schema: str = "main"
@@ -88,6 +110,11 @@ class DuckDBCredentials(Credentials):
     # number of key-value pairs that will be passed as arguments to the fsspec
     # registry method.
     filesystems: Optional[List[Dict[str, Any]]] = None
+
+    # A list of external catalogs that can support loading PyArrow entities
+    # (e.g., Tables or Datasets) from a given directory; see the schema for
+    # the Catalog dataclass above for what fields it can contain
+    catalogs: Optional[List[Dict[str, Any]]] = None
 
     @classmethod
     def __pre_deserialize__(cls, data: Dict[Any, Any]) -> Dict[Any, Any]:
@@ -191,6 +218,7 @@ class DuckDBConnectionManager(SQLConnectionManager):
     LOCK = threading.RLock()
     CONN = None
     CONN_COUNT = 0
+    CATALOGS = {}
 
     def __init__(self, profile: AdapterRequiredConfig):
         super().__init__(profile)
@@ -228,6 +256,18 @@ class DuckDBConnectionManager(SQLConnectionManager):
                             attachment = Attachment(**entry)
                             cls.CONN.execute(attachment.to_sql())
 
+                    # initialize any external catalogs we will be using
+                    if credentials.catalogs:
+                        for entry in credentials.catalogs:
+                            catalog = Catalog(**entry)
+                            if catalog.name in cls.CATALOGS:
+                                raise Exception(
+                                    "Duplicate catalog name in profile: " + catalog.name
+                                )
+                            else:
+                                catalog.initialize()
+                                cls.CATALOGS[catalog.name] = catalog
+
                 connection.handle = DuckDBConnectionWrapper(cls.CONN.cursor(), credentials)
                 connection.state = ConnectionState.OPEN
                 cls.CONN_COUNT += 1
@@ -260,6 +300,11 @@ class DuckDBConnectionManager(SQLConnectionManager):
                     cls.CONN = None
 
         return connection
+
+    @classmethod
+    def register_pyarrow_as(cls, pyarrow_obj, view_name: str):
+        with cls.LOCK:
+            cls.CONN.execute(f"CREATE OR REPLACE VIEW {view_name} AS pyarrow_obj")
 
     def cancel(self, connection):
         pass

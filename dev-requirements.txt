@@ -10,6 +10,7 @@ pandas
 pyarrow
 black==22.12.0
 bumpversion
+deltalake
 flake8
 flaky
 freezegun==1.2.2
@@ -18,6 +19,7 @@ ipdb
 mypy==1.1.1
 pip-tools
 pre-commit
+pyiceberg
 pytest
 pytest-dotenv
 pytest-logbook
