@@ -43,7 +43,7 @@ class TestDuckDBAdapter(unittest.TestCase):
             self._adapter = DuckDBAdapter(self.config)
         return self._adapter
 
-    @mock.patch("dbt.adapters.duckdb.connections.duckdb")
+    @mock.patch("dbt.adapters.duckdb.environments.duckdb")
     def test_acquire_connection(self, connector):
         DuckDBConnectionManager.close_all_connections()
         connection = self.adapter.acquire_connection("dummy")
