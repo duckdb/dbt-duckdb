@@ -9,6 +9,7 @@ from typing import Optional
 from typing import Tuple
 
 import duckdb
+
 from dbt.adapters.base import Credentials
 
 

@@ -1,7 +1,8 @@
-import dbt.exceptions
 import duckdb
 
-from .credentials import Attachment, DuckDBCredentials
+import dbt.exceptions
+from .credentials import Attachment
+from .credentials import DuckDBCredentials
 
 
 class DuckDBCursorWrapper:

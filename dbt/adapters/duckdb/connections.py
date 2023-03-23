@@ -3,14 +3,13 @@ import threading
 from contextlib import contextmanager
 
 import dbt.exceptions
+from . import environments
 from dbt.adapters.sql import SQLConnectionManager
 from dbt.contracts.connection import AdapterRequiredConfig
 from dbt.contracts.connection import AdapterResponse
 from dbt.contracts.connection import Connection
 from dbt.contracts.connection import ConnectionState
 from dbt.logger import GLOBAL_LOGGER as logger
-
-from . import environments
 
 
 class DuckDBConnectionManager(SQLConnectionManager):
