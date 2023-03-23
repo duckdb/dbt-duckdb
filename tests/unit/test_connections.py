@@ -2,7 +2,7 @@ from unittest import mock
 
 from botocore.credentials import Credentials
 
-from dbt.adapters.duckdb.connections import Attachment, DuckDBCredentials
+from dbt.adapters.duckdb.credentials import Attachment, DuckDBCredentials
 
 
 def test_load_basic_settings():
