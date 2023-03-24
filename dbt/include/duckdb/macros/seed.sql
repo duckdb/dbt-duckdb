@@ -1,6 +1,6 @@
 
 {% macro duckdb__get_binding_char() %}
-  {{ return('?') }}
+  {{ return(adapter.get_binding_char()) }}
 {% endmacro %}
 
 {% macro duckdb__get_batch_size() %}

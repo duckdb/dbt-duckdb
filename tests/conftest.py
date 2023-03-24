@@ -15,15 +15,31 @@ def pytest_addoption(parser):
 def dbt_profile_target(request, tmp_path_factory):
     profile_type = request.config.getoption("--profile")
 
-    if profile_type == "memory":
-        path = ":memory:"
+    profile = {
+        "type": "duckdb",
+        "threads": 4
+    }
+
+    if profile_type == "buenavista":
+        profile["database"] = "nba_monte_carlo"
+        profile["remote"] = {
+            "host": "127.0.0.1",
+            "port": 5433,
+            "user": "test",
+        }
+    elif profile_type == "memory":
+         profile["path"] = ":memory:"
     elif profile_type == "file":
-        path = str(tmp_path_factory.getbasetemp() / "tmp.db")
+        profile["path"] = str(tmp_path_factory.getbasetemp() / "tmp.db")
     else:
         raise ValueError(f"Invalid profile type '{profile_type}'")
 
-    return {
-        "type": "duckdb",
-        "threads": 4,
-        "path": path,
-    }
+    return profile
+
+@pytest.fixture(autouse=True)
+def skip_by_profile_type(request):
+    profile_type = request.config.getoption("--profile")
+    if request.node.get_closest_marker("skip_profile"):
+        for skip_profile_type in request.node.get_closest_marker("skip_profile").args:
+            if skip_profile_type == profile_type:
+                pytest.skip(f"skipped on '{profile_type}' profile")
