@@ -1,5 +1,5 @@
 import pytest
-from dbt.tests.util import run_dbt
+from dbt.tests.util import run_dbt, relation_from_name
 from dbt.adapters.duckdb import DuckDBConnectionManager
 
 upstream_model_sql = """
@@ -68,6 +68,12 @@ class TestRematerializeDownstreamExternalModel:
             [
                 "run",
                 "--select",
-                "downstream_model,other_downstream_model,downstream_of_partition_model",
+                "downstream_model other_downstream_model downstream_of_partition_model",
             ]
         )
+
+        # really makes sure we have created the downstream model
+        relation = relation_from_name(project.adapter, "downstream_of_partition_model")
+        result = project.run_sql(f"select count(*) as num_rows from {relation}", fetch="one")
+        assert result[0] == 5
+
