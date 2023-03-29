@@ -34,14 +34,6 @@ class TestRematerializeDownstreamExternalModel:
     """
 
     @pytest.fixture(scope="class")
-    def dbt_profile_target(self):
-        return {
-            "type": "duckdb",
-            "path": ":memory:",
-            "threads": 3,
-        }
-
-    @pytest.fixture(scope="class")
     def project_config_update(self):
         return {
             "name": "base",

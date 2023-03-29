@@ -124,14 +124,6 @@ class TestMultiThreadedImports:
     """
 
     @pytest.fixture(scope="class")
-    def dbt_profile_target(self):
-        return {
-            "type": "duckdb",
-            "path": ":memory:",
-            "threads": 2,
-        }
-
-    @pytest.fixture(scope="class")
     def models(self):
         return {
             "model_table1.py": python_pyarrow_table_model,
