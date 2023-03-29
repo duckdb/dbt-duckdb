@@ -11,6 +11,6 @@ pytest_plugins = ["dbt.tests.fixtures.project"]
 def dbt_profile_target():
     return {
         "type": "duckdb",
-        "threads": 1,
+        "threads": 4,
         "path": ":memory:",
     }
