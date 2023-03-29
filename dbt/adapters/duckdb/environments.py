@@ -25,11 +25,10 @@ class DuckDBCursorWrapper:
 
 class DuckDBConnectionWrapper:
     def __init__(self, env):
-        self._env = env
         self._cursor = DuckDBCursorWrapper(env.cursor())
 
     def close(self):
-        self._env.close(self._cursor)
+        self._cursor.close()
 
     def cursor(self):
         return self._cursor
@@ -49,8 +48,8 @@ class Environment:
 class LocalEnvironment(Environment):
     def __init__(self, credentials: DuckDBCredentials):
         self.creds = credentials
-        self.handles = 0
         self.conn = duckdb.connect(credentials.path, read_only=False)
+
         # install any extensions on the connection
         if credentials.extensions is not None:
             for extension in credentials.extensions:
@@ -73,7 +72,6 @@ class LocalEnvironment(Environment):
                 self.conn.execute(attachment.to_sql())
 
     def handle(self):
-        self.handles += 1
         return DuckDBConnectionWrapper(self)
 
     def cursor(self):
@@ -87,13 +85,13 @@ class LocalEnvironment(Environment):
             cursor.execute(f"SET {key} = '{value}'")
         return cursor
 
-    def close(self, cursor):
-        cursor.close()
-        self.handles -= 1
+    def close(self):
+        if self.conn:
+            self.conn.close()
+            self.conn = None
 
     def __del__(self):
-        self.conn.close()
-        self.conn = None
+        self.close()
 
 
 def create(creds: DuckDBCredentials) -> Environment:
