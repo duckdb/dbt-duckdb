@@ -9,7 +9,7 @@ class DuckDBCursorWrapper:
     def __init__(self, cursor):
         self._cursor = cursor
 
-    # forward along all non-execute() methods/attribute look ups
+    # forward along all non-execute() methods/attribute look-ups
     def __getattr__(self, name):
         return getattr(self._cursor, name)
 
@@ -90,9 +90,6 @@ class LocalEnvironment(Environment):
     def close(self, cursor):
         cursor.close()
         self.handles -= 1
-        if self.conn and self.handles == 0 and self.creds.path != ":memory:":
-            self.conn.close()
-            self.conn = None
 
     def __del__(self):
         self.conn.close()

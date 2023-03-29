@@ -23,6 +23,7 @@ downstream_of_partition_model = """
 select a * 3 from {{ ref('upstream_partition_by_model') }}
 """
 
+
 # class must begin with 'Test'
 class TestRematerializeDownstreamExternalModel:
     """
@@ -68,4 +69,3 @@ class TestRematerializeDownstreamExternalModel:
         relation = relation_from_name(project.adapter, "downstream_of_partition_model")
         result = project.run_sql(f"select count(*) as num_rows from {relation}", fetch="one")
         assert result[0] == 5
-

@@ -120,7 +120,7 @@ def model(dbt, con):
 class TestMultiThreadedImports:
     """
     This test ensures that multiple pyarrow models can run concurrently with threads > 1
-    and not suffer import issues
+    and not suffer import issues.
     """
 
     @pytest.fixture(scope="class")

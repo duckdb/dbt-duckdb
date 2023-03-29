@@ -114,7 +114,7 @@ class TestArrayConcat(BaseArrayConcat):
     pass
 
 
-class TestArrayConcat(BaseArrayConstruct):
+class TestArrayConstruct(BaseArrayConstruct):
     pass
 
 
