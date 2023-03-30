@@ -31,9 +31,14 @@ class DuckDBRelation(BaseRelation):
             # can be injected into the string; this helps reduce boilerplate when all
             # of the tables in the source have a similar location based on their name
             # and/or identifier.
-            ext_location = ext_location.format(
-                schema=source.schema, name=source.name, identifier=source.identifier
-            )
+            format_args = {
+                "schema": source.schema,
+                "name": source.name,
+                "identifier": source.identifier,
+            }
+            if source.meta:
+                format_args.update(source.meta)
+            ext_location = ext_location.format(**format_args)
             # If it's a function call or already has single quotes, don't add them
             if "(" not in ext_location and not ext_location.startswith("'"):
                 ext_location = f"'{ext_location}'"
