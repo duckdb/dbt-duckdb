@@ -8,10 +8,12 @@ sources_schema_yml = """version: 2
 sources:
   - name: external_source
     meta:
-      external_location: "/tmp/{name}.csv"
+      external_location: "/tmp/{name}_{extra}.csv"
     tables:
       - name: seeds_source
         description: "A source table"
+        meta:
+          extra: 'something'
         columns:
           - name: id
             description: "An id"
@@ -58,10 +60,10 @@ class TestExternalSources:
 
     @pytest.fixture(scope="class")
     def seeds_source_file(self):
-        with open("/tmp/seeds_source.csv", "w") as f:
+        with open("/tmp/seeds_source_something.csv", "w") as f:
             f.write("id,a,b\n1,2,3\n4,5,6\n7,8,9")
         yield
-        os.unlink("/tmp/seeds_source.csv")
+        os.unlink("/tmp/seeds_source_something.csv")
 
     @pytest.fixture(scope="class")
     def ost_file(self):
