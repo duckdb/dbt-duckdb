@@ -2,6 +2,7 @@
 
   {%- set location = render(config.get('location', default=external_location(this, config))) -%})
   {%- set rendered_options = render_write_options(config) -%}
+  {%- set format = config.get('format', 'parquet') -%}
   {%- set write_options = adapter.external_write_options(location, rendered_options) -%}
   {%- set read_location = adapter.external_read_location(location, rendered_options) -%}
 
