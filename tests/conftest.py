@@ -17,7 +17,7 @@ def dbt_profile_target(request, tmp_path_factory):
 
     if profile_type == "memory":
         path = ":memory:"
-    elif profile_type == "database":
+    elif profile_type == "file":
         path = str(tmp_path_factory.getbasetemp() / "tmp.db")
     else:
         raise ValueError(f"Invalid profile type '{profile_type}'")
