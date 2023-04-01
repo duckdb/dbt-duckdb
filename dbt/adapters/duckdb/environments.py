@@ -149,6 +149,7 @@ class LocalEnvironment(Environment):
 def create(creds: DuckDBCredentials) -> Environment:
     if creds.remote:
         from .buenavista import BVEnvironment
+
         return BVEnvironment(creds)
     else:
         return LocalEnvironment(creds)
