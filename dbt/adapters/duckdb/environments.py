@@ -133,8 +133,10 @@ class LocalEnvironment(Environment):
 
     def submit_python_job(self, handle, parsed_model: dict, compiled_code: str) -> AdapterResponse:
         con = handle.cursor()
+
         def ldf(table_name):
             return con.query(f"select * from {table_name}")
+
         self.run_python_job(con, ldf, parsed_model, compiled_code)
         return AdapterResponse(_message="OK")
 
