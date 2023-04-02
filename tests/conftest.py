@@ -21,7 +21,7 @@ def dbt_profile_target(request, tmp_path_factory):
     }
 
     if profile_type == "buenavista":
-        profile["database"] = "nba_monte_carlo"
+        profile["database"] = "memory"
         profile["remote"] = {
             "host": "127.0.0.1",
             "port": 5433,
