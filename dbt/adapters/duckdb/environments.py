@@ -9,6 +9,21 @@ from dbt.contracts.connection import AdapterResponse
 from dbt.exceptions import DbtRuntimeError
 
 
+def _ensure_event_loop():
+    """
+    Ensures the current thread has an event loop defined, and creates one if necessary.
+    """
+    import asyncio
+
+    try:
+        # Check that the current thread has an event loop attached
+        loop = asyncio.get_event_loop()
+    except RuntimeError:
+        # If the current thread doesn't have an event loop, create one
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+
+
 class DuckDBCursorWrapper:
     def __init__(self, cursor):
         self._cursor = cursor
@@ -89,11 +104,15 @@ class Environment:
         return cursor
 
     @classmethod
-    def run_python_job(cls, con, load_df_function, parsed_model: dict, compiled_code: str):
-        identifier = parsed_model["alias"]
+    def run_python_job(cls, con, load_df_function, identifier: str, compiled_code: str):
         mod_file = tempfile.NamedTemporaryFile(suffix=".py", delete=False)
         mod_file.write(compiled_code.lstrip().encode("utf-8"))
         mod_file.close()
+
+        # Ensure that we have an event loop for async code to use since we may
+        # be running inside of a thread that doesn't have one defined
+        _ensure_event_loop()
+
         try:
             spec = importlib.util.spec_from_file_location(identifier, mod_file.name)
             if not spec:
@@ -137,7 +156,7 @@ class LocalEnvironment(Environment):
         def ldf(table_name):
             return con.query(f"select * from {table_name}")
 
-        self.run_python_job(con, ldf, parsed_model, compiled_code)
+        self.run_python_job(con, ldf, parsed_model["alias"], compiled_code)
         return AdapterResponse(_message="OK")
 
     def close(self):
