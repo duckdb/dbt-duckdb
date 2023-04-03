@@ -9,6 +9,7 @@ mypy-boto3-glue
 pandas
 pyarrow
 black==22.12.0
+buenavista
 bumpversion
 flake8
 flaky
@@ -18,6 +19,7 @@ ipdb
 mypy==1.1.1
 pip-tools
 pre-commit
+psycopg2-binary
 pytest
 pytest-dotenv
 pytest-logbook

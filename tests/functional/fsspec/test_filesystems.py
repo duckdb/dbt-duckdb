@@ -9,10 +9,12 @@ from read_csv_auto('github://data/team_ratings.csv')
 WHERE conf = 'West'
 """
 
-
+@pytest.mark.skip_profile("buenavista")
 class TestFilesystems:
     @pytest.fixture(scope="class")
     def dbt_profile_target(self, dbt_profile_target):
+        if "path" not in dbt_profile_target:
+            return dbt_profile_target
         return {
             "type": "duckdb",
             "path": dbt_profile_target["path"],

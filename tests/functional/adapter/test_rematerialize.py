@@ -1,3 +1,4 @@
+import os
 import pytest
 from dbt.tests.util import run_dbt, relation_from_name
 from dbt.adapters.duckdb import DuckDBConnectionManager
@@ -34,6 +35,13 @@ class TestRematerializeDownstreamExternalModel:
     in-memory database.
     """
 
+    @pytest.fixture(scope="class")
+    def dbt_profile_target(self, dbt_profile_target, tmp_path_factory):
+        extroot = str(tmp_path_factory.getbasetemp() / "rematerialize")
+        os.mkdir(extroot)
+        dbt_profile_target["external_root"] = extroot
+        return dbt_profile_target
+    
     @pytest.fixture(scope="class")
     def project_config_update(self):
         return {

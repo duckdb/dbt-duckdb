@@ -11,11 +11,12 @@ from typing import Tuple
 import duckdb
 
 from dbt.adapters.base import Credentials
+from dbt.dataclass_schema import dbtClassMixin
 
 
 @dataclass
-class Attachment:
-    # The path to the database to be attached; may be a URL
+class Attachment(dbtClassMixin):
+    # The path to the database to be attached (may be a URL)
     path: str
 
     # The type of the attached database (defaults to duckdb, but may be supported by an extension)
@@ -43,10 +44,22 @@ class Attachment:
 
 
 @dataclass
+class Remote(dbtClassMixin):
+    host: str
+    port: int
+    user: str
+    password: Optional[str] = None
+
+
+@dataclass
 class DuckDBCredentials(Credentials):
     database: str = "main"
     schema: str = "main"
     path: str = ":memory:"
+
+    # Any connection-time configuration information that we need to pass
+    # to DuckDB (e.g., if we need to enable using unsigned extensions)
+    config_options: Optional[Dict[str, Any]] = None
 
     # any extensions we want to install and load (httpfs, parquet, etc.)
     extensions: Optional[Tuple[str, ...]] = None
@@ -68,7 +81,7 @@ class DuckDBCredentials(Credentials):
     # A list of additional databases that should be attached to the running
     # DuckDB instance to make them available for use in models; see the
     # schema for the Attachment dataclass above for what fields it can contain
-    attach: Optional[List[Dict[str, Any]]] = None
+    attach: Optional[List[Attachment]] = None
 
     # A list of filesystems to attach to the DuckDB database via the fsspec
     # interface; see https://duckdb.org/docs/guides/python/filesystems.html
@@ -79,11 +92,14 @@ class DuckDBCredentials(Credentials):
     # registry method.
     filesystems: Optional[List[Dict[str, Any]]] = None
 
+    # Used to configure remote environments/connections
+    remote: Optional[Remote] = None
+
     @classmethod
     def __pre_deserialize__(cls, data: Dict[Any, Any]) -> Dict[Any, Any]:
         data = super().__pre_deserialize__(data)
-        path = data["path"]
-        if duckdb.__version__ >= "0.7.0":
+        path = data.get("path")
+        if path and "database" not in data and duckdb.__version__ >= "0.7.0":
             if path == ":memory:":
                 data["database"] = "memory"
             else:
