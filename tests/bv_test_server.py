@@ -9,6 +9,7 @@ from buenavista.postgres import BuenaVistaServer
 from dbt.adapters.duckdb.credentials import DuckDBCredentials
 from dbt.adapters.duckdb.environments import Environment
 
+
 class TestPythonRunner(Extension):
     def type(self) -> str:
         return "dbt_python_job"
@@ -38,11 +39,18 @@ class TestPythonRunner(Extension):
         finally:
             os.unlink(mod_file.name)
 
-if __name__ == '__main__':
+
+def create():
     config = {"path": ":memory:", "type": "duckdb"}
     creds = DuckDBCredentials.from_dict(config)
     db = Environment.initialize_db(creds)
     conn = DuckDBConnection(db)
+    server = BuenaVistaServer(
+        ("localhost", 5433), conn, extensions=[TestPythonRunner()]
+    )
+    return server
 
-    server = BuenaVistaServer(('localhost', 5433), conn, extensions=[TestPythonRunner()])
+
+if __name__ == "__main__":
+    server = create()
     server.serve_forever()

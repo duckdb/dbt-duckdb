@@ -200,6 +200,51 @@ jobs:
           name: filebased_results_${{ matrix.python-version }}-${{ steps.date.outputs.date }}.csv
           path: filebased_results.csv
 
+  buenavista:
+    name: Buena Vista functional test / python ${{ matrix.python-version }}
+
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ['3.9', '3.10', '3.11']
+
+    env:
+      TOXENV: "buenavista"
+      PYTEST_ADDOPTS: "-v --color=yes --csv buenavista_results.csv"
+
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v3
+        with:
+          persist-credentials: false
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install python dependencies
+        run: |
+          python -m pip install tox
+          python -m pip --version
+          tox --version
+
+      - name: Run tox
+        run: tox
+
+      - name: Get current date
+        if: always()
+        id: date
+        run: echo "date=$(date +'%Y-%m-%dT%H_%M_%S')" >> $GITHUB_OUTPUT #no colons allowed for artifacts
+
+      - uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: buenavista_results_${{ matrix.python-version }}-${{ steps.date.outputs.date }}.csv
+          path: buenavista_results.csv
+
   fsspec:
     name: fsspec test / python ${{ matrix.python-version }}
 
