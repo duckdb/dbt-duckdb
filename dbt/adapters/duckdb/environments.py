@@ -1,10 +1,13 @@
 import importlib.util
 import os
 import tempfile
+from typing import Dict
 
 import duckdb
 
 from .credentials import DuckDBCredentials
+from .plugins import Plugin
+from .utils import SourceConfig
 from dbt.contracts.connection import AdapterResponse
 from dbt.exceptions import DbtRuntimeError
 
@@ -60,11 +63,16 @@ class Environment:
     def cursor(self):
         raise NotImplementedError
 
-    def submit_python_job(self, handle, parsed_model: dict, compiled_code: str) -> AdapterResponse:
+    def submit_python_job(
+        self, handle, parsed_model: dict, compiled_code: str
+    ) -> AdapterResponse:
         raise NotImplementedError
 
-    def close(self, cursor):
-        raise NotImplementedError
+    def get_binding_char(self) -> str:
+        return "?"
+
+    def load_source(self, plugin_name: str, source_config: SourceConfig) -> str:
+        return "load_source_todo"
 
     @classmethod
     def initialize_db(cls, creds: DuckDBCredentials):
@@ -93,7 +101,7 @@ class Environment:
         return conn
 
     @classmethod
-    def initialize_cursor(cls, creds, cursor):
+    def initialize_cursor(cls, creds: DuckDBCredentials, cursor):
         # Extensions/settings need to be configured per cursor
         for ext in creds.extensions or []:
             cursor.execute(f"LOAD '{ext}'")
@@ -102,6 +110,16 @@ class Environment:
             # to the correct type
             cursor.execute(f"SET {key} = '{value}'")
         return cursor
+
+    @classmethod
+    def initialize_plugins(cls, creds: DuckDBCredentials) -> Dict[str, Plugin]:
+        ret = {}
+        for plugin in creds.plugins or []:
+            if plugin.name in ret:
+                raise Exception("Duplicate plugin name: " + plugin.name)
+            else:
+                ret[plugin.name] = Plugin.create(plugin.impl, plugin.config or {})
+        return ret
 
     @classmethod
     def run_python_job(cls, con, load_df_function, identifier: str, compiled_code: str):
@@ -136,13 +154,11 @@ class Environment:
         finally:
             os.unlink(mod_file.name)
 
-    def get_binding_char(self) -> str:
-        return "?"
-
 
 class LocalEnvironment(Environment):
     def __init__(self, credentials: DuckDBCredentials):
         self.conn = self.initialize_db(credentials)
+        self.plugins = self.initialize_plugins(credentials)
         self.creds = credentials
 
     def handle(self):
@@ -150,7 +166,9 @@ class LocalEnvironment(Environment):
         cursor = self.initialize_cursor(self.creds, self.conn.cursor())
         return DuckDBConnectionWrapper(cursor)
 
-    def submit_python_job(self, handle, parsed_model: dict, compiled_code: str) -> AdapterResponse:
+    def submit_python_job(
+        self, handle, parsed_model: dict, compiled_code: str
+    ) -> AdapterResponse:
         con = handle.cursor()
 
         def ldf(table_name):
