@@ -145,9 +145,12 @@ def _load_aws_credentials(ttl=None) -> Dict[str, Any]:
 
     # now extract/return them
     aws_creds = session.get_credentials().get_frozen_credentials()
-    return {
+
+    credentials = {
         "s3_access_key_id": aws_creds.access_key,
         "s3_secret_access_key": aws_creds.secret_key,
         "s3_session_token": aws_creds.token,
         "s3_region": session.region_name,
     }
+    # only return if value is filled
+    return {k: v for k, v in credentials.items() if v}
