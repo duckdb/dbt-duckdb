@@ -15,9 +15,7 @@ class DuckDBRelation(BaseRelation):
     external: Optional[str] = None
 
     @classmethod
-    def create_from_source(
-        cls: Type[Self], source: SourceDefinition, **kwargs: Any
-    ) -> Self:
+    def create_from_source(cls: Type[Self], source: SourceDefinition, **kwargs: Any) -> Self:
         source_config = SourceConfig.create(source)
         # First check to see if a 'plugin' is defined in the meta argument for
         # the source or its parent configuration, and if it is, use the environment
@@ -25,9 +23,7 @@ class DuckDBRelation(BaseRelation):
         # reference in the compiled model
         if "plugin" in source_config.meta:
             plugin_name = source_config.meta["plugin"]
-            source_name = DuckDBConnectionManager.env().load_source(
-                plugin_name, source_config
-            )
+            source_name = DuckDBConnectionManager.env().load_source(plugin_name, source_config)
             kwargs["external"] = source_name
         elif "external_location" in source_config.meta:
             # Call str.format with the schema, name and identifier for the source so that they

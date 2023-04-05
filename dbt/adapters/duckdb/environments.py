@@ -63,9 +63,7 @@ class Environment:
     def cursor(self):
         raise NotImplementedError
 
-    def submit_python_job(
-        self, handle, parsed_model: dict, compiled_code: str
-    ) -> AdapterResponse:
+    def submit_python_job(self, handle, parsed_model: dict, compiled_code: str) -> AdapterResponse:
         raise NotImplementedError
 
     def get_binding_char(self) -> str:
@@ -166,9 +164,7 @@ class LocalEnvironment(Environment):
         cursor = self.initialize_cursor(self.creds, self.conn.cursor())
         return DuckDBConnectionWrapper(cursor)
 
-    def submit_python_job(
-        self, handle, parsed_model: dict, compiled_code: str
-    ) -> AdapterResponse:
+    def submit_python_job(self, handle, parsed_model: dict, compiled_code: str) -> AdapterResponse:
         con = handle.cursor()
 
         def ldf(table_name):

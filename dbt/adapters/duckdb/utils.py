@@ -1,5 +1,6 @@
 from dataclasses import dataclass
-from typing import Any, Dict
+from typing import Any
+from typing import Dict
 
 from dbt.contracts.graph.nodes import SourceDefinition
 

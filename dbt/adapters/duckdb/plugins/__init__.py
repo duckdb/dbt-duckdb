@@ -3,7 +3,7 @@ import importlib
 from typing import Any
 from typing import Dict
 
-from dbt.contracts.graph.nodes import SourceDefinition
+from ..utils import SourceConfig
 
 
 class Plugin(abc.ABC):
@@ -21,11 +21,11 @@ class Plugin(abc.ABC):
         pass
 
     @abc.abstractmethod
-    def load_source(self, source_definition: SourceDefinition) -> str:
-        """Load data from a source and return it as a string."""
+    def load(self, source_config: SourceConfig):
+        """Load data from a source config and return it as a string."""
         pass
 
     @abc.abstractmethod
-    def store_target(self, data, config: Dict) -> None:
+    def store(self, data, config: Dict) -> None:
         """Store the given data using the provided config dictionary."""
         pass
