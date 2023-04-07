@@ -108,7 +108,10 @@ class DuckDBCredentials(Credentials):
 
     @property
     def unique_field(self) -> str:
-        return self.database + self.schema + self.path
+        if self.remote:
+            return self.remote.host + str(self.remote.port)
+        else:
+            return self.path + self.external_root
 
     @property
     def type(self):
