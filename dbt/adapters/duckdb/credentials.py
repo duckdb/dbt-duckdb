@@ -107,6 +107,10 @@ class DuckDBCredentials(Credentials):
         return data
 
     @property
+    def unique_field(self) -> str:
+        return self.database + self.schema + self.path
+
+    @property
     def type(self):
         return "duckdb"
 

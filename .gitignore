@@ -76,3 +76,4 @@ target/
 .python-version
 
 .DS_Store
+.idea/
