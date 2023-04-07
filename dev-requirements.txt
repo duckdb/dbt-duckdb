@@ -15,11 +15,13 @@ flake8
 flaky
 freezegun==1.2.2
 fsspec
+gspread
 ipdb
 mypy==1.1.1
 pip-tools
 pre-commit
 psycopg2-binary
+pyiceberg
 pytest
 pytest-dotenv
 pytest-logbook

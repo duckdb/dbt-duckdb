@@ -1,3 +1,4 @@
+import abc
 import importlib.util
 import os
 import tempfile
@@ -56,21 +57,21 @@ class DuckDBConnectionWrapper:
         return self._cursor
 
 
-class Environment:
+class Environment(abc.ABC):
+    @abc.abstractmethod
     def handle(self):
-        raise NotImplementedError
+        pass
 
-    def cursor(self):
-        raise NotImplementedError
-
+    @abc.abstractmethod
     def submit_python_job(self, handle, parsed_model: dict, compiled_code: str) -> AdapterResponse:
-        raise NotImplementedError
+        pass
 
     def get_binding_char(self) -> str:
         return "?"
 
+    @abc.abstractmethod
     def load_source(self, plugin_name: str, source_config: SourceConfig) -> str:
-        return "load_source_todo"
+        pass
 
     @classmethod
     def initialize_db(cls, creds: DuckDBCredentials):
@@ -116,7 +117,10 @@ class Environment:
             if plugin.name in ret:
                 raise Exception("Duplicate plugin name: " + plugin.name)
             else:
-                ret[plugin.name] = Plugin.create(plugin.impl, plugin.config or {})
+                try:
+                    ret[plugin.name] = Plugin.create(plugin.impl, plugin.config or {})
+                except Exception as e:
+                    raise Exception(f"Error attempting to create plugin {plugin.name}", e)
         return ret
 
     @classmethod
@@ -156,7 +160,7 @@ class Environment:
 class LocalEnvironment(Environment):
     def __init__(self, credentials: DuckDBCredentials):
         self.conn = self.initialize_db(credentials)
-        self.plugins = self.initialize_plugins(credentials)
+        self._plugins = self.initialize_plugins(credentials)
         self.creds = credentials
 
     def handle(self):
@@ -172,6 +176,15 @@ class LocalEnvironment(Environment):
 
         self.run_python_job(con, ldf, parsed_model["alias"], compiled_code)
         return AdapterResponse(_message="OK")
+
+    def load_source(self, plugin_name: str, source_config: SourceConfig):
+        df = self._plugins[plugin_name].load(source_config)
+        assert df
+        handle = self.handle()
+        cursor = handle.cursor()
+        cursor.execute(f"CREATE OR REPLACE TABLE {source_config.table_name()} AS SELECT * FROM df")
+        cursor.close()
+        handle.close()
 
     def close(self):
         if self.conn:

@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 from typing import Any
 from typing import Dict
+from typing import Optional
 
 from dbt.contracts.graph.nodes import SourceDefinition
 
@@ -10,8 +11,11 @@ class SourceConfig:
     name: str
     identifier: str
     schema: str
-    database: str
+    database: Optional[str]
     meta: Dict[str, Any]
+
+    def table_name(self) -> str:
+        return f"{self.schema}.{self.identifier}"
 
     def as_dict(self) -> Dict[str, Any]:
         base = {

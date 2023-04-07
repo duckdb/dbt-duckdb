@@ -3,6 +3,7 @@ import json
 import psycopg2
 
 from . import credentials
+from . import utils
 from .environments import Environment
 from dbt.contracts.connection import AdapterResponse
 
@@ -29,6 +30,9 @@ class BVEnvironment(Environment):
         cursor.close()
         return conn
 
+    def get_binding_char(self) -> str:
+        return "%s"
+
     def submit_python_job(self, handle, parsed_model: dict, compiled_code: str) -> AdapterResponse:
         identifier = parsed_model["alias"]
         payload = {
@@ -42,5 +46,18 @@ class BVEnvironment(Environment):
         handle.cursor().execute(json.dumps(payload))
         return AdapterResponse(_message="OK")
 
-    def get_binding_char(self) -> str:
-        return "%s"
+    def load_source(self, plugin_name: str, source_config: utils.SourceConfig) -> str:
+        handle = self.handle()
+        payload = {
+            "method": "dbt_load_source",
+            "params": {
+                "plugin_name": plugin_name,
+                "source_config": source_config.as_dict(),
+            },
+        }
+        cursor = handle.cursor()
+        cursor.execute(json.dumps(payload))
+        res = cursor.fetchone()
+        cursor.close()
+        handle.close()
+        return res[0]

@@ -4,6 +4,13 @@ from typing import Any
 from typing import Dict
 
 from ..utils import SourceConfig
+from dbt.dataclass_schema import dbtClassMixin
+
+
+class PluginConfig(dbtClassMixin):
+    """A helper class for defining the configuration settings a particular plugin uses."""
+
+    pass
 
 
 class Plugin(abc.ABC):
@@ -20,12 +27,6 @@ class Plugin(abc.ABC):
     def __init__(self, plugin_config: Dict):
         pass
 
-    @abc.abstractmethod
     def load(self, source_config: SourceConfig):
-        """Load data from a source config and return it as a string."""
-        pass
-
-    @abc.abstractmethod
-    def store(self, data, config: Dict) -> None:
-        """Store the given data using the provided config dictionary."""
-        pass
+        """Load data from a source config and return it as a DataFrame-like object that DuckDB can read."""
+        raise NotImplementedError

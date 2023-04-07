@@ -23,8 +23,7 @@ class DuckDBRelation(BaseRelation):
         # reference in the compiled model
         if "plugin" in source_config.meta:
             plugin_name = source_config.meta["plugin"]
-            source_name = DuckDBConnectionManager.env().load_source(plugin_name, source_config)
-            kwargs["external"] = source_name
+            DuckDBConnectionManager.env().load_source(plugin_name, source_config)
         elif "external_location" in source_config.meta:
             # Call str.format with the schema, name and identifier for the source so that they
             # can be injected into the string; this helps reduce boilerplate when all
