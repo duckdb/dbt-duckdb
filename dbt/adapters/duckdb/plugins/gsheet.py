@@ -1,4 +1,3 @@
-import tempfile
 from dataclasses import dataclass
 from typing import Dict
 from typing import Literal
@@ -6,7 +5,8 @@ from typing import Literal
 import gspread
 import pandas as pd
 
-from . import Plugin, PluginConfig
+from . import Plugin
+from . import PluginConfig
 from ..utils import SourceConfig
 
 

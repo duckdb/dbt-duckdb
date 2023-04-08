@@ -1,4 +1,3 @@
-import tempfile
 from typing import Dict
 
 from pyiceberg import catalog

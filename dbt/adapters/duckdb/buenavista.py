@@ -46,7 +46,7 @@ class BVEnvironment(Environment):
         handle.cursor().execute(json.dumps(payload))
         return AdapterResponse(_message="OK")
 
-    def load_source(self, plugin_name: str, source_config: utils.SourceConfig) -> str:
+    def load_source(self, plugin_name: str, source_config: utils.SourceConfig):
         handle = self.handle()
         payload = {
             "method": "dbt_load_source",
@@ -57,7 +57,5 @@ class BVEnvironment(Environment):
         }
         cursor = handle.cursor()
         cursor.execute(json.dumps(payload))
-        res = cursor.fetchone()
         cursor.close()
         handle.close()
-        return res[0]
