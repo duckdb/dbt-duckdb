@@ -117,6 +117,8 @@ class Environment(abc.ABC):
             if plugin.name in ret:
                 raise Exception("Duplicate plugin name: " + plugin.name)
             else:
+                if plugin.impl in Plugin.WELL_KNOWN_PLUGINS:
+                    plugin.impl = Plugin.WELL_KNOWN_PLUGINS[plugin.impl]
                 try:
                     ret[plugin.name] = Plugin.create(plugin.impl, plugin.config or {})
                 except Exception as e:
@@ -179,7 +181,7 @@ class LocalEnvironment(Environment):
 
     def load_source(self, plugin_name: str, source_config: SourceConfig):
         df = self._plugins[plugin_name].load(source_config)
-        assert df
+        assert df is not None
         handle = self.handle()
         cursor = handle.cursor()
         cursor.execute(f"CREATE OR REPLACE TABLE {source_config.table_name()} AS SELECT * FROM df")

@@ -15,7 +15,10 @@ class SourceConfig:
     meta: Dict[str, Any]
 
     def table_name(self) -> str:
-        return f"{self.schema}.{self.identifier}"
+        if self.database:
+            return ".".join([self.database, self.schema, self.identifier])
+        else:
+            return ".".join([self.schema, self.identifier])
 
     def as_dict(self) -> Dict[str, Any]:
         base = {

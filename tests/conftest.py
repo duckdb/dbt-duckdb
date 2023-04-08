@@ -1,3 +1,4 @@
+import os
 import subprocess
 import time
 
@@ -65,3 +66,9 @@ def skip_by_profile_type(profile_type, request):
         for skip_profile_type in request.node.get_closest_marker("skip_profile").args:
             if skip_profile_type == profile_type:
                 pytest.skip(f"skipped on '{profile_type}' profile")
+
+
+@pytest.fixture(scope="session")
+def test_data_path():
+    test_dir = os.path.dirname(os.path.abspath(__file__))
+    return os.path.join(test_dir, "data")

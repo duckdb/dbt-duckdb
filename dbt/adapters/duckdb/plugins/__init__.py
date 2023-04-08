@@ -14,6 +14,13 @@ class PluginConfig(dbtClassMixin):
 
 
 class Plugin(abc.ABC):
+
+    WELL_KNOWN_PLUGINS = {
+        "excel": "dbt.adapters.duckdb.plugins.excel.ExcelPlugin",
+        "gsheet": "dbt.adapters.duckdb.plugins.gsheet.GSheetPlugin",
+        "iceberg": "dbt.adapters.duckdb.plugins.iceberg.IcebergPlugin",
+    }
+
     @classmethod
     def create(cls, impl: str, config: Dict[str, Any]) -> "Plugin":
         module_name, class_name = impl.rsplit(".", 1)
