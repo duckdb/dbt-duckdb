@@ -38,7 +38,7 @@ class GSheetPlugin(Plugin):
             raise Exception("Source config did not indicate a method to open a GSheet to read")
 
         sheet = None
-        if "worksheeet" in source_config.meta:
+        if "worksheet" in source_config.meta:
             work_id = source_config.meta["worksheet"]
             if isinstance(work_id, int):
                 sheet = doc.get_worksheet(work_id)
