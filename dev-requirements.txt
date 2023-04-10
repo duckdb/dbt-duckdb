@@ -16,7 +16,7 @@ flaky
 freezegun==1.2.2
 fsspec
 ipdb
-mypy==1.1.1
+mypy==1.2.0
 pip-tools
 pre-commit
 psycopg2-binary
