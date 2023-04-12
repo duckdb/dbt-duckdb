@@ -1,4 +1,6 @@
-from typing import Dict, Any
+from typing import Any
+from typing import Dict
+
 import pandas as pd
 from sqlalchemy import create_engine
 
