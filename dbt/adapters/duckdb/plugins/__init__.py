@@ -14,11 +14,11 @@ class PluginConfig(dbtClassMixin):
 
 
 class Plugin(abc.ABC):
-
     WELL_KNOWN_PLUGINS = {
         "excel": "dbt.adapters.duckdb.plugins.excel.ExcelPlugin",
         "gsheet": "dbt.adapters.duckdb.plugins.gsheet.GSheetPlugin",
         "iceberg": "dbt.adapters.duckdb.plugins.iceberg.IcebergPlugin",
+        "sqlalchemy": "dbt.adapters.duckdb.plugins.sqlalchemy.SQLAlchemyPlugin",
     }
 
     @classmethod
