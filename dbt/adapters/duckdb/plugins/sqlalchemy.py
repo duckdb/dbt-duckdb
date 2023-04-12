@@ -3,6 +3,7 @@ from typing import Dict
 
 import pandas as pd
 from sqlalchemy import create_engine
+from sqlalchemy import text
 
 from . import Plugin
 from ..utils import SourceConfig
@@ -13,7 +14,16 @@ class SQLAlchemyPlugin(Plugin):
         self.engine = create_engine(plugin_config["connection_url"])
 
     def load(self, source_config: SourceConfig) -> pd.DataFrame:
-        query = source_config.meta["query"]
-        query = query.format(**source_config.as_dict())
-        params = source_config.meta.get("params", {})
-        return pd.read_sql_query(query, con=self.engine, params=params)
+        if "query" in source_config.meta:
+            query = source_config.meta["query"]
+            query = query.format(**source_config.as_dict())
+            params = source_config.meta.get("params", {})
+            with self.engine.connect() as conn:
+                return pd.read_sql_query(text(query), con=conn, params=params)
+        else:
+            if "table" in source_config.meta:
+                table = source_config.meta["table"]
+            else:
+                table = source_config.table_name()
+            with self.engine.connect() as conn:
+                return pd.read_sql_table(table, con=conn)

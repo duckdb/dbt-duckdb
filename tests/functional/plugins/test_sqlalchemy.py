@@ -15,30 +15,40 @@ sources:
     schema: main
     meta:
       plugin: sql
-      query: "SELECT * FROM {identifier} WHERE id=:id"
     tables:
-      - name: test_table
+      - name: tt1
         description: "My first SQLAlchemy table"
         meta:
+          query: "SELECT * FROM {identifier} WHERE id=:id"
           params:
             id: 1
+      - name: tt2
+        meta:
+          table: "test_table2"
 """
 
 models_source_model1_sql = """
-    select * from {{ source('sql_source', 'test_table') }}
+    select * from {{ source('sql_source', 'tt1') }}
+"""
+models_source_model2_sql = """
+    select * from {{ source('sql_source', 'tt2') }}
 """
 
 
+@pytest.mark.skip_profile("buenavista")
 class TestSQLAlchemyPlugin:
     @pytest.fixture(scope="class")
     def sqlite_test_db(self):
         path = "/tmp/satest.db"
         db = sqlite3.connect(path)
         cursor = db.cursor()
-        cursor.execute("CREATE TABLE test_table (id int, name text)")
-        cursor.execute("INSERT INTO test_table VALUES (1, 'John Doe')")
-        cursor.execute("INSERT INTO test_table VALUES (2, 'Jane Smith')")
+        cursor.execute("CREATE TABLE tt1 (id int, name text)")
+        cursor.execute("INSERT INTO tt1 VALUES (1, 'John Doe')")
+        cursor.execute("INSERT INTO tt1 VALUES (2, 'Jane Smith')")
+        cursor.execute("CREATE TABLE test_table2 (a int, b int, c int)")
+        cursor.execute("INSERT INTO test_table2 VALUES (1, 2, 3), (4, 5, 6)")
         cursor.close()
+        db.commit()
         db.close()
         yield path
         os.unlink(path)
@@ -68,16 +78,25 @@ class TestSQLAlchemyPlugin:
         return {
             "schema.yml": sources_schema_yml,
             "source_model1.sql": models_source_model1_sql,
+            "source_model2.sql": models_source_model2_sql,
         }
 
     def test_sqlalchemy_plugin(self, project):
         results = run_dbt()
-        assert len(results) == 1
+        assert len(results) == 2
 
         check_relations_equal(
             project.adapter,
             [
-                "test_table",
+                "tt1",
                 "source_model1",
+            ],
+        )
+
+        check_relations_equal(
+            project.adapter,
+            [
+                "tt2",
+                "source_model2",
             ],
         )
