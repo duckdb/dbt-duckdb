@@ -29,6 +29,7 @@ pytest-csv
 pytest-xdist
 pytest-mock
 pytz
+sqlalchemy
 tox>=3.13
 twine
 wheel
