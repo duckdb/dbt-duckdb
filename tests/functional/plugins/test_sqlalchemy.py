@@ -2,7 +2,6 @@ import os
 import pytest
 import sqlite3
 
-from sqlalchemy import create_engine, Column, Integer, String, MetaData, Table
 from dbt.tests.util import (
     check_relations_equal,
     run_dbt,
