@@ -180,6 +180,11 @@ class LocalEnvironment(Environment):
         return AdapterResponse(_message="OK")
 
     def load_source(self, plugin_name: str, source_config: SourceConfig):
+        if plugin_name not in self._plugins:
+            raise Exception(
+                f"Plugin {plugin_name} not found; known plugins are: "
+                + ",".join(self._plugins.keys())
+            )
         df = self._plugins[plugin_name].load(source_config)
         assert df is not None
         handle = self.handle()
