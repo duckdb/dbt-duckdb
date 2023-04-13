@@ -108,7 +108,9 @@ class TestPlugins:
         results = run_dbt()
         assert len(results) == 3
 
-        # relations_equal
+        res = project.run_sql("SELECT COUNT(1) FROM excel_file", fetch="one")
+        assert res[0] == 9
+
         check_relations_equal(
             project.adapter,
             [
@@ -117,7 +119,8 @@ class TestPlugins:
             ],
         )
 
-        # relations_equal
+        res = project.run_sql("SELECT COUNT(1) FROM tt1", fetch="one")
+        assert res[0] == 1
         check_relations_equal(
             project.adapter,
             [
@@ -126,7 +129,8 @@ class TestPlugins:
             ],
         )
 
-        # relations_equal
+        res = project.run_sql("SELECT COUNT(1) FROM tt2", fetch="one")
+        assert res[0] == 2
         check_relations_equal(
             project.adapter,
             [
