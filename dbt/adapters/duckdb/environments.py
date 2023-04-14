@@ -1,10 +1,14 @@
+import abc
 import importlib.util
 import os
 import tempfile
+from typing import Dict
 
 import duckdb
 
 from .credentials import DuckDBCredentials
+from .plugins import Plugin
+from .utils import SourceConfig
 from dbt.contracts.connection import AdapterResponse
 from dbt.exceptions import DbtRuntimeError
 
@@ -53,18 +57,21 @@ class DuckDBConnectionWrapper:
         return self._cursor
 
 
-class Environment:
+class Environment(abc.ABC):
+    @abc.abstractmethod
     def handle(self):
-        raise NotImplementedError
+        pass
 
-    def cursor(self):
-        raise NotImplementedError
-
+    @abc.abstractmethod
     def submit_python_job(self, handle, parsed_model: dict, compiled_code: str) -> AdapterResponse:
-        raise NotImplementedError
+        pass
 
-    def close(self, cursor):
-        raise NotImplementedError
+    def get_binding_char(self) -> str:
+        return "?"
+
+    @abc.abstractmethod
+    def load_source(self, plugin_name: str, source_config: SourceConfig) -> str:
+        pass
 
     @classmethod
     def initialize_db(cls, creds: DuckDBCredentials):
@@ -93,7 +100,7 @@ class Environment:
         return conn
 
     @classmethod
-    def initialize_cursor(cls, creds, cursor):
+    def initialize_cursor(cls, creds: DuckDBCredentials, cursor):
         # Extensions/settings need to be configured per cursor
         for ext in creds.extensions or []:
             cursor.execute(f"LOAD '{ext}'")
@@ -102,6 +109,21 @@ class Environment:
             # to the correct type
             cursor.execute(f"SET {key} = '{value}'")
         return cursor
+
+    @classmethod
+    def initialize_plugins(cls, creds: DuckDBCredentials) -> Dict[str, Plugin]:
+        ret = {}
+        for plugin in creds.plugins or []:
+            if plugin.name in ret:
+                raise Exception("Duplicate plugin name: " + plugin.name)
+            else:
+                if plugin.impl in Plugin.WELL_KNOWN_PLUGINS:
+                    plugin.impl = Plugin.WELL_KNOWN_PLUGINS[plugin.impl]
+                try:
+                    ret[plugin.name] = Plugin.create(plugin.impl, plugin.config or {})
+                except Exception as e:
+                    raise Exception(f"Error attempting to create plugin {plugin.name}", e)
+        return ret
 
     @classmethod
     def run_python_job(cls, con, load_df_function, identifier: str, compiled_code: str):
@@ -136,13 +158,11 @@ class Environment:
         finally:
             os.unlink(mod_file.name)
 
-    def get_binding_char(self) -> str:
-        return "?"
-
 
 class LocalEnvironment(Environment):
     def __init__(self, credentials: DuckDBCredentials):
         self.conn = self.initialize_db(credentials)
+        self._plugins = self.initialize_plugins(credentials)
         self.creds = credentials
 
     def handle(self):
@@ -158,6 +178,23 @@ class LocalEnvironment(Environment):
 
         self.run_python_job(con, ldf, parsed_model["alias"], compiled_code)
         return AdapterResponse(_message="OK")
+
+    def load_source(self, plugin_name: str, source_config: SourceConfig):
+        if plugin_name not in self._plugins:
+            raise Exception(
+                f"Plugin {plugin_name} not found; known plugins are: "
+                + ",".join(self._plugins.keys())
+            )
+        df = self._plugins[plugin_name].load(source_config)
+        assert df is not None
+        handle = self.handle()
+        cursor = handle.cursor()
+        materialization = source_config.meta.get("materialization", "table")
+        cursor.execute(
+            f"CREATE OR REPLACE {materialization} {source_config.table_name()} AS SELECT * FROM df"
+        )
+        cursor.close()
+        handle.close()
 
     def close(self):
         if self.conn:

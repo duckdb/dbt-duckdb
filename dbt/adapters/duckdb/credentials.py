@@ -44,6 +44,20 @@ class Attachment(dbtClassMixin):
 
 
 @dataclass
+class PluginConfig(dbtClassMixin):
+    # The name that this plugin will be referred to by in sources/models; must
+    # be unique within the project
+    name: str
+
+    # The fully-specified class name of the plugin code to use, which must be a
+    # subclass of dbt.adapters.duckdb.plugins.Plugin.
+    impl: str
+
+    # A plugin-specific set of configuration options
+    config: Optional[Dict[str, Any]] = None
+
+
+@dataclass
 class Remote(dbtClassMixin):
     host: str
     port: int
@@ -61,7 +75,7 @@ class DuckDBCredentials(Credentials):
     # to DuckDB (e.g., if we need to enable using unsigned extensions)
     config_options: Optional[Dict[str, Any]] = None
 
-    # any extensions we want to install and load (httpfs, parquet, etc.)
+    # any DuckDB extensions we want to install and load (httpfs, parquet, etc.)
     extensions: Optional[Tuple[str, ...]] = None
 
     # any additional pragmas we want to configure on our DuckDB connections;
@@ -94,6 +108,11 @@ class DuckDBCredentials(Credentials):
 
     # Used to configure remote environments/connections
     remote: Optional[Remote] = None
+
+    # A list of dbt-duckdb plugins that can be used to customize the
+    # behavior of loading source data and/or storing the relations that are
+    # created by SQL or Python models; see the plugins module for more details.
+    plugins: Optional[List[PluginConfig]] = None
 
     @classmethod
     def __pre_deserialize__(cls, data: Dict[Any, Any]) -> Dict[Any, Any]:

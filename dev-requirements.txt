@@ -15,8 +15,10 @@ flake8
 flaky
 freezegun==1.2.2
 fsspec
+gspread
 ipdb
 mypy==1.2.0
+openpyxl
 pip-tools
 pre-commit
 psycopg2-binary
@@ -27,6 +29,7 @@ pytest-csv
 pytest-xdist
 pytest-mock
 pytz
+sqlalchemy
 tox>=3.13
 twine
 wheel

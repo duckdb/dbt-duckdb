@@ -14,11 +14,18 @@ from dbt.logger import GLOBAL_LOGGER as logger
 
 class DuckDBConnectionManager(SQLConnectionManager):
     TYPE = "duckdb"
-    LOCK = threading.RLock()
-    ENV = None
+    _LOCK = threading.RLock()
+    _ENV = None
 
     def __init__(self, profile: AdapterRequiredConfig):
         super().__init__(profile)
+
+    @classmethod
+    def env(cls) -> environments.Environment:
+        with cls._LOCK:
+            if not cls._ENV:
+                raise Exception("DuckDBConnectionManager environment requested before creation!")
+            return cls._ENV
 
     @classmethod
     def open(cls, connection: Connection) -> Connection:
@@ -27,11 +34,11 @@ class DuckDBConnectionManager(SQLConnectionManager):
             return connection
 
         credentials = cls.get_credentials(connection.credentials)
-        with cls.LOCK:
+        with cls._LOCK:
             try:
-                if not cls.ENV:
-                    cls.ENV = environments.create(credentials)
-                connection.handle = cls.ENV.handle()
+                if not cls._ENV:
+                    cls._ENV = environments.create(credentials)
+                connection.handle = cls._ENV.handle()
                 connection.state = ConnectionState.OPEN
 
             except RuntimeError as e:
@@ -79,9 +86,9 @@ class DuckDBConnectionManager(SQLConnectionManager):
 
     @classmethod
     def close_all_connections(cls):
-        with cls.LOCK:
-            if cls.ENV is not None:
-                cls.ENV = None
+        with cls._LOCK:
+            if cls._ENV is not None:
+                cls._ENV = None
 
 
 atexit.register(DuckDBConnectionManager.close_all_connections)

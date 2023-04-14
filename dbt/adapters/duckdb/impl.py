@@ -85,7 +85,7 @@ class DuckDBAdapter(SQLAdapter):
 
     @available
     def get_binding_char(self):
-        return DuckDBConnectionManager.ENV.get_binding_char()
+        return DuckDBConnectionManager.env().get_binding_char()
 
     @available
     def external_write_options(self, write_location: str, rendered_options: dict) -> str:
@@ -144,11 +144,8 @@ class DuckDBAdapter(SQLAdapter):
         connection = self.connections.get_if_exists()
         if not connection:
             connection = self.connections.get_thread_connection()
-        if DuckDBConnectionManager.ENV:
-            env = DuckDBConnectionManager.ENV
-            return env.submit_python_job(connection.handle, parsed_model, compiled_code)
-        else:
-            raise Exception("No ENV defined to execute dbt-duckdb python models!")
+        env = DuckDBConnectionManager.env()
+        return env.submit_python_job(connection.handle, parsed_model, compiled_code)
 
     def get_rows_different_sql(
         self,
