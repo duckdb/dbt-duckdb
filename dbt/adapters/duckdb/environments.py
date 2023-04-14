@@ -189,7 +189,10 @@ class LocalEnvironment(Environment):
         assert df is not None
         handle = self.handle()
         cursor = handle.cursor()
-        cursor.execute(f"CREATE OR REPLACE TABLE {source_config.table_name()} AS SELECT * FROM df")
+        materialization = source_config.meta.get("materialization", "table")
+        cursor.execute(
+            f"CREATE OR REPLACE {materialization} {source_config.table_name()} AS SELECT * FROM df"
+        )
         cursor.close()
         handle.close()
 
