@@ -185,10 +185,25 @@ class LocalEnvironment(Environment):
                 f"Plugin {plugin_name} not found; known plugins are: "
                 + ",".join(self._plugins.keys())
             )
-        df = self._plugins[plugin_name].load(source_config)
-        assert df is not None
+        plugin = self._plugins[plugin_name]
         handle = self.handle()
         cursor = handle.cursor()
+        save_mode = source_config.meta.get("save_mode", "overwrite")
+        if save_mode in ("ignore", "error_if_exists"):
+            schema, identifier = source_config.schema, source_config.identifier
+            q = f"""SELECT COUNT(1)
+                FROM information_schema.tables
+                WHERE table_schema = '{schema}'
+                AND table_name = '{identifier}'
+                """
+            if cursor.execute(q).fetchone()[0]:
+                if save_mode == "error_if_exists":
+                    raise Exception(f"Source {source_config.table_name()} already exists!")
+                else:
+                    # Nothing to do (we ignore the existing table)
+                    return
+        df = plugin.load(source_config)
+        assert df is not None
         materialization = source_config.meta.get("materialization", "table")
         cursor.execute(
             f"CREATE OR REPLACE {materialization} {source_config.table_name()} AS SELECT * FROM df"
