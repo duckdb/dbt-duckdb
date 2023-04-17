@@ -1,6 +1,6 @@
 from typing import Dict
 
-from pyiceberg import catalog
+import pyiceberg.catalog
 
 from . import Plugin
 from ..utils import SourceConfig
@@ -8,7 +8,10 @@ from ..utils import SourceConfig
 
 class IcebergPlugin(Plugin):
     def __init__(self, config: Dict):
-        self._catalog = catalog.load_catalog(config.get("catalog"))
+        if "catalog" not in config:
+            raise Exception("'catalog' is a required argument for the iceberg plugin!")
+        catalog = config.pop("catalog")
+        self._catalog = pyiceberg.catalog.load_catalog(catalog, **config)
 
     def load(self, source_config: SourceConfig):
         table_format = source_config.meta.get("iceberg_table", "{schema}.{identifier}")

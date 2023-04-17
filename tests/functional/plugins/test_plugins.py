@@ -28,6 +28,7 @@ sources:
     schema: main
     meta:
       plugin: sql
+      save_mode: ignore
     tables:
       - name: tt1
         description: "My first SQLAlchemy table"
