@@ -30,6 +30,7 @@ class TestBasePythonModelDuckDBPyRelation(BasePythonModelTests):
         return {
             "schema.yml": schema_yml,
             "my_sql_model.sql": basic_sql,
+            "my_versioned_sql_model_v1.sql": basic_sql,
             "my_python_model.py": basic_python_template.format(extension=""),
             "second_sql_model.sql": second_sql,
         }
@@ -41,6 +42,7 @@ class TestBasePythonModelPandasDF(BasePythonModelTests):
         return {
             "schema.yml": schema_yml,
             "my_sql_model.sql": basic_sql,
+            "my_versioned_sql_model_v1.sql": basic_sql,
             "my_python_model.py": basic_python_template.format(extension=".df()"),
             "second_sql_model.sql": second_sql,
         }
