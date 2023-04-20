@@ -15,6 +15,7 @@ from dbt.adapters.duckdb.glue import create_or_update_table
 from dbt.adapters.duckdb.relation import DuckDBRelation
 from dbt.adapters.sql import SQLAdapter
 from dbt.contracts.connection import AdapterResponse
+from dbt.contracts.graph.nodes import ColumnLevelConstraint
 from dbt.contracts.graph.nodes import ConstraintType
 from dbt.exceptions import DbtInternalError
 from dbt.exceptions import DbtRuntimeError
@@ -197,6 +198,16 @@ class DuckDBAdapter(SQLAdapter):
             for column_name, column_type_name, *_ in cursor.description
         ]
         return columns
+
+    @classmethod
+    def render_column_constraint(cls, constraint: ColumnLevelConstraint) -> Optional[str]:
+        """Render the given constraint as DDL text. Should be overriden by adapters which need custom constraint
+        rendering."""
+        if constraint.type == ConstraintType.foreign_key:
+            # DuckDB doesn't support 'foreign key' as an alias
+            return f"references {constraint.expression}"
+        else:
+            return super().render_column_constraint(constraint)
 
 
 # Change `table_a/b` to `table_aaaaa/bbbbb` to avoid duckdb binding issues when relation_a/b
