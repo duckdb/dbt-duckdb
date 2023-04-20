@@ -28,6 +28,18 @@
   {{ return(run_query(sql)) }}
 {% endmacro %}
 
+{% macro get_column_names() %}
+  {# loop through user_provided_columns to get column names #}
+    {%- set user_provided_columns = model['columns'] -%}
+    (
+    {% for i in user_provided_columns %}
+      {% set col = user_provided_columns[i] %}
+      {{ col['name'] }} {{ "," if not loop.last }}
+    {% endfor %}
+  )
+{% endmacro %}
+
+
 {% macro duckdb__create_table_as(temporary, relation, compiled_code, language='sql') -%}
   {%- if language == 'sql' -%}
     {%- set sql_header = config.get('sql_header', none) -%}
@@ -36,7 +48,18 @@
 
     create {% if temporary: -%}temporary{%- endif %} table
       {{ relation.include(database=(not temporary and adapter.use_database()), schema=(not temporary)) }}
-    as (
+  {% set contract_config = config.get('contract') %}
+  {% if contract_config.enforced and not temporary %}
+    {{ get_assert_columns_equivalent(compiled_code) }}
+    {% if not temporary %} {#-- DuckDB doesnt support constraints on temp tables --#}
+      {{ get_table_columns_and_constraints() }} ;
+      insert into {{ relation }} {{ get_column_names() }}
+      {%- set compiled_code = get_select_subquery(compiled_code) %}
+      {% else %}
+        as
+    {% endif %}
+  {% endif %}
+    (
       {{ compiled_code }}
     );
   {%- elif language == 'python' -%}
@@ -62,6 +85,10 @@ def materialize(df, con):
 {% endmacro %}
 
 {% macro duckdb__create_view_as(relation, sql) -%}
+  {% set contract_config = config.get('contract') %}
+  {% if contract_config.enforced %}
+    {{ get_assert_columns_equivalent(sql) }}
+  {%- endif %}
   {%- set sql_header = config.get('sql_header', none) -%}
 
   {{ sql_header if sql_header is not none }}

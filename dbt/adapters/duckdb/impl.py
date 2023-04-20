@@ -8,12 +8,14 @@ import duckdb
 
 from dbt.adapters.base import BaseRelation
 from dbt.adapters.base.column import Column
+from dbt.adapters.base.impl import ConstraintSupport
 from dbt.adapters.base.meta import available
 from dbt.adapters.duckdb.connections import DuckDBConnectionManager
 from dbt.adapters.duckdb.glue import create_or_update_table
 from dbt.adapters.duckdb.relation import DuckDBRelation
 from dbt.adapters.sql import SQLAdapter
 from dbt.contracts.connection import AdapterResponse
+from dbt.contracts.graph.nodes import ConstraintType
 from dbt.exceptions import DbtInternalError
 from dbt.exceptions import DbtRuntimeError
 
@@ -21,6 +23,14 @@ from dbt.exceptions import DbtRuntimeError
 class DuckDBAdapter(SQLAdapter):
     ConnectionManager = DuckDBConnectionManager
     Relation = DuckDBRelation
+
+    CONSTRAINT_SUPPORT = {
+        ConstraintType.check: ConstraintSupport.ENFORCED,
+        ConstraintType.not_null: ConstraintSupport.ENFORCED,
+        ConstraintType.unique: ConstraintSupport.ENFORCED,
+        ConstraintType.primary_key: ConstraintSupport.ENFORCED,
+        ConstraintType.foreign_key: ConstraintSupport.ENFORCED,
+    }
 
     @classmethod
     def date_function(cls) -> str:
@@ -175,6 +185,18 @@ class DuckDBAdapter(SQLAdapter):
             except_op=except_operator,
         )
         return sql
+
+    @available.parse(lambda *a, **k: [])
+    def get_column_schema_from_query(self, sql: str) -> List[Column]:
+        """Get a list of the Columns with names and data types from the given sql."""
+        _, cursor = self.connections.add_select_query(sql)
+        columns = [
+            # duckdb returns column_type as a string, rather than int (code)
+            self.Column.create(column_name, column_type_name)
+            # https://peps.python.org/pep-0249/#description
+            for column_name, column_type_name, *_ in cursor.description
+        ]
+        return columns
 
 
 # Change `table_a/b` to `table_aaaaa/bbbbb` to avoid duckdb binding issues when relation_a/b
