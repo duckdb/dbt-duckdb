@@ -42,26 +42,28 @@
 
 {% macro duckdb__create_table_as(temporary, relation, compiled_code, language='sql') -%}
   {%- if language == 'sql' -%}
+    {% set contract_config = config.get('contract') %}
+    {% if contract_config.enforced %}
+      {{ get_assert_columns_equivalent(compiled_code) }}
+    {% endif %}
     {%- set sql_header = config.get('sql_header', none) -%}
 
     {{ sql_header if sql_header is not none }}
 
     create {% if temporary: -%}temporary{%- endif %} table
       {{ relation.include(database=(not temporary and adapter.use_database()), schema=(not temporary)) }}
-  {% set contract_config = config.get('contract') %}
   {% if contract_config.enforced and not temporary %}
-    {{ get_assert_columns_equivalent(compiled_code) }}
-    {% if not temporary %} {#-- DuckDB doesnt support constraints on temp tables --#}
-      {{ get_table_columns_and_constraints() }} ;
-      insert into {{ relation }} {{ get_column_names() }}
-      {%- set compiled_code = get_select_subquery(compiled_code) %}
-      {% else %}
-        as
-    {% endif %}
-  {% endif %}
-    (
+    {#-- DuckDB doesnt support constraints on temp tables --#}
+    {{ get_table_columns_and_constraints() }} ;
+    insert into {{ relation }} {{ get_column_names() }} (
       {{ compiled_code }}
     );
+    {%- set compiled_code = get_select_subquery(compiled_code) %}
+  {% else %}
+    as (
+      {{ compiled_code }}
+    );
+  {% endif %}
   {%- elif language == 'python' -%}
     {{ py_write_table(temporary=temporary, relation=relation, compiled_code=compiled_code) }}
   {%- else -%}
