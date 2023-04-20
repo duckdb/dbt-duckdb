@@ -1,5 +1,16 @@
 import pytest
 
+from dbt.tests.adapter.constraints.test_constraints import (
+    BaseTableConstraintsColumnsEqual,
+    BaseViewConstraintsColumnsEqual,
+    BaseIncrementalConstraintsColumnsEqual,
+    BaseConstraintsRuntimeDdlEnforcement,
+    BaseConstraintsRollback,
+    BaseIncrementalConstraintsRuntimeDdlEnforcement,
+    BaseIncrementalConstraintsRollback,
+    BaseModelConstraintsRuntimeEnforcement,
+)
+
 class DuckDBColumnEqualSetup:
     @pytest.fixture
     def int_type(self):
