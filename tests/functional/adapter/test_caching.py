@@ -1,6 +1,5 @@
 from dbt.tests.adapter.caching.test_caching import (
     BaseCachingLowercaseModel,
-    BaseCachingUppercaseModel,
     BaseCachingSelectedSchemaOnly,
 )
 
