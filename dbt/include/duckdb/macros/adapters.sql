@@ -56,9 +56,8 @@
     {#-- DuckDB doesnt support constraints on temp tables --#}
     {{ get_table_columns_and_constraints() }} ;
     insert into {{ relation }} {{ get_column_names() }} (
-      {{ compiled_code }}
+      {{ get_select_subquery(compiled_code) }}
     );
-    {%- set compiled_code = get_select_subquery(compiled_code) %}
   {% else %}
     as (
       {{ compiled_code }}
