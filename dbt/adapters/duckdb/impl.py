@@ -7,6 +7,7 @@ import agate
 import duckdb
 
 from dbt.adapters.base import BaseRelation
+from dbt.adapters.base.column import Column as DBTColumn
 from dbt.adapters.base.impl import ConstraintSupport
 from dbt.adapters.base.meta import available
 from dbt.adapters.duckdb.column import DuckDBColumn
@@ -74,7 +75,7 @@ class DuckDBAdapter(SQLAdapter):
         self,
         glue_database: str,
         table: str,
-        column_list: Sequence[Column],
+        column_list: Sequence[DBTColumn],
         location: str,
         file_format: str,
     ) -> None:
@@ -97,7 +98,7 @@ class DuckDBAdapter(SQLAdapter):
 
     @available
     def get_binding_char(self):
-        return self.connections.env().get_binding_char()
+        return DuckDBConnectionManager.env().get_binding_char()
 
     @available
     def external_write_options(self, write_location: str, rendered_options: dict) -> str:
@@ -156,7 +157,7 @@ class DuckDBAdapter(SQLAdapter):
         connection = self.connections.get_if_exists()
         if not connection:
             connection = self.connections.get_thread_connection()
-        env = self.connections.env()
+        env = DuckDBConnectionManager.env()
         return env.submit_python_job(connection.handle, parsed_model, compiled_code)
 
     def get_rows_different_sql(
@@ -189,11 +190,11 @@ class DuckDBAdapter(SQLAdapter):
         return sql
 
     @available.parse(lambda *a, **k: [])
-    def get_column_schema_from_query(self, sql: str) -> List[Column]:
+    def get_column_schema_from_query(self, sql: str) -> List[DBTColumn]:
         """Get a list of the Columns with names and data types from the given sql."""
         _, cursor = self.connections.add_select_query(sql)
-        return self.connections.env().create_columns(cursor)
-    
+        return DuckDBConnectionManager.env().create_columns(cursor)
+
     @classmethod
     def render_column_constraint(cls, constraint: ColumnLevelConstraint) -> Optional[str]:
         """Render the given constraint as DDL text. Should be overriden by adapters which need custom constraint

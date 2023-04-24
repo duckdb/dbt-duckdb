@@ -4,10 +4,11 @@ from typing import List
 import psycopg2
 from psycopg2.extensions import string_types
 
+from . import Environment
 from .. import column
 from .. import credentials
 from .. import utils
-from . import Environment
+from dbt.adapters.base.column import Column
 from dbt.contracts.connection import AdapterResponse
 
 
@@ -63,11 +64,9 @@ class BVEnvironment(Environment):
         cursor.close()
         handle.close()
 
-    def create_columns(self, cursor) -> List[column.DuckDBColumn]:
+    def create_columns(self, cursor) -> List[Column]:
         columns = [
-            column.DuckDBColumn.create(
-                column_name, string_types[column_type_code].name
-            )
+            column.DuckDBColumn.create(column_name, string_types[column_type_code].name)
             # https://peps.python.org/pep-0249/#description
             for column_name, column_type_code, *_ in cursor.description
         ]

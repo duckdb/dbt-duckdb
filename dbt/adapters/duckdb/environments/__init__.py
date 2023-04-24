@@ -7,11 +7,10 @@ from typing import List
 
 import duckdb
 
-from ..column import DuckDBColumn
 from ..credentials import DuckDBCredentials
 from ..plugins import Plugin
 from ..utils import SourceConfig
-
+from dbt.adapters.base.column import Column
 from dbt.contracts.connection import AdapterResponse
 from dbt.exceptions import DbtRuntimeError
 
@@ -45,7 +44,7 @@ class Environment(abc.ABC):
         pass
 
     @abc.abstractmethod
-    def create_columns(self, cursor) -> List[DuckDBColumn]:
+    def create_columns(self, cursor) -> List[Column]:
         pass
 
     def get_binding_char(self) -> str:
@@ -140,7 +139,9 @@ class Environment(abc.ABC):
 def create(creds: DuckDBCredentials) -> Environment:
     if creds.remote:
         from .buenavista import BVEnvironment
+
         return BVEnvironment(creds)
     else:
         from .local import LocalEnvironment
+
         return LocalEnvironment(creds)
