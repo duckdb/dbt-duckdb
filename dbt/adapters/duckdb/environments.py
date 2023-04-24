@@ -10,7 +10,6 @@ import duckdb
 from .column import DuckDBColumn
 from .credentials import DuckDBCredentials
 from .plugins import Plugin
-from .utils import PG_TYPE_CODE_TO_NAME
 from .utils import SourceConfig
 
 from dbt.contracts.connection import AdapterResponse
