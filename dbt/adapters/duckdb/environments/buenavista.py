@@ -4,10 +4,10 @@ from typing import List
 import psycopg2
 from psycopg2.extensions import string_types
 
-from . import column
-from . import credentials
-from . import utils
-from .environments import Environment
+from .. import column
+from .. import credentials
+from .. import utils
+from . import Environment
 from dbt.contracts.connection import AdapterResponse
 
 
