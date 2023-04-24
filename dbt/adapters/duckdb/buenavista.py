@@ -66,7 +66,7 @@ class BVEnvironment(Environment):
     def create_columns(self, cursor) -> List[column.DuckDBColumn]:
         columns = [
             column.DuckDBColumn.create(
-                column_name, string_types[column_type_code]
+                column_name, string_types[column_type_code].name
             )
             # https://peps.python.org/pep-0249/#description
             for column_name, column_type_code, *_ in cursor.description
