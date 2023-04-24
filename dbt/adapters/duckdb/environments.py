@@ -3,12 +3,16 @@ import importlib.util
 import os
 import tempfile
 from typing import Dict
+from typing import List
 
 import duckdb
 
+from .column import DuckDBColumn
 from .credentials import DuckDBCredentials
 from .plugins import Plugin
+from .utils import PG_TYPE_CODE_TO_NAME
 from .utils import SourceConfig
+
 from dbt.contracts.connection import AdapterResponse
 from dbt.exceptions import DbtRuntimeError
 
@@ -66,12 +70,16 @@ class Environment(abc.ABC):
     def submit_python_job(self, handle, parsed_model: dict, compiled_code: str) -> AdapterResponse:
         pass
 
-    def get_binding_char(self) -> str:
-        return "?"
-
     @abc.abstractmethod
     def load_source(self, plugin_name: str, source_config: SourceConfig) -> str:
         pass
+
+    @abc.abstractmethod
+    def create_columns(self, cursor) -> List[DuckDBColumn]:
+        pass
+
+    def get_binding_char(self) -> str:
+        return "?"
 
     @classmethod
     def initialize_db(cls, creds: DuckDBCredentials):

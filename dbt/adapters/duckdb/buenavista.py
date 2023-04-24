@@ -1,7 +1,10 @@
 import json
+from typing import List
 
 import psycopg2
+from psycopg2.extensions import string_types
 
+from . import column
 from . import credentials
 from . import utils
 from .environments import Environment
@@ -59,3 +62,13 @@ class BVEnvironment(Environment):
         cursor.execute(json.dumps(payload))
         cursor.close()
         handle.close()
+
+    def create_columns(self, cursor) -> List[column.DuckDBColumn]:
+        columns = [
+            column.DuckDBColumn.create(
+                column_name, string_types[column_type_code]
+            )
+            # https://peps.python.org/pep-0249/#description
+            for column_name, column_type_code, *_ in cursor.description
+        ]
+        return columns

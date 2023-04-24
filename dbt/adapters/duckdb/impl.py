@@ -7,9 +7,9 @@ import agate
 import duckdb
 
 from dbt.adapters.base import BaseRelation
-from dbt.adapters.base.column import Column
 from dbt.adapters.base.impl import ConstraintSupport
 from dbt.adapters.base.meta import available
+from dbt.adapters.duckdb.column import DuckDBColumn
 from dbt.adapters.duckdb.connections import DuckDBConnectionManager
 from dbt.adapters.duckdb.glue import create_or_update_table
 from dbt.adapters.duckdb.relation import DuckDBRelation
@@ -24,6 +24,7 @@ from dbt.exceptions import DbtRuntimeError
 class DuckDBAdapter(SQLAdapter):
     ConnectionManager = DuckDBConnectionManager
     Relation = DuckDBRelation
+    Column = DuckDBColumn
 
     CONSTRAINT_SUPPORT = {
         ConstraintType.check: ConstraintSupport.ENFORCED,
@@ -191,14 +192,8 @@ class DuckDBAdapter(SQLAdapter):
     def get_column_schema_from_query(self, sql: str) -> List[Column]:
         """Get a list of the Columns with names and data types from the given sql."""
         _, cursor = self.connections.add_select_query(sql)
-        columns = [
-            # duckdb returns column_type as a string, rather than int (code)
-            self.Column.create(column_name, column_type_name)
-            # https://peps.python.org/pep-0249/#description
-            for column_name, column_type_name, *_ in cursor.description
-        ]
-        return columns
-
+        return self.connections.env().create_columns(cursor)
+    
     @classmethod
     def render_column_constraint(cls, constraint: ColumnLevelConstraint) -> Optional[str]:
         """Render the given constraint as DDL text. Should be overriden by adapters which need custom constraint
