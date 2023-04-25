@@ -3,14 +3,12 @@ import importlib.util
 import os
 import tempfile
 from typing import Dict
-from typing import List
 
 import duckdb
 
 from ..credentials import DuckDBCredentials
 from ..plugins import Plugin
 from ..utils import SourceConfig
-from dbt.adapters.base.column import Column
 from dbt.contracts.connection import AdapterResponse
 from dbt.exceptions import DbtRuntimeError
 
@@ -31,6 +29,11 @@ def _ensure_event_loop():
 
 
 class Environment(abc.ABC):
+    """An Environment is an abstraction to describe *where* the code you execute in your dbt-duckdb project
+    actually runs. This could be the local Python process that runs dbt (which is the default),
+    a remote server (like a Buena Vista instance), or even a Jupyter notebook kernel.
+    """
+
     @abc.abstractmethod
     def handle(self):
         pass
@@ -41,10 +44,6 @@ class Environment(abc.ABC):
 
     @abc.abstractmethod
     def load_source(self, plugin_name: str, source_config: SourceConfig) -> str:
-        pass
-
-    @abc.abstractmethod
-    def create_columns(self, cursor) -> List[Column]:
         pass
 
     def get_binding_char(self) -> str:
@@ -137,6 +136,8 @@ class Environment(abc.ABC):
 
 
 def create(creds: DuckDBCredentials) -> Environment:
+    """Create an Environment based on the credentials passed in."""
+
     if creds.remote:
         from .buenavista import BVEnvironment
 

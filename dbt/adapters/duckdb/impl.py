@@ -192,8 +192,16 @@ class DuckDBAdapter(SQLAdapter):
     @available.parse(lambda *a, **k: [])
     def get_column_schema_from_query(self, sql: str) -> List[DBTColumn]:
         """Get a list of the Columns with names and data types from the given sql."""
-        _, cursor = self.connections.add_select_query(sql)
-        return DuckDBConnectionManager.env().create_columns(cursor)
+
+        # Taking advantage of yet another amazing DuckDB SQL feature right here: the
+        # ability to DESCRIBE a query instead of a relation
+        describe_sql = f"DESCRIBE ({sql})"
+        _, cursor = self.connections.add_select_query(describe_sql)
+        ret = []
+        for row in cursor.fetchall():
+            name, dtype = row[0], row[1]
+            ret.append(DuckDBColumn.create(name, dtype))
+        return ret
 
     @classmethod
     def render_column_constraint(cls, constraint: ColumnLevelConstraint) -> Optional[str]:

@@ -14,34 +14,53 @@ from dbt.tests.adapter.constraints.test_constraints import (
 
 class DuckDBColumnEqualSetup:
     @pytest.fixture
+    def int_type(self):
+        return "INT"
+
+    @pytest.fixture
+    def string_type(self):
+        return "VARCHAR"
+
+    @pytest.fixture
     def data_types(self, schema_int_type, int_type, string_type):
         # sql_column_value, schema_data_type, error_data_type
         return [
             ["1", schema_int_type, int_type],
             ["'1'", string_type, string_type],
-            ["true", "bool", "bool"],
-            ["'2013-11-03 00:00:00-07'::timestamptz", "timestamptz", "DATETIME"],
-            ["'2013-11-03 00:00:00-07'::timestamp", "timestamp", "DATETIME"],
-            ["ARRAY['a','b','c']", "text[]", "STRINGARRAY"],
-            ["ARRAY[1,2,3]", "int[]", "INTEGERARRAY"],
+            ["true", "bool", "BOOL"],
+            ["'2013-11-03 00:00:00-07'::timestamp", "TIMESTAMP", "TIMESTAMP"],
+            ["ARRAY['a','b','c']", "VARCHAR[]", "VARCHAR[]"],
+            ["ARRAY[1,2,3]", "INTEGER[]", "INTEGER[]"],
             ["'1'::numeric", "numeric", "DECIMAL"],
-            ["""{'bar': 'baz', 'balance': 7.77, 'active': false}""", "struct(bar text, balance decimal, active boolean)", "json"],
+            [
+                """'{"bar": "baz", "balance": 7.77, "active": false}'::json""",
+                "json",
+                "JSON",
+            ],
         ]
 
 
-class TestTableConstraintsColumnsEqual(DuckDBColumnEqualSetup, BaseTableConstraintsColumnsEqual):
+class TestTableConstraintsColumnsEqual(
+    DuckDBColumnEqualSetup, BaseTableConstraintsColumnsEqual
+):
     pass
 
 
-class TestViewConstraintsColumnsEqual(DuckDBColumnEqualSetup, BaseViewConstraintsColumnsEqual):
+class TestViewConstraintsColumnsEqual(
+    DuckDBColumnEqualSetup, BaseViewConstraintsColumnsEqual
+):
     pass
 
 
-class TestIncrementalConstraintsColumnsEqual(DuckDBColumnEqualSetup, BaseIncrementalConstraintsColumnsEqual):
+class TestIncrementalConstraintsColumnsEqual(
+    DuckDBColumnEqualSetup, BaseIncrementalConstraintsColumnsEqual
+):
     pass
 
 
-class TestTableConstraintsRuntimeDdlEnforcement(DuckDBColumnEqualSetup, BaseConstraintsRuntimeDdlEnforcement):
+class TestTableConstraintsRuntimeDdlEnforcement(
+    DuckDBColumnEqualSetup, BaseConstraintsRuntimeDdlEnforcement
+):
     pass
 
 
@@ -59,12 +78,17 @@ class TestIncrementalConstraintsRuntimeDdlEnforcement(
         return ["NOT NULL constraint failed"]
 
 
-class TestIncrementalConstraintsRollback(DuckDBColumnEqualSetup, BaseIncrementalConstraintsRollback):
+class TestIncrementalConstraintsRollback(
+    DuckDBColumnEqualSetup, BaseIncrementalConstraintsRollback
+):
     @pytest.fixture(scope="class")
     def expected_error_messages(self):
         return ["NOT NULL constraint failed"]
-    
-class TestModelConstraintsRuntimeEnforcement(DuckDBColumnEqualSetup, BaseModelConstraintsRuntimeEnforcement):
+
+
+class TestModelConstraintsRuntimeEnforcement(
+    DuckDBColumnEqualSetup, BaseModelConstraintsRuntimeEnforcement
+):
     @pytest.fixture(scope="class")
     def expected_error_messages(self):
         return ["NOT NULL constraint failed"]

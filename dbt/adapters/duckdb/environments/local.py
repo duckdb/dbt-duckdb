@@ -1,12 +1,6 @@
-from typing import List
-
-import pyarrow as pa
-
 from . import Environment
-from .. import column
 from .. import credentials
 from .. import utils
-from dbt.adapters.base.column import Column
 from dbt.contracts.connection import AdapterResponse
 from dbt.exceptions import DbtRuntimeError
 
@@ -38,44 +32,6 @@ class DuckDBConnectionWrapper:
 
     def cursor(self):
         return self._cursor
-
-
-def convert_type(t: pa.DataType) -> str:
-    if pa.types.is_int64(t):
-        return "BIGINT"
-    elif pa.types.is_integer(t):
-        return "INTEGER"
-    elif pa.types.is_string(t):
-        return "TEXT"
-    elif pa.types.is_date(t):
-        return "DATE"
-    elif pa.types.is_time(t):
-        return "TIME"
-    elif pa.types.is_timestamp(t):
-        return "DATETIME"
-    elif pa.types.is_floating(t):
-        return "FLOAT"
-    elif pa.types.is_decimal(t):
-        return "DECIMAL"
-    elif pa.types.is_boolean(t):
-        return "BOOL"
-    elif pa.types.is_binary(t):
-        return "BINARY"
-    elif pa.types.is_interval(t):
-        return "INTERVAL"
-    elif pa.types.is_list(t):
-        field_type = t.field(0).type
-        if pa.types.is_integer(field_type):
-            return "INTEGERARRAY"
-        elif pa.types.is_string(field_type):
-            return "STRINGARRAY"
-        else:
-            return "ARRAY"
-    elif pa.types.is_struct(t) or pa.types.is_map(t):
-        # TODO: support detailed nested types
-        return "JSON"
-    else:
-        return "UNKNOWN"
 
 
 class LocalEnvironment(Environment):
@@ -129,12 +85,6 @@ class LocalEnvironment(Environment):
         )
         cursor.close()
         handle.close()
-
-    def create_columns(self, cursor) -> List[Column]:
-        columns = []
-        for field in cursor.fetch_record_batch().schema:
-            columns.append(column.DuckDBColumn.create(field.name, convert_type(field.type)))
-        return columns
 
     def close(self):
         if self.conn:
