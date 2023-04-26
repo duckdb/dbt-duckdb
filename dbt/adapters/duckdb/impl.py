@@ -8,12 +8,15 @@ import duckdb
 
 from dbt.adapters.base import BaseRelation
 from dbt.adapters.base.column import Column
+from dbt.adapters.base.impl import ConstraintSupport
 from dbt.adapters.base.meta import available
 from dbt.adapters.duckdb.connections import DuckDBConnectionManager
 from dbt.adapters.duckdb.glue import create_or_update_table
 from dbt.adapters.duckdb.relation import DuckDBRelation
 from dbt.adapters.sql import SQLAdapter
 from dbt.contracts.connection import AdapterResponse
+from dbt.contracts.graph.nodes import ColumnLevelConstraint
+from dbt.contracts.graph.nodes import ConstraintType
 from dbt.exceptions import DbtInternalError
 from dbt.exceptions import DbtRuntimeError
 
@@ -21,6 +24,14 @@ from dbt.exceptions import DbtRuntimeError
 class DuckDBAdapter(SQLAdapter):
     ConnectionManager = DuckDBConnectionManager
     Relation = DuckDBRelation
+
+    CONSTRAINT_SUPPORT = {
+        ConstraintType.check: ConstraintSupport.ENFORCED,
+        ConstraintType.not_null: ConstraintSupport.ENFORCED,
+        ConstraintType.unique: ConstraintSupport.ENFORCED,
+        ConstraintType.primary_key: ConstraintSupport.ENFORCED,
+        ConstraintType.foreign_key: ConstraintSupport.ENFORCED,
+    }
 
     @classmethod
     def date_function(cls) -> str:
@@ -175,6 +186,30 @@ class DuckDBAdapter(SQLAdapter):
             except_op=except_operator,
         )
         return sql
+
+    @available.parse(lambda *a, **k: [])
+    def get_column_schema_from_query(self, sql: str) -> List[Column]:
+        """Get a list of the Columns with names and data types from the given sql."""
+
+        # Taking advantage of yet another amazing DuckDB SQL feature right here: the
+        # ability to DESCRIBE a query instead of a relation
+        describe_sql = f"DESCRIBE ({sql})"
+        _, cursor = self.connections.add_select_query(describe_sql)
+        ret = []
+        for row in cursor.fetchall():
+            name, dtype = row[0], row[1]
+            ret.append(Column.create(name, dtype))
+        return ret
+
+    @classmethod
+    def render_column_constraint(cls, constraint: ColumnLevelConstraint) -> Optional[str]:
+        """Render the given constraint as DDL text. Should be overriden by adapters which need custom constraint
+        rendering."""
+        if constraint.type == ConstraintType.foreign_key:
+            # DuckDB doesn't support 'foreign key' as an alias
+            return f"references {constraint.expression}"
+        else:
+            return super().render_column_constraint(constraint)
 
 
 # Change `table_a/b` to `table_aaaaa/bbbbb` to avoid duckdb binding issues when relation_a/b
