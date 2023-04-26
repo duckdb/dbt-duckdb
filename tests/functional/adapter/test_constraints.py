@@ -29,6 +29,7 @@ class DuckDBColumnEqualSetup:
             ["'1'", string_type, string_type],
             ["true", "bool", "BOOL"],
             ["'2013-11-03 00:00:00-07'::timestamp", "TIMESTAMP", "TIMESTAMP"],
+            ["'2013-11-03 00:00:00-07'::timestamptz", "TIMESTAMPTZ", "TIMESTAMP WITH TIME ZONE"],
             ["ARRAY['a','b','c']", "VARCHAR[]", "VARCHAR[]"],
             ["ARRAY[1,2,3]", "INTEGER[]", "INTEGER[]"],
             ["'1'::numeric", "numeric", "DECIMAL"],
