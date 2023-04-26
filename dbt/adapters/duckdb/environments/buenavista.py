@@ -2,9 +2,9 @@ import json
 
 import psycopg2
 
-from . import credentials
-from . import utils
-from .environments import Environment
+from . import Environment
+from .. import credentials
+from .. import utils
 from dbt.contracts.connection import AdapterResponse
 
 
