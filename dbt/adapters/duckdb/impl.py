@@ -7,10 +7,9 @@ import agate
 import duckdb
 
 from dbt.adapters.base import BaseRelation
-from dbt.adapters.base.column import Column as DBTColumn
+from dbt.adapters.base.column import Column
 from dbt.adapters.base.impl import ConstraintSupport
 from dbt.adapters.base.meta import available
-from dbt.adapters.duckdb.column import DuckDBColumn
 from dbt.adapters.duckdb.connections import DuckDBConnectionManager
 from dbt.adapters.duckdb.glue import create_or_update_table
 from dbt.adapters.duckdb.relation import DuckDBRelation
@@ -25,7 +24,6 @@ from dbt.exceptions import DbtRuntimeError
 class DuckDBAdapter(SQLAdapter):
     ConnectionManager = DuckDBConnectionManager
     Relation = DuckDBRelation
-    Column = DuckDBColumn
 
     CONSTRAINT_SUPPORT = {
         ConstraintType.check: ConstraintSupport.ENFORCED,
@@ -75,7 +73,7 @@ class DuckDBAdapter(SQLAdapter):
         self,
         glue_database: str,
         table: str,
-        column_list: Sequence[DBTColumn],
+        column_list: Sequence[Column],
         location: str,
         file_format: str,
     ) -> None:
@@ -190,7 +188,7 @@ class DuckDBAdapter(SQLAdapter):
         return sql
 
     @available.parse(lambda *a, **k: [])
-    def get_column_schema_from_query(self, sql: str) -> List[DBTColumn]:
+    def get_column_schema_from_query(self, sql: str) -> List[Column]:
         """Get a list of the Columns with names and data types from the given sql."""
 
         # Taking advantage of yet another amazing DuckDB SQL feature right here: the
@@ -200,7 +198,7 @@ class DuckDBAdapter(SQLAdapter):
         ret = []
         for row in cursor.fetchall():
             name, dtype = row[0], row[1]
-            ret.append(DuckDBColumn.create(name, dtype))
+            ret.append(Column.create(name, dtype))
         return ret
 
     @classmethod
