@@ -14,7 +14,7 @@ This project is hosted on PyPI, so you should be able to install it and the nece
 
 `pip3 install dbt-duckdb`
 
-The latest supported version targets `dbt-core` 1.4.x and `duckdb` version 0.7.x, but we work hard to ensure that newer
+The latest supported version targets `dbt-core` 1.5.x and `duckdb` version 0.7.x, but we work hard to ensure that newer
 versions of DuckDB will continue to work with the adapter as they are released. If you would like to use our new (and experimental!)
 support for persisting the tables that DuckDB creates to the [AWS Glue Catalog](https://aws.amazon.com/glue/), you should install
 `dbt-duckdb[glue]` in order to get the AWS dependencies as well.
@@ -94,9 +94,9 @@ Instead of specifying the credentials through the settings block, you can also u
 
 #### Attaching Additional Databases
 
-DuckDB version `0.7.0` and dbt-duckdb version `1.4.0` support [attaching additional databases](https://duckdb.org/docs/sql/statements/attach.html) to your dbt-duckdb run so that you can read
+DuckDB version `0.7.0` added support for [attaching additional databases](https://duckdb.org/docs/sql/statements/attach.html) to your dbt-duckdb run so that you can read
 and write from multiple databases. Additional databases may be configured using [dbt run hooks](https://docs.getdbt.com/docs/build/hooks-operations) or via the `attach` argument
-in your profile:
+in your profile that was added in dbt-duckdb `1.4.0`:
 
 ```
 default:
