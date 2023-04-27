@@ -125,7 +125,8 @@ class DuckDBCredentials(Credentials):
                 data["database"] = "memory"
             else:
                 parsed = urlparse(path)
-                db = os.path.splitext(parsed.path)[0]
+                base_file = os.path.basename(parsed.path)
+                db = os.path.splitext(base_file)[0]
                 if db:
                     data["database"] = db
                 else:
