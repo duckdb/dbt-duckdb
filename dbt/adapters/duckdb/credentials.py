@@ -7,9 +7,11 @@ from typing import Dict
 from typing import List
 from typing import Optional
 from typing import Tuple
+from urllib.parse import urlparse
 
 import duckdb
 
+import dbt.exceptions
 from dbt.adapters.base import Credentials
 from dbt.dataclass_schema import dbtClassMixin
 
@@ -122,7 +124,16 @@ class DuckDBCredentials(Credentials):
             if path == ":memory:":
                 data["database"] = "memory"
             else:
-                data["database"] = os.path.splitext(os.path.basename(path))[0]
+                parsed = urlparse(path)
+                base_file = os.path.basename(parsed.path)
+                db = os.path.splitext(base_file)[0]
+                if db:
+                    data["database"] = db
+                else:
+                    raise dbt.exceptions.DbtRuntimeError(
+                        "Unable to determine database name from path"
+                        " and no database was specified in profile"
+                    )
         return data
 
     @property
