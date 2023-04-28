@@ -26,18 +26,18 @@ version: 2
 sources:
   - name: sql_source
     schema: main
-    meta:
+    config:
       plugin: sql
       save_mode: ignore
     tables:
       - name: tt1
         description: "My first SQLAlchemy table"
-        meta:
+        config:
           query: "SELECT * FROM {identifier} WHERE id=:id"
           params:
             id: 1
       - name: tt2
-        meta:
+        config:
           table: "test_table2"
 """
 

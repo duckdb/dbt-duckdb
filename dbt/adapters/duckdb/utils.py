@@ -34,6 +34,8 @@ class SourceConfig:
     def create(cls, source: SourceDefinition) -> "SourceConfig":
         meta = source.source_meta.copy()
         meta.update(source.meta)
+        # Use the config properties as well if they are present
+        meta.update(source.config._extra)
         return SourceConfig(
             name=source.name,
             identifier=source.identifier,
