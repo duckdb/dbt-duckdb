@@ -6,12 +6,12 @@ from dbt.tests.util import run_dbt
 sources_schema_yml = """version: 2
 sources:
   - name: external_source
-    meta:
+    config:
       external_location: "/tmp/{name}_{extra}.csv"
     tables:
       - name: seeds_source
         description: "A source table"
-        meta:
+        config:
           extra: 'something'
         columns:
           - name: id
@@ -21,7 +21,7 @@ sources:
               - not_null
       - name: seeds_ost
         identifier: "seeds_other_source_table"
-        meta:
+        config:
           external_location: "read_csv_auto('/tmp/{identifier}.csv')"
 """
 
