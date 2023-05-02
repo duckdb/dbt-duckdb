@@ -14,8 +14,6 @@ WHERE conf = 'West'
 class TestFilesystems:
     @pytest.fixture(scope="class")
     def dbt_profile_target(self, dbt_profile_target):
-        if "path" not in dbt_profile_target:
-            return dbt_profile_target
         return {
             "type": "duckdb",
             "path": dbt_profile_target.get("path", ":memory:"),
