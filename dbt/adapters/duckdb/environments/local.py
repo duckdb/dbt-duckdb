@@ -36,6 +36,9 @@ class DuckDBConnectionWrapper:
 
 class LocalEnvironment(Environment):
     def __init__(self, credentials: credentials.DuckDBCredentials):
+        # Set the conn attribute to None so it always exists even if
+        # DB initialization fails
+        self.conn = None
         self.conn = self.initialize_db(credentials)
         self._plugins = self.initialize_plugins(credentials)
         self.creds = credentials
