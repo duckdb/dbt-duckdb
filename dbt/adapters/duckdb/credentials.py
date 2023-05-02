@@ -118,22 +118,25 @@ class DuckDBCredentials(Credentials):
 
     @classmethod
     def __pre_deserialize__(cls, data: Dict[Any, Any]) -> Dict[Any, Any]:
-        data = super().__pre_deserialize__(data)
-        path = data.get("path")
-        if path and "database" not in data and duckdb.__version__ >= "0.7.0":
-            if path == ":memory:":
-                data["database"] = "memory"
-            else:
-                parsed = urlparse(path)
-                base_file = os.path.basename(parsed.path)
-                db = os.path.splitext(base_file)[0]
-                if db:
-                    data["database"] = db
+        if duckdb.__version__ >= "0.7.0":
+            data = super().__pre_deserialize__(data)
+            if "database" not in data:
+                # if no database is specified in the profile, figure out
+                # the database value to use from the path argument
+                path = data.get("path")
+                if path is None or path == ":memory:":
+                    data["database"] = "memory"
                 else:
-                    raise dbt.exceptions.DbtRuntimeError(
-                        "Unable to determine database name from path"
-                        " and no database was specified in profile"
-                    )
+                    parsed = urlparse(path)
+                    base_file = os.path.basename(parsed.path)
+                    db = os.path.splitext(base_file)[0]
+                    if db:
+                        data["database"] = db
+                    else:
+                        raise dbt.exceptions.DbtRuntimeError(
+                            "Unable to determine database name from path"
+                            " and no database was specified in profile"
+                        )
         return data
 
     @property

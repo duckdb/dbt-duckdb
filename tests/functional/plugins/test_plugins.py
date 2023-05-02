@@ -73,9 +73,6 @@ class TestPlugins:
 
     @pytest.fixture(scope="class")
     def profiles_config_update(self, dbt_profile_target, sqlite_test_db):
-        if "path" not in dbt_profile_target:
-            return {}
-
         config = {"connection_url": f"sqlite:///{sqlite_test_db}"}
         plugins = [
             {"name": "excel", "impl": "excel"},
@@ -87,7 +84,7 @@ class TestPlugins:
                 "outputs": {
                     "dev": {
                         "type": "duckdb",
-                        "path": dbt_profile_target["path"],
+                        "path": dbt_profile_target.get("path", ":memory:"),
                         "plugins": plugins,
                     }
                 },

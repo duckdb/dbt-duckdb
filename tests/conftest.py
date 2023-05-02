@@ -50,10 +50,10 @@ def dbt_profile_target(profile_type, bv_server_process, tmp_path_factory):
             "port": 5433,
             "user": "test",
         }
-    elif profile_type == "memory":
-        profile["path"] = ":memory:"
     elif profile_type == "file":
         profile["path"] = str(tmp_path_factory.getbasetemp() / "tmp.db")
+    elif profile_type == "memory":
+        pass  # use the default path-less profile
     else:
         raise ValueError(f"Invalid profile type '{profile_type}'")
 

@@ -31,6 +31,7 @@ models_target_model_sql = """
     SELECT * FROM {{ ref('source_model') }}
 """
 
+
 @pytest.mark.skip_profile("buenavista")
 class TestAttachedDatabase:
     @pytest.fixture(scope="class")
@@ -45,14 +46,12 @@ class TestAttachedDatabase:
 
     @pytest.fixture(scope="class")
     def profiles_config_update(self, dbt_profile_target, attach_test_db):
-        if "path" not in dbt_profile_target:
-            return {}
         return {
             "test": {
                 "outputs": {
                     "dev": {
                         "type": "duckdb",
-                        "path": dbt_profile_target["path"],
+                        "path": dbt_profile_target.get("path", ":memory:"),
                         "attach": [{"path": attach_test_db}],
                     }
                 },
