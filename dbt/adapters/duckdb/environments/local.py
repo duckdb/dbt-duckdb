@@ -1,3 +1,5 @@
+import threading
+
 from . import Environment
 from .. import credentials
 from .. import utils
@@ -24,11 +26,13 @@ class DuckDBCursorWrapper:
 
 
 class DuckDBConnectionWrapper:
-    def __init__(self, cursor):
+    def __init__(self, cursor, env):
         self._cursor = DuckDBCursorWrapper(cursor)
+        self._env = env
 
     def close(self):
         self._cursor.close()
+        self._env.notify_closed()
 
     def cursor(self):
         return self._cursor
@@ -39,14 +43,25 @@ class LocalEnvironment(Environment):
         # Set the conn attribute to None so it always exists even if
         # DB initialization fails
         self.conn = None
-        self.conn = self.initialize_db(credentials)
         self._plugins = self.initialize_plugins(credentials)
         self.creds = credentials
+        self.handle_count = 0
+        self.lock = threading.RLock()
+
+    def notify_closed(self):
+        with self.lock:
+            self.handle_count -= 1
+            if self.handle_count == 0 and self.creds.path != ":memory:":
+                self.close()
 
     def handle(self):
         # Extensions/settings need to be configured per cursor
+        with self.lock:
+            if self.conn is None:
+                self.conn = self.initialize_db(self.creds)
+            self.handle_count += 1
         cursor = self.initialize_cursor(self.creds, self.conn.cursor())
-        return DuckDBConnectionWrapper(cursor)
+        return DuckDBConnectionWrapper(cursor, self)
 
     def submit_python_job(self, handle, parsed_model: dict, compiled_code: str) -> AdapterResponse:
         con = handle.cursor()
