@@ -1,4 +1,17 @@
 
+{% macro duckdb__get_create_index_sql(relation, index_dict) -%}
+  {%- set index_config = adapter.parse_index(index_dict) -%}
+  {%- set comma_separated_columns = ", ".join(index_config.columns) -%}
+  {%- set index_name = index_config.render(relation) -%}
+
+  create {% if index_config.unique -%}
+    unique
+  {%- endif %} index
+  "{{ index_name }}"
+  on {{ relation }}
+  ({{ comma_separated_columns }});
+{%- endmacro %}
+
 {% macro duckdb__create_schema(relation) -%}
   {%- call statement('create_schema') -%}
     create schema if not exists {{ relation.without_identifier().include(database=adapter.use_database()) }}

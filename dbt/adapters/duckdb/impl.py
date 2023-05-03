@@ -1,4 +1,7 @@
 import os
+from dataclasses import dataclass
+from datetime import datetime
+from typing import Any
 from typing import List
 from typing import Optional
 from typing import Sequence
@@ -6,8 +9,10 @@ from typing import Sequence
 import agate
 import duckdb
 
+import dbt.utils
 from dbt.adapters.base import BaseRelation
 from dbt.adapters.base.column import Column
+from dbt.adapters.base.impl import AdapterConfig
 from dbt.adapters.base.impl import ConstraintSupport
 from dbt.adapters.base.meta import available
 from dbt.adapters.duckdb.connections import DuckDBConnectionManager
@@ -17,13 +22,55 @@ from dbt.adapters.sql import SQLAdapter
 from dbt.contracts.connection import AdapterResponse
 from dbt.contracts.graph.nodes import ColumnLevelConstraint
 from dbt.contracts.graph.nodes import ConstraintType
+from dbt.dataclass_schema import dbtClassMixin
+from dbt.dataclass_schema import ValidationError
 from dbt.exceptions import DbtInternalError
 from dbt.exceptions import DbtRuntimeError
+from dbt.exceptions import IndexConfigError
+from dbt.exceptions import IndexConfigNotDictError
+
+
+@dataclass
+class DuckDBIndexConfig(dbtClassMixin):
+    columns: List[str]
+    unique: bool = False
+
+    def render(self, relation):
+        # We append the current timestamp to the index name because otherwise
+        # the index will only be created on every other run. See
+        # https://github.com/dbt-labs/dbt-core/issues/1945#issuecomment-576714925
+        # for an explanation.
+        now = datetime.utcnow().isoformat()
+        inputs = self.columns + [
+            relation.render(),
+            str(self.unique),
+            now,
+        ]
+        string = "_".join(inputs)
+        return dbt.utils.md5(string)
+
+    @classmethod
+    def parse(cls, raw_index) -> Optional["DuckDBIndexConfig"]:
+        if raw_index is None:
+            return None
+        try:
+            cls.validate(raw_index)
+            return cls.from_dict(raw_index)
+        except ValidationError as exc:
+            raise IndexConfigError(exc)
+        except TypeError:
+            raise IndexConfigNotDictError(raw_index)
+
+
+@dataclass
+class DuckDBConfig(AdapterConfig):
+    indexes: Optional[List[DuckDBIndexConfig]] = None
 
 
 class DuckDBAdapter(SQLAdapter):
     ConnectionManager = DuckDBConnectionManager
     Relation = DuckDBRelation
+    AdapterSpecificConfigs = DuckDBConfig
 
     CONSTRAINT_SUPPORT = {
         ConstraintType.check: ConstraintSupport.ENFORCED,
@@ -40,6 +87,10 @@ class DuckDBAdapter(SQLAdapter):
     @classmethod
     def is_cancelable(cls) -> bool:
         return False
+
+    @available
+    def parse_index(self, raw_index: Any) -> Optional[DuckDBIndexConfig]:
+        return DuckDBIndexConfig.parse(raw_index)
 
     @available
     def convert_datetimes_to_strs(self, table: agate.Table) -> agate.Table:
