@@ -76,10 +76,11 @@
 def materialize(df, con):
     try:
         import pyarrow
+        pyarrow_available = True
     except ImportError:
-        pass
+        pyarrow_available = False
     finally:
-        if isinstance(df, pyarrow.Table):
+        if pyarrow_available and isinstance(df, pyarrow.Table):
             # https://github.com/duckdb/duckdb/issues/6584
             import pyarrow.dataset
     con.execute('create table {{ relation.include(database=adapter.use_database()) }} as select * from df')
