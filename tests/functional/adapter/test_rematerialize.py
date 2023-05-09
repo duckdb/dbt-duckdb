@@ -21,7 +21,7 @@ select range * 5 from {{ ref('upstream_model') }}
 """
 
 downstream_of_partition_model = """
-select a * 3 from {{ ref('upstream_partition_by_model') }}
+select a from {{ ref('upstream_partition_by_model') }}
 """
 
 
