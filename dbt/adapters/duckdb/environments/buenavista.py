@@ -16,6 +16,7 @@ class BVEnvironment(Environment):
             user=remote.user,
             host=remote.host,
             port=remote.port,
+            password=remote.password,
         )
 
     def __init__(self, credentials: credentials.DuckDBCredentials):
