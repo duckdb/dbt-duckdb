@@ -116,6 +116,11 @@ class DuckDBCredentials(Credentials):
     # created by SQL or Python models; see the plugins module for more details.
     plugins: Optional[List[PluginConfig]] = None
 
+    # Whether to emulate a different database type (e.g., snowflake) for the syntax
+    # of the SQL queries for models; this is useful for testing snowflake-based
+    # dbt projects using dbt-duckdb
+    emulate: Optional[str] = None
+
     @classmethod
     def __pre_deserialize__(cls, data: Dict[Any, Any]) -> Dict[Any, Any]:
         if duckdb.__version__ >= "0.7.0":

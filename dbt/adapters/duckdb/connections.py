@@ -1,6 +1,9 @@
 import atexit
 import threading
 from contextlib import contextmanager
+from typing import Any
+from typing import Optional
+from typing import Tuple
 
 import dbt.exceptions
 from . import environments
@@ -19,6 +22,13 @@ class DuckDBConnectionManager(SQLConnectionManager):
 
     def __init__(self, profile: AdapterRequiredConfig):
         super().__init__(profile)
+        if profile.credentials.emulate:
+            print("Emulating: " + profile.credentials.emulate)
+            from sqlglot import transpile
+            read = profile.credentials.emulate
+            self.transpile = lambda sql: transpile(sql, read=read, write="duckdb")[0]
+        else:
+            self.transpile = lambda sql: sql
 
     @classmethod
     def env(cls) -> environments.Environment:
@@ -89,6 +99,15 @@ class DuckDBConnectionManager(SQLConnectionManager):
         with cls._LOCK:
             if cls._ENV is not None:
                 cls._ENV = None
+    
+    def execute(
+        self, sql: str, auto_begin: bool = False, fetch: bool = False, **kwargs
+    ) -> Tuple[AdapterResponse, Any]:
+        if fetch:
+            # We need to apply transpiling to fetched SQL; DDL/DML should have had
+            # translation applied at an earlier step in the sequence
+            sql = self.transpile(sql)
+        return super().execute(sql, auto_begin, fetch, **kwargs)
 
 
 atexit.register(DuckDBConnectionManager.close_all_connections)

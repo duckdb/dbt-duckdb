@@ -73,6 +73,12 @@ class Environment(abc.ABC):
         if creds.attach:
             for attachment in creds.attach:
                 conn.execute(attachment.to_sql())
+        
+        if creds.emulate:
+            # only snowflake is supported at the moment
+            from ..emulate import snowflake
+            conn = snowflake.emulate(conn)
+
         return conn
 
     @classmethod
