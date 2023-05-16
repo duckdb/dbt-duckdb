@@ -83,13 +83,16 @@ class LocalEnvironment(Environment):
         cursor = handle.cursor()
         save_mode = source_config.meta.get("save_mode", "overwrite")
         if save_mode in ("ignore", "error_if_exists"):
-            schema, identifier = source_config.schema, source_config.identifier
-            q = f"""SELECT COUNT(1)
-                FROM information_schema.tables
-                WHERE table_schema = '{schema}'
-                AND table_name = '{identifier}'
+            params = [source_config.schema, source_config.identifier]
+            q = """SELECT COUNT(1)
+                FROM system.information_schema.tables
+                WHERE table_schema = ?
+                AND table_name = ?
                 """
-            if cursor.execute(q).fetchone()[0]:
+            if source_config.database:
+                q += "AND table_catalog = ?"
+                params.append(source_config.database)
+            if cursor.execute(q, params).fetchone()[0]:
                 if save_mode == "error_if_exists":
                     raise Exception(f"Source {source_config.table_name()} already exists!")
                 else:
