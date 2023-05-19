@@ -2,7 +2,7 @@ import datetime as dt
 
 from duckdb import typing as t
 from duckdb import DuckDBPyConnection
-
+from sqlglot.dialects.snowflake import Snowflake
 
 def emulate(db: DuckDBPyConnection) -> DuckDBPyConnection:
     _emulate_types(db)
@@ -39,29 +39,9 @@ def _emulate_functions(db: DuckDBPyConnection) -> None:
 
 
 def convert_snowflake_format(snowflake_format_str):
-    format_mapping = {
-        "yyyy": "%Y",
-        "yy": "%y",
-        "mmmm": "%B",
-        "mm": "%m",
-        "mon": "%b",
-        "dd": "%d",
-        "dy": "%a",
-        "hh24": "%H",
-        "hh12": "%I",
-        "mi": "%M",
-        "ss": "%S",
-        # The following don't have a direct equivalent in Python
-        # "FF[0-9]": ???,
-        # "TZH:TZM" : ???,
-        # "TZHTZM" : ???,
-        # "TZH" : ???,
-    }
-    python_format_str = snowflake_format_str.lower()
+    format_mapping = Snowflake.time_mapping
+    python_format_str = snowflake_format_str
     for snowflake_str, python_str in format_mapping.items():
+        python_str = python_str.replace("-", "")
         python_format_str = python_format_str.replace(snowflake_str, python_str)
-    unsupported_formats = ["ff[0-9]", "tzh:tzm", "tzhtzm", "tzh"]
-    for unsupported in unsupported_formats:
-        if unsupported in python_format_str:
-            raise ValueError(f"Unsupported Snowflake format: {unsupported}")
     return python_format_str
