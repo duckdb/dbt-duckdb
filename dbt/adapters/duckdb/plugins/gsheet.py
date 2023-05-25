@@ -1,11 +1,12 @@
 from dataclasses import dataclass
+from typing import Any
 from typing import Dict
 from typing import Literal
 
 import gspread
 import pandas as pd
 
-from . import Plugin
+from . import BasePlugin
 from . import PluginConfig
 from ..utils import SourceConfig
 
@@ -21,8 +22,8 @@ class GSheetConfig(PluginConfig):
             return gspread.oauth()
 
 
-class GSheetPlugin(Plugin):
-    def __init__(self, config: Dict):
+class Plugin(BasePlugin):
+    def initialize(self, config: Dict[str, Any]):
         self._config = GSheetConfig.from_dict(config)
         self._gc = self._config.client()
 

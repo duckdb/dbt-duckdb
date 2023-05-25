@@ -75,8 +75,8 @@ class TestPlugins:
     def profiles_config_update(self, dbt_profile_target, sqlite_test_db):
         config = {"connection_url": f"sqlite:///{sqlite_test_db}"}
         plugins = [
-            {"name": "excel", "impl": "excel"},
-            {"name": "sql", "impl": "sqlalchemy", "config": config},
+            {"module": "excel"},
+            {"module": "sqlalchemy", "alias": "sql", "config": config},
         ]
 
         return {

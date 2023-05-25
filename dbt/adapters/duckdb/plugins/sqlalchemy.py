@@ -5,12 +5,12 @@ import pandas as pd
 from sqlalchemy import create_engine
 from sqlalchemy import text
 
-from . import Plugin
+from . import BasePlugin
 from ..utils import SourceConfig
 
 
-class SQLAlchemyPlugin(Plugin):
-    def __init__(self, plugin_config: Dict[str, Any]):
+class Plugin(BasePlugin):
+    def initialize(self, plugin_config: Dict[str, Any]):
         self.engine = create_engine(plugin_config["connection_url"])
 
     def load(self, source_config: SourceConfig) -> pd.DataFrame:

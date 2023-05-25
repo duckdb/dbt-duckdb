@@ -10,8 +10,8 @@ version: 2
 sources:
   - name: iceberg_source
     schema: main
-    meta:
-      plugin: icee
+    config:
+      plugin: iceberg
       iceberg_table: "examples.{identifier}"
     tables:
       - name: nyc_taxi_locations
@@ -40,7 +40,7 @@ class TestIcebergPlugin:
                         "type": "duckdb",
                         "path": dbt_profile_target["path"],
                         "plugins": [
-                            {"name": "icee", "impl": "iceberg", "config": config}
+                            {"module": "iceberg", "config": config}
                         ],
                     }
                 },

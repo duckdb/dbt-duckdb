@@ -1,9 +1,10 @@
-import abc
 import importlib
 from typing import Any
 from typing import Dict
+from typing import Optional
 
 from duckdb import DuckDBPyConnection
+
 from ..utils import SourceConfig
 from dbt.dataclass_schema import dbtClassMixin
 
@@ -14,29 +15,32 @@ class PluginConfig(dbtClassMixin):
     pass
 
 
-class Plugin(abc.ABC):
-    WELL_KNOWN_PLUGINS = {
-        "excel": "dbt.adapters.duckdb.plugins.excel.ExcelPlugin",
-        "gsheet": "dbt.adapters.duckdb.plugins.gsheet.GSheetPlugin",
-        "iceberg": "dbt.adapters.duckdb.plugins.iceberg.IcebergPlugin",
-        "sqlalchemy": "dbt.adapters.duckdb.plugins.sqlalchemy.SQLAlchemyPlugin",
-    }
-
+class BasePlugin:
     @classmethod
-    def create(cls, impl: str, config: Dict[str, Any]) -> "Plugin":
-        module_name, class_name = impl.rsplit(".", 1)
-        module = importlib.import_module(module_name)
-        Class = getattr(module, class_name)
-        if not issubclass(Class, Plugin):
-            raise TypeError(f"{impl} is not a subclass of Plugin")
-        return Class(config)
+    def create(
+        cls, module: str, *, config: Optional[Dict[str, Any]] = None, alias: Optional[str] = None
+    ) -> "BasePlugin":
+        """Create a plugin from a module name and optional configuration."""
+        if "." not in module:
+            name = module
+            module = f"dbt.adapters.duckdb.plugins.{module}"
+        else:
+            name = module.split(".")[-1]
+        mod = importlib.import_module(module)
+        return mod.Plugin(alias or name, config or {})
 
-    def __init__(self, name: str, plugin_config: Dict):
+    def __init__(self, name: str, plugin_config: Dict[str, Any]):
         self.name = name
+        self.initialize(plugin_config)
 
-    def configure_connection(self, conn: DuckDBPyConnection):
+    def initialize(self, plugin_config: Dict[str, Any]):
+        """Initialize the plugin with its configuration dictionary."""
         pass
 
-    def load_source(self, source_config: SourceConfig):
+    def configure_connection(self, conn: DuckDBPyConnection):
+        """Configure the DuckDB connection with any necessary extensions and/or settings."""
+        pass
+
+    def load(self, source_config: SourceConfig):
         """Load data from a source config and return it as a DataFrame-like object that DuckDB can read."""
-        raise NotImplementedError
+        raise NotImplementedError(f"load_source not implemented for {self.name}")

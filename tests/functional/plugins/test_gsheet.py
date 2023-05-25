@@ -48,7 +48,7 @@ class TestGSheetPlugin:
                         "type": "duckdb",
                         "path": dbt_profile_target["path"],
                         "plugins": [
-                            {"name": "gsheet", "impl": "gsheet", "config": config}
+                            {"module": "gsheet", "config": config}
                         ],
                     }
                 },

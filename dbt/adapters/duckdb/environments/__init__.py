@@ -3,11 +3,12 @@ import importlib.util
 import os
 import tempfile
 from typing import Dict
+from typing import Optional
 
 import duckdb
 
 from ..credentials import DuckDBCredentials
-from ..plugins import Plugin
+from ..plugins import BasePlugin
 from ..utils import SourceConfig
 from dbt.contracts.connection import AdapterResponse
 from dbt.exceptions import DbtRuntimeError
@@ -39,9 +40,7 @@ class Environment(abc.ABC):
         pass
 
     @abc.abstractmethod
-    def submit_python_job(
-        self, handle, parsed_model: dict, compiled_code: str
-    ) -> AdapterResponse:
+    def submit_python_job(self, handle, parsed_model: dict, compiled_code: str) -> AdapterResponse:
         pass
 
     @abc.abstractmethod
@@ -52,7 +51,9 @@ class Environment(abc.ABC):
         return "?"
 
     @classmethod
-    def initialize_db(cls, creds: DuckDBCredentials, plugins: Dict[str, Plugin] = None):
+    def initialize_db(
+        cls, creds: DuckDBCredentials, plugins: Optional[Dict[str, BasePlugin]] = None
+    ):
         config = creds.config_options or {}
         conn = duckdb.connect(creds.path, read_only=False, config=config)
 
@@ -77,7 +78,7 @@ class Environment(abc.ABC):
                 conn.execute(attachment.to_sql())
 
         # let the plugins do any configuration on the
-        # connection they need to do
+        # connection that they need to do
         if plugins:
             for plugin in plugins.values():
                 plugin.configure_connection(conn)
@@ -96,11 +97,13 @@ class Environment(abc.ABC):
         return cursor
 
     @classmethod
-    def initialize_plugins(cls, creds: DuckDBCredentials) -> Dict[str, Plugin]:
-        ret: Dict[str, Plugin] = {}
+    def initialize_plugins(cls, creds: DuckDBCredentials) -> Dict[str, BasePlugin]:
+        ret = {}
         for plugin_def in creds.plugins or []:
-            # TODO
-            pass
+            plugin = BasePlugin.create(
+                plugin_def.module, config=plugin_def.config, alias=plugin_def.alias
+            )
+            ret[plugin.name] = plugin
         return ret
 
     @classmethod
