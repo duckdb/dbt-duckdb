@@ -58,7 +58,7 @@ class LocalEnvironment(Environment):
         # Extensions/settings need to be configured per cursor
         with self.lock:
             if self.conn is None:
-                self.conn = self.initialize_db(self.creds)
+                self.conn = self.initialize_db(self.creds, self._plugins)
             self.handle_count += 1
         cursor = self.initialize_cursor(self.creds, self.conn.cursor())
         return DuckDBConnectionWrapper(cursor, self)
