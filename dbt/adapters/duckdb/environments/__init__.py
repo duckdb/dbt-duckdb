@@ -39,7 +39,9 @@ class Environment(abc.ABC):
         pass
 
     @abc.abstractmethod
-    def submit_python_job(self, handle, parsed_model: dict, compiled_code: str) -> AdapterResponse:
+    def submit_python_job(
+        self, handle, parsed_model: dict, compiled_code: str
+    ) -> AdapterResponse:
         pass
 
     @abc.abstractmethod
@@ -50,7 +52,7 @@ class Environment(abc.ABC):
         return "?"
 
     @classmethod
-    def initialize_db(cls, creds: DuckDBCredentials):
+    def initialize_db(cls, creds: DuckDBCredentials, plugins: Dict[str, Plugin] = None):
         config = creds.config_options or {}
         conn = duckdb.connect(creds.path, read_only=False, config=config)
 
@@ -73,6 +75,13 @@ class Environment(abc.ABC):
         if creds.attach:
             for attachment in creds.attach:
                 conn.execute(attachment.to_sql())
+
+        # let the plugins do any configuration on the
+        # connection they need to do
+        if plugins:
+            for plugin in plugins.values():
+                plugin.configure_connection(conn)
+
         return conn
 
     @classmethod
@@ -88,17 +97,10 @@ class Environment(abc.ABC):
 
     @classmethod
     def initialize_plugins(cls, creds: DuckDBCredentials) -> Dict[str, Plugin]:
-        ret = {}
-        for plugin in creds.plugins or []:
-            if plugin.name in ret:
-                raise Exception("Duplicate plugin name: " + plugin.name)
-            else:
-                if plugin.impl in Plugin.WELL_KNOWN_PLUGINS:
-                    plugin.impl = Plugin.WELL_KNOWN_PLUGINS[plugin.impl]
-                try:
-                    ret[plugin.name] = Plugin.create(plugin.impl, plugin.config or {})
-                except Exception as e:
-                    raise Exception(f"Error attempting to create plugin {plugin.name}", e)
+        ret: Dict[str, Plugin] = {}
+        for plugin_def in creds.plugins or []:
+            # TODO
+            pass
         return ret
 
     @classmethod

@@ -3,6 +3,7 @@ import importlib
 from typing import Any
 from typing import Dict
 
+from duckdb import DuckDBPyConnection
 from ..utils import SourceConfig
 from dbt.dataclass_schema import dbtClassMixin
 
@@ -30,10 +31,12 @@ class Plugin(abc.ABC):
             raise TypeError(f"{impl} is not a subclass of Plugin")
         return Class(config)
 
-    @abc.abstractmethod
-    def __init__(self, plugin_config: Dict):
+    def __init__(self, name: str, plugin_config: Dict):
+        self.name = name
+
+    def configure_connection(self, conn: DuckDBPyConnection):
         pass
 
-    def load(self, source_config: SourceConfig):
+    def load_source(self, source_config: SourceConfig):
         """Load data from a source config and return it as a DataFrame-like object that DuckDB can read."""
         raise NotImplementedError
