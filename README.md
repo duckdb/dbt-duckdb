@@ -313,7 +313,7 @@ additional configuration for the module based on the project; this method is cal
 database and may perform any additional configuration of that object that is needed by the plugin, like defining
 custom user-defined functions.
 1. `load`: Takes a [SourceConfig](dbt/adapters/duckdb/utils.py) instance, which encapsulates the configuration for a
-a dbt source and can optionally return a DataFrame-like object that DuckDB knows how to turn into a table (this is 
+a dbt source and can optionally return a DataFrame-like object that DuckDB knows how to turn into a table (this is
 similar to a dbt-duckdb Python model, but without the ability to `ref` any models or access any information beyond
 the source config.)
 
