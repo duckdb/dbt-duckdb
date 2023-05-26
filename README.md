@@ -239,12 +239,18 @@ on-run-start:
 
 dbt added support for [Python models in version 1.3.0](https://docs.getdbt.com/docs/build/python-models). For most data platforms,
 dbt will package up the Python code defined in a `.py` file and ship it off to be executed in whatever Python environment that
-data platform supports. However, in `dbt-duckdb`, the local machine *is* the data platform, and so we support executing any Python
-code that will run on your machine via an [exec](https://realpython.com/python-exec/) call. The value of the `dbt.ref` and `dbt.source`
-functions will be a [DuckDB Relation](https://duckdb.org/docs/api/python/reference/) object that can be easily converted into a
-Pandas DataFrame or Arrow table, and the return value of the `def models` function can be _any_ Python object that DuckDB knows how
-to turn into a relation, including a Pandas or Polars `DataFrame`, a DuckDB `Relation`, or an Arrow `Table`, `Dataset`, `RecordBatchReader`, or
-`Scanner`.
+data platform supports (e.g., Snowpark for Snowflake or Dataproc for BigQuery.) In dbt-duckdb, we execute Python models in the same
+process that owns the connection to the DuckDB database, which by default, is the Python process that is created when you run dbt.
+To execute the Python model, we treat the `.py` file that your model is defined in as a Python module and load it into the
+running process using [importlib](https://docs.python.org/3/library/importlib.html). We then construct the arguments to the `model`
+function that you defined (a `dbt` object that contains the names of any `ref` and `source` information your model needs and a
+`DuckDBPyConnection` object for you to interact with the underlying DuckDB database), call the `model` function, and then materialize
+the returned object as a table in DuckDB.
+
+The value of the `dbt.ref` and `dbt.source` functions inside of a Python model will be a [DuckDB Relation](https://duckdb.org/docs/api/python/reference/)
+object that can be easily converted into a Pandas/Polars DataFrame or an Arrow table. The return value of the `model` function can be
+any Python object that DuckDB knows how to turn into a table, including a Pandas/Polars `DataFrame`, a DuckDB `Relation`, or an Arrow `Table`,
+`Dataset`, `RecordBatchReader`, or `Scanner`.
 
 ### Roadmap
 
@@ -252,4 +258,3 @@ Things that we would like to add in the near future:
 
 * Support for Delta and Iceberg external table formats (both as sources and destinations)
 * Make dbt's incremental models and snapshots work with external materializations
-* Make AWS Glue registration a first-class concept and add support for Snowflake/BigQuery registrations
