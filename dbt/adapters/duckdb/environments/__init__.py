@@ -3,11 +3,12 @@ import importlib.util
 import os
 import tempfile
 from typing import Dict
+from typing import Optional
 
 import duckdb
 
 from ..credentials import DuckDBCredentials
-from ..plugins import Plugin
+from ..plugins import BasePlugin
 from ..utils import SourceConfig
 from dbt.contracts.connection import AdapterResponse
 from dbt.exceptions import DbtRuntimeError
@@ -50,7 +51,9 @@ class Environment(abc.ABC):
         return "?"
 
     @classmethod
-    def initialize_db(cls, creds: DuckDBCredentials):
+    def initialize_db(
+        cls, creds: DuckDBCredentials, plugins: Optional[Dict[str, BasePlugin]] = None
+    ):
         config = creds.config_options or {}
         conn = duckdb.connect(creds.path, read_only=False, config=config)
 
@@ -73,6 +76,13 @@ class Environment(abc.ABC):
         if creds.attach:
             for attachment in creds.attach:
                 conn.execute(attachment.to_sql())
+
+        # let the plugins do any configuration on the
+        # connection that they need to do
+        if plugins:
+            for plugin in plugins.values():
+                plugin.configure_connection(conn)
+
         return conn
 
     @classmethod
@@ -87,18 +97,13 @@ class Environment(abc.ABC):
         return cursor
 
     @classmethod
-    def initialize_plugins(cls, creds: DuckDBCredentials) -> Dict[str, Plugin]:
+    def initialize_plugins(cls, creds: DuckDBCredentials) -> Dict[str, BasePlugin]:
         ret = {}
-        for plugin in creds.plugins or []:
-            if plugin.name in ret:
-                raise Exception("Duplicate plugin name: " + plugin.name)
-            else:
-                if plugin.impl in Plugin.WELL_KNOWN_PLUGINS:
-                    plugin.impl = Plugin.WELL_KNOWN_PLUGINS[plugin.impl]
-                try:
-                    ret[plugin.name] = Plugin.create(plugin.impl, plugin.config or {})
-                except Exception as e:
-                    raise Exception(f"Error attempting to create plugin {plugin.name}", e)
+        for plugin_def in creds.plugins or []:
+            plugin = BasePlugin.create(
+                plugin_def.module, config=plugin_def.config, alias=plugin_def.alias
+            )
+            ret[plugin.name] = plugin
         return ret
 
     @classmethod

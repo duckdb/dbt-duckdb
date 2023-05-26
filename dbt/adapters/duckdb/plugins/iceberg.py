@@ -1,13 +1,14 @@
+from typing import Any
 from typing import Dict
 
 import pyiceberg.catalog
 
-from . import Plugin
+from . import BasePlugin
 from ..utils import SourceConfig
 
 
-class IcebergPlugin(Plugin):
-    def __init__(self, config: Dict):
+class Plugin(BasePlugin):
+    def initialize(self, config: Dict[str, Any]):
         if "catalog" not in config:
             raise Exception("'catalog' is a required argument for the iceberg plugin!")
         catalog = config.pop("catalog")

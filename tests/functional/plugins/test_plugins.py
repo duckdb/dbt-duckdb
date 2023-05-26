@@ -51,6 +51,9 @@ sqlalchemy1_sql = """
 sqlalchemy2_sql = """
     select * from {{ source('sql_source', 'tt2') }}
 """
+foo_sql = """
+    select foo() as foo
+"""
 
 
 @pytest.mark.skip_profile("buenavista")
@@ -75,8 +78,9 @@ class TestPlugins:
     def profiles_config_update(self, dbt_profile_target, sqlite_test_db):
         config = {"connection_url": f"sqlite:///{sqlite_test_db}"}
         plugins = [
-            {"name": "excel", "impl": "excel"},
-            {"name": "sql", "impl": "sqlalchemy", "config": config},
+            {"module": "excel"},
+            {"module": "sqlalchemy", "alias": "sql", "config": config},
+            {"module": "tests.create_function_plugin"},
         ]
 
         return {
@@ -100,11 +104,12 @@ class TestPlugins:
             "excel.sql": excel1_sql,
             "sqlalchemy1.sql": sqlalchemy1_sql,
             "sqlalchemy2.sql": sqlalchemy2_sql,
+            "foo.sql": foo_sql,
         }
 
     def test_plugins(self, project):
         results = run_dbt()
-        assert len(results) == 3
+        assert len(results) == 4
 
         res = project.run_sql("SELECT COUNT(1) FROM excel_file", fetch="one")
         assert res[0] == 9
@@ -136,3 +141,6 @@ class TestPlugins:
                 "sqlalchemy2",
             ],
         )
+
+        res = project.run_sql("SELECT foo FROM foo", fetch="one")
+        assert res[0] == 1729

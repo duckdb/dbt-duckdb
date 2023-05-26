@@ -47,13 +47,9 @@ class Attachment(dbtClassMixin):
 
 @dataclass
 class PluginConfig(dbtClassMixin):
-    # The name that this plugin will be referred to by in sources/models; must
-    # be unique within the project
-    name: str
+    module: str
 
-    # The fully-specified class name of the plugin code to use, which must be a
-    # subclass of dbt.adapters.duckdb.plugins.Plugin.
-    impl: str
+    alias: Optional[str] = None
 
     # A plugin-specific set of configuration options
     config: Optional[Dict[str, Any]] = None
