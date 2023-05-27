@@ -14,7 +14,10 @@
 {% macro duckdb__list_schemas(database) -%}
   {% set sql %}
     select schema_name
-    from information_schema.schemata
+    from system.information_schema.schemata
+    {% if database is not none %}
+    where catalog_name = '{{ database }}'
+    {% endif %}
   {% endset %}
   {{ return(run_query(sql)) }}
 {% endmacro %}
@@ -22,8 +25,11 @@
 {% macro duckdb__check_schema_exists(information_schema, schema) -%}
   {% set sql -%}
         select count(*)
-        from information_schema.schemata
-        where schema_name='{{ schema }}'
+        from system.information_schema.schemata
+        where schema_name = '{{ schema }}'
+        {% if adapter.use_database() %}
+        and catalog_name = '{{ information_schema.database }}'
+        {% endif %}
   {%- endset %}
   {{ return(run_query(sql)) }}
 {% endmacro %}
@@ -108,11 +114,14 @@ def materialize(df, con):
           numeric_precision,
           numeric_scale
 
-      from information_schema.columns
+      from system.information_schema.columns
       where table_name = '{{ relation.identifier }}'
-        {% if relation.schema %}
-        and table_schema = '{{ relation.schema }}'
-        {% endif %}
+      {% if relation.schema %}
+      and table_schema = '{{ relation.schema }}'
+      {% endif %}
+      {% if adapter.use_database() and relation.database %}
+      and table_catalog = '{{ relation.database }}'
+      {% endif %}
       order by ordinal_position
 
   {% endcall %}
@@ -131,8 +140,11 @@ def materialize(df, con):
         WHEN 'VIEW' THEN 'view'
         WHEN 'LOCAL TEMPORARY' THEN 'table'
         END as type
-    from information_schema.tables
+    from system.information_schema.tables
     where table_schema = '{{ schema_relation.schema }}'
+    {% if adapter.use_database() %}
+    and table_catalog = '{{ schema_relation.database }}'
+    {% endif %}
   {% endcall %}
   {{ return(load_result('list_relations_without_caching').table) }}
 {% endmacro %}
