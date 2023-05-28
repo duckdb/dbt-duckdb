@@ -57,6 +57,8 @@ def dbt_profile_target(profile_type, bv_server_process, tmp_path_factory):
         }
     elif profile_type == "file":
         profile["path"] = str(tmp_path_factory.getbasetemp() / "tmp.db")
+    elif profile_type == "notxn":
+        profile["disable_transactions"] = True
     elif profile_type == "memory":
         pass  # use the default path-less profile
     else:
