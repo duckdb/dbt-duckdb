@@ -2,7 +2,10 @@ from dataclasses import dataclass
 from typing import Any
 from typing import Dict
 from typing import Optional
+from typing import Sequence
 
+from dbt.adapters.base.column import Column
+from dbt.adapters.base.relation import BaseRelation
 from dbt.contracts.graph.nodes import SourceDefinition
 
 
@@ -52,3 +55,33 @@ class SourceConfig:
             database=source.database,
             meta=meta,
         )
+
+
+@dataclass
+class TargetConfig:
+    relation: BaseRelation
+    column_list: Sequence[Column]
+    config: Dict[str, Any]
+    path: Optional[str] = None
+    format: Optional[str] = None
+
+    def get(self, key, default=None):
+        return self.config.get(key, default)
+
+    def __getitem__(self, key):
+        return self.config[key]
+
+    def __contains__(self, key):
+        return key in self.settings
+
+    def as_dict(self) -> Dict[str, Any]:
+        base = {
+            "relation": self.relation.to_dict(),
+            "column_list": [{"column": c.column, "dtype": c.dtype} for c in self.column_list],
+            "config": self.config,
+        }
+        if self.path:
+            base["path"] = self.path
+        if self.format:
+            base["format"] = self.format
+        return base

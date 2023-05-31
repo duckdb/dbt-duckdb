@@ -81,7 +81,7 @@ class LocalEnvironment(Environment):
         plugin = self._plugins[plugin_name]
         handle = self.handle()
         cursor = handle.cursor()
-        save_mode = source_config.meta.get("save_mode", "overwrite")
+        save_mode = source_config.get("save_mode", "overwrite")
         if save_mode in ("ignore", "error_if_exists"):
             params = [source_config.schema, source_config.identifier]
             q = """SELECT COUNT(1)
@@ -106,6 +106,20 @@ class LocalEnvironment(Environment):
         )
         cursor.close()
         handle.close()
+
+    def store_relation(self, plugin_name: str, target_config: utils.TargetConfig) -> None:
+        if plugin_name not in self._plugins:
+            if plugin_name == "glue":
+                from ..plugins import glue
+
+                self._plugins[plugin_name] = glue.Plugin("glue", self.creds.settings or {})
+            else:
+                raise Exception(
+                    f"Plugin {plugin_name} not found; known plugins are: "
+                    + ",".join(self._plugins.keys())
+                )
+        plugin = self._plugins[plugin_name]
+        plugin.store(target_config)
 
     def close(self):
         if self.conn:
