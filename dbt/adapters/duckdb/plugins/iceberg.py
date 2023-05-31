@@ -15,7 +15,7 @@ class Plugin(BasePlugin):
         self._catalog = pyiceberg.catalog.load_catalog(catalog, **config)
 
     def load(self, source_config: SourceConfig):
-        table_format = source_config.meta.get("iceberg_table", "{schema}.{identifier}")
+        table_format = source_config.get("iceberg_table", "{schema}.{identifier}")
         table_name = table_format.format(**source_config.as_dict())
         table = self._catalog.load_table(table_name)
         scan_keys = {
@@ -26,5 +26,5 @@ class Plugin(BasePlugin):
             "options",
             "limit",
         }
-        scan_config = {k: source_config.meta[k] for k in scan_keys if k in source_config.meta}
+        scan_config = {k: source_config[k] for k in scan_keys if k in source_config}
         return table.scan(**scan_config).to_arrow()

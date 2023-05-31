@@ -14,15 +14,15 @@ class Plugin(BasePlugin):
         self.engine = create_engine(plugin_config["connection_url"])
 
     def load(self, source_config: SourceConfig) -> pd.DataFrame:
-        if "query" in source_config.meta:
-            query = source_config.meta["query"]
+        if "query" in source_config:
+            query = source_config["query"]
             query = query.format(**source_config.as_dict())
-            params = source_config.meta.get("params", {})
+            params = source_config.get("params", {})
             with self.engine.connect() as conn:
                 return pd.read_sql_query(text(query), con=conn, params=params)
         else:
-            if "table" in source_config.meta:
-                table = source_config.meta["table"]
+            if "table" in source_config:
+                table = source_config["table"]
             else:
                 table = source_config.table_name()
             with self.engine.connect() as conn:

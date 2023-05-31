@@ -14,6 +14,15 @@ class SourceConfig:
     database: Optional[str]
     meta: Dict[str, Any]
 
+    def get(self, key, default=None):
+        return self.meta.get(key, default)
+
+    def __getitem__(self, key):
+        return self.meta[key]
+
+    def __contains__(self, key):
+        return key in self.meta
+
     def table_name(self) -> str:
         if self.database:
             return ".".join([self.database, self.schema, self.identifier])
@@ -31,7 +40,7 @@ class SourceConfig:
         return base
 
     @classmethod
-    def create(cls, source: SourceDefinition) -> "SourceConfig":
+    def create_from_source(cls, source: SourceDefinition) -> "SourceConfig":
         meta = source.source_meta.copy()
         meta.update(source.meta)
         # Use the config properties as well if they are present
