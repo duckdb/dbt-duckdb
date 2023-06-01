@@ -60,7 +60,7 @@ class TestGlue:
             column_list=columns,
             s3_path="s3://test/aaa.parquet",
             file_format="parquet",
-            settings=None,
+            delimiter=",",
         )
 
         client.assert_has_calls(
@@ -164,7 +164,7 @@ class TestGlue:
             column_list=columns,
             s3_path="s3://test/aaa.parquet",
             file_format="parquet",
-            settings=None,
+            delimiter=",",
         )
         client.assert_has_calls(
             [
@@ -306,9 +306,7 @@ class TestGlue:
             column_list=columns,
             s3_path="test",
             file_format="parquet",
-            settings=None,
+            delimiter=",",
         )
         assert len(client.mock_calls) == 1
-        client.has_calls(
-            [call.get_table(DatabaseName="test", Name="test")]
-        )
+        client.has_calls([call.get_table(DatabaseName="test", Name="test")])
