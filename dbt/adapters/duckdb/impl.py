@@ -1,6 +1,4 @@
 import os
-from typing import Any
-from typing import Dict
 from typing import List
 from typing import Optional
 from typing import Sequence
@@ -80,14 +78,12 @@ class DuckDBAdapter(SQLAdapter):
         plugin_name: str,
         relation: DuckDBRelation,
         column_list: Sequence[Column],
-        config: Dict[str, Any],
         path: Optional[str] = None,
         format: Optional[str] = None,
     ) -> None:
         target_config = TargetConfig(
             relation=relation,
             column_list=column_list,
-            config=config,
             path=path,
             format=format,
         )

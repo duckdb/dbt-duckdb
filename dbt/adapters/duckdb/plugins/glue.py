@@ -2,7 +2,6 @@ from typing import Any
 from typing import Dict
 from typing import Optional
 from typing import Sequence
-from typing import Union
 
 import boto3
 from mypy_boto3_glue import GlueClient
@@ -161,7 +160,7 @@ def _get_table_def(
     s3_path: str,
     columns: Sequence["ColumnTypeDef"],
     file_format: str,
-    **kwargs,
+    delimiter: str,
 ):
     s3_parent = "/".join(s3_path.split("/")[:-1])
     if file_format == "csv":
@@ -169,7 +168,7 @@ def _get_table_def(
             table=table,
             s3_parent=s3_parent,
             columns=columns,
-            delimiter=kwargs.get("delimiter", ","),
+            delimiter=delimiter,
         )
     elif file_format == "parquet":
         table_def = _get_parquet_table_def(table=table, s3_parent=s3_parent, columns=columns)
@@ -198,7 +197,7 @@ def create_or_update_table(
     column_list: Sequence[Column],
     s3_path: str,
     file_format: str,
-    **kwargs: Optional[Dict[str, Union[str, int]]],
+    delimiter: str,
 ) -> None:
     # Existing table in AWS Glue catalog
     glue_table = _get_table(client=client, database=database, table=table)
@@ -208,7 +207,7 @@ def create_or_update_table(
         s3_path=s3_path,
         columns=columns,
         file_format=file_format,
-        **kwargs,
+        delimiter=delimiter,
     )
     if glue_table:
         # Existing columns in AWS Glue catalog
@@ -223,19 +222,20 @@ def create_or_update_table(
 class Plugin(BasePlugin):
     def initialize(self, config: Dict[str, Any]):
         self.client = _get_glue_client(config)
+        self.database = config.get("glue_database", "default")
+        self.delimiter = config.get("delimiter", ",")
 
     def store(self, target_config: TargetConfig):
         assert target_config.path is not None
         assert target_config.format is not None
         assert target_config.relation.identifier is not None
-        database: str = target_config["glue_database"]
         table: str = target_config.relation.identifier
         create_or_update_table(
             self.client,
-            database,
+            self.database,
             table,
             target_config.column_list,
             target_config.path,
             target_config.format,
-            **target_config.config,
+            self.delimiter,
         )

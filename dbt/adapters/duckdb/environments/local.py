@@ -109,10 +109,13 @@ class LocalEnvironment(Environment):
 
     def store_relation(self, plugin_name: str, target_config: utils.TargetConfig) -> None:
         if plugin_name not in self._plugins:
-            if plugin_name == "glue":
+            if plugin_name.startswith("glue|"):
                 from ..plugins import glue
 
-                self._plugins[plugin_name] = glue.Plugin("glue", self.creds.settings or {})
+                _, glue_db = plugin_name.split("|")
+                config = (self.creds.settings or {}).copy()
+                config["glue_database"] = glue_db
+                self._plugins[plugin_name] = glue.Plugin(plugin_name, config)
             else:
                 raise Exception(
                     f"Plugin {plugin_name} not found; known plugins are: "

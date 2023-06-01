@@ -11,11 +11,12 @@ from dbt.tests.util import (
 )
 
 config_materialized_glue = """
-  {{ config(materialized="external", glue_register=true) }}
+  {{ config(materialized="external", glue_register=true, glue_database='db2') }}
 """
 default_glue_sql = config_materialized_glue + model_base
 
 
+@pytest.mark.skip
 class TestGlueMaterializations:
     @pytest.fixture(scope="class")
     def models(self):

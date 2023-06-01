@@ -61,24 +61,13 @@ class SourceConfig:
 class TargetConfig:
     relation: BaseRelation
     column_list: Sequence[Column]
-    config: Dict[str, Any]
     path: Optional[str] = None
     format: Optional[str] = None
-
-    def get(self, key, default=None):
-        return self.config.get(key, default)
-
-    def __getitem__(self, key):
-        return self.config[key]
-
-    def __contains__(self, key):
-        return key in self.settings
 
     def as_dict(self) -> Dict[str, Any]:
         base = {
             "relation": self.relation.to_dict(),
             "column_list": [{"column": c.column, "dtype": c.dtype} for c in self.column_list],
-            "config": self.config,
         }
         if self.path:
             base["path"] = self.path

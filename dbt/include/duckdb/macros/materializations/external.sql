@@ -80,7 +80,8 @@
   {%- set glue_register = config.get('glue_register', default=false) -%}
   {% if plugin_name is not none or glue_register is true %}
     {% if glue_register %}
-      {%- set plugin_name = 'glue' -%}
+      {# legacy hack to set the glue database name, deprecate this #}
+      {%- set plugin_name = 'glue|' ~ config.get('glue_database', 'default') -%}
     {% endif %}
     {% do store_relation(plugin_name, target_relation, location, format) %}
   {% endif %}

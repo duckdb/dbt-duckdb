@@ -215,7 +215,7 @@ def materialize(df, con):
 
 {% macro store_relation(plugin, relation, location, format) -%}
   {%- set column_list = adapter.get_columns_in_relation(relation) -%}
-  {% do adapter.store_relation(relation, column_list, location, format) %}
+  {% do adapter.store_relation(plugin, relation, column_list, location, format) %}
 {% endmacro %}
 
 {% macro render_write_options(config) -%}
