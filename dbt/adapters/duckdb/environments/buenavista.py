@@ -67,7 +67,7 @@ class BVEnvironment(Environment):
             "method": "dbt_store_relation",
             "params": {
                 "plugin_name": plugin_name,
-                "source_config": target_config.as_dict(),
+                "target_config": target_config.as_dict(),
             },
         }
         cursor = handle.cursor()

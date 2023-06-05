@@ -226,8 +226,7 @@ class Plugin(BasePlugin):
         self.delimiter = config.get("delimiter", ",")
 
     def store(self, target_config: TargetConfig):
-        assert target_config.path is not None
-        assert target_config.format is not None
+        assert target_config.location is not None
         assert target_config.relation.identifier is not None
         table: str = target_config.relation.identifier
         create_or_update_table(
@@ -235,7 +234,7 @@ class Plugin(BasePlugin):
             self.database,
             table,
             target_config.column_list,
-            target_config.path,
-            target_config.format,
+            target_config.location.path,
+            target_config.location.format,
             self.delimiter,
         )

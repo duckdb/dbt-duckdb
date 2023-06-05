@@ -58,19 +58,25 @@ class SourceConfig:
 
 
 @dataclass
+class TargetLocation:
+    path: str
+    format: str
+
+    def as_dict(self) -> Dict[str, Any]:
+        return {"path": self.path, "format": self.format}
+
+
+@dataclass
 class TargetConfig:
     relation: BaseRelation
     column_list: Sequence[Column]
-    path: Optional[str] = None
-    format: Optional[str] = None
+    location: Optional[TargetLocation] = None
 
     def as_dict(self) -> Dict[str, Any]:
         base = {
             "relation": self.relation.to_dict(),
             "column_list": [{"column": c.column, "dtype": c.dtype} for c in self.column_list],
         }
-        if self.path:
-            base["path"] = self.path
-        if self.format:
-            base["format"] = self.format
+        if self.location:
+            base["location"] = self.location.as_dict()
         return base

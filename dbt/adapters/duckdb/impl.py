@@ -13,6 +13,7 @@ from dbt.adapters.base.meta import available
 from dbt.adapters.duckdb.connections import DuckDBConnectionManager
 from dbt.adapters.duckdb.relation import DuckDBRelation
 from dbt.adapters.duckdb.utils import TargetConfig
+from dbt.adapters.duckdb.utils import TargetLocation
 from dbt.adapters.sql import SQLAdapter
 from dbt.contracts.connection import AdapterResponse
 from dbt.contracts.graph.nodes import ColumnLevelConstraint
@@ -78,14 +79,13 @@ class DuckDBAdapter(SQLAdapter):
         plugin_name: str,
         relation: DuckDBRelation,
         column_list: Sequence[Column],
-        path: Optional[str] = None,
-        format: Optional[str] = None,
+        path: str,
+        format: str,
     ) -> None:
         target_config = TargetConfig(
             relation=relation,
             column_list=column_list,
-            path=path,
-            format=format,
+            location=TargetLocation(path=path, format=format),
         )
         DuckDBConnectionManager.env().store_relation(plugin_name, target_config)
 
