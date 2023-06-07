@@ -10,6 +10,7 @@ import duckdb
 from ..credentials import DuckDBCredentials
 from ..plugins import BasePlugin
 from ..utils import SourceConfig
+from ..utils import TargetConfig
 from dbt.contracts.connection import AdapterResponse
 from dbt.exceptions import DbtRuntimeError
 
@@ -45,6 +46,10 @@ class Environment(abc.ABC):
 
     @abc.abstractmethod
     def load_source(self, plugin_name: str, source_config: SourceConfig) -> str:
+        pass
+
+    @abc.abstractmethod
+    def store_relation(self, plugin_name: str, target_config: TargetConfig) -> None:
         pass
 
     def get_binding_char(self) -> str:
@@ -99,10 +104,11 @@ class Environment(abc.ABC):
     @classmethod
     def initialize_plugins(cls, creds: DuckDBCredentials) -> Dict[str, BasePlugin]:
         ret = {}
+        base_config = creds.settings or {}
         for plugin_def in creds.plugins or []:
-            plugin = BasePlugin.create(
-                plugin_def.module, config=plugin_def.config, alias=plugin_def.alias
-            )
+            config = base_config.copy()
+            config.update(plugin_def.config or {})
+            plugin = BasePlugin.create(plugin_def.module, config=config, alias=plugin_def.alias)
             ret[plugin.name] = plugin
         return ret
 

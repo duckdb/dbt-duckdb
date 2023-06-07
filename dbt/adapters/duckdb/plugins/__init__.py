@@ -6,6 +6,7 @@ from typing import Optional
 from duckdb import DuckDBPyConnection
 
 from ..utils import SourceConfig
+from ..utils import TargetConfig
 from dbt.dataclass_schema import dbtClassMixin
 
 
@@ -103,3 +104,6 @@ class BasePlugin:
         :raises NotImplementedError: If this method is not implemented by a subclass.
         """
         raise NotImplementedError(f"load method not implemented for {self.name}")
+
+    def store(self, target_config: TargetConfig):
+        raise NotImplementedError(f"store method not implemented for {self.name}")

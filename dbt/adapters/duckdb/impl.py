@@ -11,8 +11,9 @@ from dbt.adapters.base.column import Column
 from dbt.adapters.base.impl import ConstraintSupport
 from dbt.adapters.base.meta import available
 from dbt.adapters.duckdb.connections import DuckDBConnectionManager
-from dbt.adapters.duckdb.glue import create_or_update_table
 from dbt.adapters.duckdb.relation import DuckDBRelation
+from dbt.adapters.duckdb.utils import TargetConfig
+from dbt.adapters.duckdb.utils import TargetLocation
 from dbt.adapters.sql import SQLAdapter
 from dbt.contracts.connection import AdapterResponse
 from dbt.contracts.graph.nodes import ColumnLevelConstraint
@@ -73,22 +74,20 @@ class DuckDBAdapter(SQLAdapter):
             return False
 
     @available
-    def register_glue_table(
+    def store_relation(
         self,
-        glue_database: str,
-        table: str,
+        plugin_name: str,
+        relation: DuckDBRelation,
         column_list: Sequence[Column],
-        location: str,
-        file_format: str,
+        path: str,
+        format: str,
     ) -> None:
-        create_or_update_table(
-            database=glue_database,
-            table=table,
+        target_config = TargetConfig(
+            relation=relation,
             column_list=column_list,
-            s3_path=location,
-            file_format=file_format,
-            settings=self.config.credentials.settings,
+            location=TargetLocation(path=path, format=format),
         )
+        DuckDBConnectionManager.env().store_relation(plugin_name, target_config)
 
     @available
     def external_root(self) -> str:

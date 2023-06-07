@@ -76,9 +76,15 @@
   {{ drop_relation_if_exists(temp_relation) }}
 
   -- register table into glue
+  {%- set plugin_name = config.get('plugin') -%}
   {%- set glue_register = config.get('glue_register', default=false) -%}
-  {%- set glue_database = render(config.get('glue_database', default='default')) -%}
-  {% do register_glue_table(glue_register, glue_database, target_relation, location, format) %}
+  {% if plugin_name is not none or glue_register is true %}
+    {% if glue_register %}
+      {# legacy hack to set the glue database name, deprecate this #}
+      {%- set plugin_name = 'glue|' ~ config.get('glue_database', 'default') -%}
+    {% endif %}
+    {% do store_relation(plugin_name, target_relation, location, format) %}
+  {% endif %}
 
   {{ run_hooks(post_hooks, inside_transaction=False) }}
 

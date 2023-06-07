@@ -3,7 +3,7 @@ from unittest.mock import call
 import pytest
 
 from dbt.adapters.base.column import Column
-from dbt.adapters.duckdb.glue import create_or_update_table
+from dbt.adapters.duckdb.plugins.glue import create_or_update_table
 
 
 class TestGlue:
@@ -51,22 +51,22 @@ class TestGlue:
         ]
 
     def test_create_glue_table(self, mocker, columns):
-        boto3 = mocker.patch("dbt.adapters.duckdb.glue.boto3.client")
-        boto3.return_value.get_table.return_value = None
+        client = mocker.Mock()
+        client.get_table.return_value = None
         create_or_update_table(
+            client,
             database="test",
             table="test",
             column_list=columns,
             s3_path="s3://test/aaa.parquet",
             file_format="parquet",
-            settings=None,
+            delimiter=",",
         )
 
-        boto3.assert_has_calls(
+        client.assert_has_calls(
             [
-                call("glue"),
-                call().get_table(DatabaseName="test", Name="test"),
-                call().create_table(
+                call.get_table(DatabaseName="test", Name="test"),
+                call.create_table(
                     DatabaseName="test",
                     TableInput={
                         "Name": "test",
@@ -132,8 +132,8 @@ class TestGlue:
         )
 
     def test_update_glue_table(self, mocker, columns):
-        boto3 = mocker.patch("dbt.adapters.duckdb.glue.boto3.client")
-        boto3.return_value.get_table.return_value = {
+        client = mocker.Mock()
+        client.get_table.return_value = {
             "Table": {
                 "Name": "test",
                 "TableType": "EXTERNAL_TABLE",
@@ -158,18 +158,18 @@ class TestGlue:
             },
         }
         create_or_update_table(
+            client,
             database="test",
             table="test",
             column_list=columns,
             s3_path="s3://test/aaa.parquet",
             file_format="parquet",
-            settings=None,
+            delimiter=",",
         )
-        boto3.assert_has_calls(
+        client.assert_has_calls(
             [
-                call("glue"),
-                call().get_table(DatabaseName="test", Name="test"),
-                call().update_table(
+                call.get_table(DatabaseName="test", Name="test"),
+                call.update_table(
                     DatabaseName="test",
                     TableInput={
                         "Name": "test",
@@ -235,8 +235,8 @@ class TestGlue:
         )
 
     def test_without_update_glue_table(self, mocker, columns):
-        boto3 = mocker.patch("dbt.adapters.duckdb.glue.boto3.client")
-        boto3.return_value.get_table.return_value = {
+        client = mocker.Mock()
+        client.get_table.return_value = {
             "Table": {
                 "Name": "test",
                 "TableType": "EXTERNAL_TABLE",
@@ -300,12 +300,13 @@ class TestGlue:
             },
         }
         create_or_update_table(
+            client,
             database="test",
             table="test",
             column_list=columns,
             s3_path="test",
             file_format="parquet",
-            settings=None,
+            delimiter=",",
         )
-        assert len(boto3.mock_calls) == 2
-        boto3.has_calls([call("glue"), call().get_table(DatabaseName="test", Name="test")])
+        assert len(client.mock_calls) == 1
+        client.has_calls([call.get_table(DatabaseName="test", Name="test")])
