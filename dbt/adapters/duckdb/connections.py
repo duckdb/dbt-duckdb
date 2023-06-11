@@ -99,7 +99,13 @@ class DuckDBConnectionManager(SQLConnectionManager):
     ) -> Tuple[AdapterResponse, agate.Table]:
         if self.disable_transactions:
             auto_begin = False
-        return super().execute(sql, auto_begin, fetch, **kwargs)
+            stmts = sql.split(";")
+            for stmt in stmts:
+                if stmt.strip():
+                    ret = super().execute(stmt, auto_begin, fetch, **kwargs)
+            return ret
+        else:
+            return super().execute(sql, auto_begin, fetch, **kwargs)
 
 
 atexit.register(DuckDBConnectionManager.close_all_connections)

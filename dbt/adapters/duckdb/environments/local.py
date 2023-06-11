@@ -47,7 +47,8 @@ class LocalEnvironment(Environment):
         self.creds = credentials
         self.handle_count = 0
         self.lock = threading.RLock()
-        self._keep_open = (self.creds.path == ":memory:"
+        self._keep_open = (
+            self.creds.path == ":memory:"
             or self.creds.path.startswith("md:")
             or self.creds.path.startswith("motherduck:")
         )
