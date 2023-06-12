@@ -22,7 +22,7 @@ class DuckDBConnectionManager(SQLConnectionManager):
 
     def __init__(self, profile: AdapterRequiredConfig):
         super().__init__(profile)
-        self.disable_transactions = profile.credentials.disable_transactions
+        self.disable_transactions = profile.credentials.disable_transactions  # type: ignore
 
     @classmethod
     def env(cls) -> environments.Environment:
