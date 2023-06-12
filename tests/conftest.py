@@ -60,7 +60,8 @@ def dbt_profile_target(profile_type, bv_server_process, tmp_path_factory):
     elif profile_type == "md":
         # Test against MotherDuck
         profile["disable_transactions"] = True
-        profile["path"] = "md:test"
+        mdtoken = os.getenv("MOTHERDUCK_TOKEN")
+        profile["path"] = f"md:test?token={mdtoken}"
     elif profile_type == "memory":
         pass  # use the default path-less profile
     else:
