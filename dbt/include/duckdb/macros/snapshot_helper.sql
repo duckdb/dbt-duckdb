@@ -1,12 +1,12 @@
 {% macro duckdb__snapshot_merge_sql(target, source, insert_cols) -%}
     {%- set insert_cols_csv = insert_cols | join(', ') -%}
 
-    update {{ target }} as TARGET
+    update {{ target }} as DBT_INTERNAL_TARGET
     set dbt_valid_to = DBT_INTERNAL_SOURCE.dbt_valid_to
     from {{ source }} as DBT_INTERNAL_SOURCE
-    where DBT_INTERNAL_SOURCE.dbt_scd_id::text = TARGET.dbt_scd_id::text
+    where DBT_INTERNAL_SOURCE.dbt_scd_id::text = DBT_INTERNAL_TARGET.dbt_scd_id::text
       and DBT_INTERNAL_SOURCE.dbt_change_type::text in ('update'::text, 'delete'::text)
-      and TARGET.dbt_valid_to is null;
+      and DBT_INTERNAL_TARGET.dbt_valid_to is null;
 
     insert into {{ target }} ({{ insert_cols_csv }})
     select {% for column in insert_cols -%}
