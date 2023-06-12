@@ -65,7 +65,8 @@ class Environment(abc.ABC):
         # install any extensions on the connection
         if creds.extensions is not None:
             for extension in creds.extensions:
-                conn.execute(f"INSTALL '{extension}'")
+                conn.install_extension(extension)
+                conn.load_extension(extension)
 
         # Attach any fsspec filesystems on the database
         if creds.filesystems:
@@ -92,9 +93,6 @@ class Environment(abc.ABC):
 
     @classmethod
     def initialize_cursor(cls, creds: DuckDBCredentials, cursor):
-        # Extensions/settings need to be configured per cursor
-        for ext in creds.extensions or []:
-            cursor.execute(f"LOAD '{ext}'")
         for key, value in creds.load_settings().items():
             # Okay to set these as strings because DuckDB will cast them
             # to the correct type
