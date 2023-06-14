@@ -1,6 +1,9 @@
 import atexit
 import threading
 from contextlib import contextmanager
+from typing import Tuple
+
+import agate
 
 import dbt.exceptions
 from . import environments
@@ -19,6 +22,7 @@ class DuckDBConnectionManager(SQLConnectionManager):
 
     def __init__(self, profile: AdapterRequiredConfig):
         super().__init__(profile)
+        self.disable_transactions = profile.credentials.disable_transactions  # type: ignore
 
     @classmethod
     def env(cls) -> environments.Environment:
@@ -89,6 +93,13 @@ class DuckDBConnectionManager(SQLConnectionManager):
         with cls._LOCK:
             if cls._ENV is not None:
                 cls._ENV = None
+
+    def execute(
+        self, sql: str, auto_begin: bool = False, fetch: bool = False, **kwargs
+    ) -> Tuple[AdapterResponse, agate.Table]:
+        if self.disable_transactions:
+            auto_begin = False
+        return super().execute(sql, auto_begin, fetch, **kwargs)
 
 
 atexit.register(DuckDBConnectionManager.close_all_connections)

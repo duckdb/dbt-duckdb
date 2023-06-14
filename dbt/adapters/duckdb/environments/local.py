@@ -47,11 +47,16 @@ class LocalEnvironment(Environment):
         self.creds = credentials
         self.handle_count = 0
         self.lock = threading.RLock()
+        self._keep_open = (
+            self.creds.path == ":memory:"
+            or self.creds.path.startswith("md:")
+            or self.creds.path.startswith("motherduck:")
+        )
 
     def notify_closed(self):
         with self.lock:
             self.handle_count -= 1
-            if self.handle_count == 0 and self.creds.path != ":memory:":
+            if self.handle_count == 0 and not self._keep_open:
                 self.close()
 
     def handle(self):

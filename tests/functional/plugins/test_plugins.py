@@ -56,7 +56,7 @@ foo_sql = """
 """
 
 
-@pytest.mark.skip_profile("buenavista")
+@pytest.mark.skip_profile("buenavista", "md")
 class TestPlugins:
     @pytest.fixture(scope="class")
     def sqlite_test_db(self):

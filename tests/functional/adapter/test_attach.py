@@ -32,7 +32,7 @@ models_target_model_sql = """
 """
 
 
-@pytest.mark.skip_profile("buenavista")
+@pytest.mark.skip_profile("buenavista", "md")
 class TestAttachedDatabase:
     @pytest.fixture(scope="class")
     def attach_test_db(self):

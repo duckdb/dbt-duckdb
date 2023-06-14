@@ -10,7 +10,7 @@ WHERE conf = 'West'
 """
 
 
-@pytest.mark.skip_profile("buenavista")
+@pytest.mark.skip_profile("buenavista", "md")
 class TestFilesystems:
     @pytest.fixture(scope="class")
     def dbt_profile_target(self, dbt_profile_target):
