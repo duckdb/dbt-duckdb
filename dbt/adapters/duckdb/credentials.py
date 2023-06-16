@@ -138,6 +138,11 @@ class DuckDBCredentials(Credentials):
                             "Unable to determine database name from path"
                             " and no database was specified in profile"
                         )
+                    # For MotherDuck, turn on disable_transactions unless
+                    # it's explicitly set already by the user
+                    if parsed.scheme in {"md", "motherduck"}:
+                        if "disable_transactions" not in data:
+                            data["disable_transactions"] = True
         return data
 
     @property
