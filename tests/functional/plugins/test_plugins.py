@@ -118,7 +118,7 @@ class TestPlugins:
             "foo.sql": foo_sql,
         }
 
-    def test_plugins(self, project, test_data_path):
+    def test_plugins(self, project):
         results = run_dbt()
         assert len(results) == 4
 
