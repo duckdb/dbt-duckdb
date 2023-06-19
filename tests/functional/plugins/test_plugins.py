@@ -49,6 +49,7 @@ sqlalchemy1_sql = """
     select * from {{ source('sql_source', 'tt1') }}
 """
 sqlalchemy2_sql = """
+   {{ config(materialized='external', plugin='sql') }}
     select * from {{ source('sql_source', 'tt2') }}
 """
 foo_sql = """
@@ -72,6 +73,16 @@ class TestPlugins:
         db.commit()
         db.close()
         yield path
+
+        # verify that the external plugin operation works to write to the db
+        db = sqlite3.connect(path)
+        cursor = db.cursor()
+        res = cursor.execute("SELECT * FROM sqlalchemy2").fetchall()
+        assert len(res) == 2
+        assert res[0] == (1, 2, 3)
+        assert res[1] == (4, 5, 6)
+        cursor.close()
+        db.close()
         os.unlink(path)
 
     @pytest.fixture(scope="class")
@@ -107,7 +118,7 @@ class TestPlugins:
             "foo.sql": foo_sql,
         }
 
-    def test_plugins(self, project):
+    def test_plugins(self, project, test_data_path):
         results = run_dbt()
         assert len(results) == 4
 
