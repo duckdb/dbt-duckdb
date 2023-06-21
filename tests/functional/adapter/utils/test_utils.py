@@ -122,5 +122,8 @@ class TestArrayConstruct(BaseArrayConstruct):
     pass
 
 
+# Skipping this while we sort out what the right default is
+# here: https://github.com/duckdb/duckdb/issues/7934
+@pytest.mark.skip
 class TestCurrentTimestamp(BaseCurrentTimestampNaive):
     pass
