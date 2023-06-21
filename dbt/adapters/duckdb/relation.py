@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from string import Template
 from typing import Any
 from typing import Optional
 from typing import Type
@@ -26,12 +27,20 @@ class DuckDBRelation(BaseRelation):
             if DuckDBConnectionManager._ENV is not None:
                 # No connection means we are probably in the dbt parsing phase, so don't load yet.
                 DuckDBConnectionManager.env().load_source(plugin_name, source_config)
-        elif "external_location" in source_config.meta:
-            # Call str.format with the schema, name and identifier for the source so that they
-            # can be injected into the string; this helps reduce boilerplate when all
-            # of the tables in the source have a similar location based on their name
-            # and/or identifier.
-            ext_location = source_config["external_location"].format(**source_config.as_dict())
+        elif "external_location" in source_config:
+            ext_location_template = source_config["external_location"]
+            formatter = source_config.get("formatter", "newstyle")
+            if formatter == "newstyle":
+                ext_location = ext_location_template.format_map(source_config.as_dict())
+            elif formatter == "oldstyle":
+                ext_location = ext_location_template % source_config.as_dict()
+            elif formatter == "template":
+                ext_location = Template(ext_location_template).substitute(source_config.as_dict())
+            else:
+                raise ValueError(
+                    f"Formatter {formatter} not recognized. Must be one of 'newstyle', 'oldstyle', or 'template'."
+                )
+
             # If it's a function call or already has single quotes, don't add them
             if "(" not in ext_location and not ext_location.startswith("'"):
                 ext_location = f"'{ext_location}'"
