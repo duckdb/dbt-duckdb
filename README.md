@@ -234,8 +234,7 @@ FROM read_parquet(['s3://my-bucket/my-sources/source2a.parquet', 's3://my-bucket
 ```
 
 Note that the value of the `external_location` property does not need to be a path-like string; it can also be a function
-call, which is helpful in the case that you have an external source that is a CSV file which requires special handling for DuckDB
-to load it correctly:
+call, which is helpful in the case that you have an external source that is a CSV file which requires special handling for DuckDB to load it correctly:
 
 ```
 sources:
@@ -244,7 +243,17 @@ sources:
       - name: flights
         meta:
           external_location: "read_csv('flights.csv', types={'FlightDate': 'DATE'}, names=['FlightDate', 'UniqueCarrier'])"
+          formatter: oldstyle
 ```
+
+Note that we need to override the default `str.format` string formatting strategy for this example
+because the `types={'FlightDate': 'DATE'}` argument to the `read_csv` function will be interpreted by
+`str.format` as a template to be matched on, which will cause a `KeyError: "'FlightDate'"` when we attempt
+to parse the source in a dbt model. The `formatter` configuration option for the source indicates whether
+we should use `newstyle` string formatting (the default), `oldstyle` string formatting, or `template` string
+formatting. You can read up on the strategies the various string formatting techniques use at this
+[Stack Overflow answer](https://stackoverflow.com/questions/13451989/pythons-many-ways-of-string-formatting-are-the-older-ones-going-to-be-depre) and see examples of their use
+in this [dbt-duckdb integration test](https://github.com/jwills/dbt-duckdb/blob/master/tests/functional/adapter/test_sources.py).
 
 #### Writing to external files
 

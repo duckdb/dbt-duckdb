@@ -22,14 +22,20 @@ sources:
       - name: seeds_ost
         identifier: "seeds_other_source_table"
         config:
-          external_location: "read_csv_auto('/tmp/{identifier}.csv')"
+          external_location: "read_csv_auto('/tmp/%(identifier)s.csv')"
+          formatter: oldstyle
+      - name: seeds_other_source_table
+        config:
+          external_location: "read_csv_auto('/tmp/${name}.csv')"
+          formatter: template
 """
 
 models_source_model_sql = """select * from {{ source('external_source', 'seeds_source') }}
 """
 
-models_multi_source_model_sql = """select * from {{ source('external_source', 'seeds_source') }}
-  inner join {{ source('external_source', 'seeds_ost') }} USING (id)
+models_multi_source_model_sql = """select s.* from {{ source('external_source', 'seeds_source') }} s
+  inner join {{ source('external_source', 'seeds_ost') }} oldstyle USING (id)
+  inner join {{ source('external_source', 'seeds_other_source_table') }} tmpl USING (id)
 """
 
 
