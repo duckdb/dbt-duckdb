@@ -327,7 +327,7 @@ any Python object that DuckDB knows how to turn into a table, including a Pandas
 
 Defining your own dbt-duckdb plugin is as simple as creating a python module that defines a class named `Plugin` that
 inherits from [dbt.adapters.duckdb.plugins.BasePlugin](dbt/adapters/duckdb/plugins/__init__.py). There are currently
-three methods that may be implemented in your Plugin class:
+four methods that may be implemented in your Plugin class:
 
 1. `initialize`: Takes in the `config` dictionary for the plugin that is defined in the profile to enable any
 additional configuration for the module based on the project; this method is called once when an instance of the
@@ -339,6 +339,11 @@ custom user-defined functions.
 a dbt source and can optionally return a DataFrame-like object that DuckDB knows how to turn into a table (this is
 similar to a dbt-duckdb Python model, but without the ability to `ref` any models or access any information beyond
 the source config.)
+1. `store`: Takes a [TargetConfig](dbt/adapters/duckdb/utils.py) instance, which encapsulates the configuration for
+an `external` materialization and can perform additional operations once the CSV/Parquet/JSON file is written. The
+[glue](dbt/adapters/duckdb/plugins/glue.py) and [sqlalchemy](dbt/adapters/duckdb/plugins/sqlalchemy.py) are examples
+that demonstrate how to use the `store` operation to register an AWS Glue database table or upload a DataFrame to
+an external database, respectively.
 
 dbt-duckdb ships with a number of [built-in plugins](dbt/adapters/duckdb/plugins/) that can be used as examples
 for implementing your own.
