@@ -44,6 +44,20 @@ is automatically set to the special value `:memory:`).
 to the basename of the file in the `path` argument with the suffix removed. For example, if the `path` is `/tmp/a/dbfile.duckdb`, the `database`
 field will be set to `dbfile`. If you are running in in-memory mode, then the `database` property will be automatically set to `memory`.
 
+#### Using MotherDuck
+
+As of `dbt-duckdb` 1.5.2, you can connect to a DuckDB instance running on [MotherDuck](http://www.motherduck.com) by setting your `path` to use a [md:<database> connection string](https://motherduck.com/docs/getting-started/connect-query-from-python/installation-authentication), just as you would with the DuckDB CLI
+or the Python API.
+
+MotherDuck databases generally work the same way as local DuckDB databases from the perspective of dbt, but
+there are a [few differences to be aware of](https://motherduck.com/docs/architecture-and-capabilities#considerations-and-limitations):
+1. For the moment, MotherDuck _requires_ DuckDB version `0.8.1`.
+1. MotherDuck databases do not suppport transactions, so there is a new `disable_transactions` profile
+option that will be automatically enabled if you are connecting to a MotherDuck database in your `path`.
+1. MotherDuck preloads a set of the most common DuckDB extensions for you, but does not support loading custom extensions or user-defined functions.
+1. A small subset of advanced SQL features are currently unsupported; the only impact of this on the dbt adapter is that the [dbt.listagg](https://docs.getdbt.com/reference/dbt-jinja-functions/cross-database-macros#listagg) macro will work against a local DuckDB database, but will
+not work against MotherDuck.
+
 #### DuckDB Extensions, Settings, and Filesystems
 
 You can load any supported [DuckDB extensions](https://duckdb.org/docs/extensions/overview) by listing them in
