@@ -136,14 +136,16 @@ class DuckDBCredentials(Credentials):
                         data["disable_transactions"] = True
                     if path_db == "":
                         path_db = "my_db"
+
             if path_db and "database" not in data:
                 data["database"] = path_db
             elif path_db and data["database"] != path_db:
-                raise dbt.exceptions.DbtRuntimeError(
-                    "Inconsistency detected between 'path' and 'database' fields in profile; "
-                    f"the 'database' property must be set to '{path_db}' to match the 'path'"
-                )
-            else:
+                if not data.get("remote"):
+                    raise dbt.exceptions.DbtRuntimeError(
+                        "Inconsistency detected between 'path' and 'database' fields in profile; "
+                        f"the 'database' property must be set to '{path_db}' to match the 'path'"
+                    )
+            elif not path_db:
                 raise dbt.exceptions.DbtRuntimeError(
                     "Unable to determine target database name from 'path' field in profile"
                 )

@@ -81,3 +81,14 @@ def test_infer_database_name_from_path():
     payload = {"path": "md:jaffle_shop?token=abc123"}
     creds = DuckDBCredentials.from_dict(payload)
     assert creds.database == "jaffle_shop"
+
+    payload = {"database": "memory"}
+    creds = DuckDBCredentials.from_dict(payload)
+    assert creds.database == "memory"
+
+    payload = {
+        "database": "remote",
+        "remote": {"host": "localhost", "port": 5433, "user": "test"},
+    }
+    creds = DuckDBCredentials.from_dict(payload)
+    assert creds.database == "remote"
