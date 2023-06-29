@@ -55,8 +55,7 @@ there are a [few differences to be aware of](https://motherduck.com/docs/archite
 1. MotherDuck databases do not suppport transactions, so there is a new `disable_transactions` profile
 option that will be automatically enabled if you are connecting to a MotherDuck database in your `path`.
 1. MotherDuck preloads a set of the most common DuckDB extensions for you, but does not support loading custom extensions or user-defined functions.
-1. A small subset of advanced SQL features are currently unsupported; the only impact of this on the dbt adapter is that the [dbt.listagg](https://docs.getdbt.com/reference/dbt-jinja-functions/cross-database-macros#listagg) macro will work against a local DuckDB database, but will
-not work against MotherDuck.
+1. A small subset of advanced SQL features are currently unsupported; the only impact of this on the dbt adapter is that the [dbt.listagg](https://docs.getdbt.com/reference/dbt-jinja-functions/cross-database-macros#listagg) macro and foreign-key constraints will work against a local DuckDB database, but will not work against a MotherDuck database.
 
 #### DuckDB Extensions, Settings, and Filesystems
 
