@@ -59,3 +59,36 @@ def test_attachments():
     for i, a in enumerate(creds.attach):
         attachment = Attachment(**a)
         assert expected_sql[i] == attachment.to_sql()
+
+
+def test_infer_database_name_from_path():
+    payload = {}
+    creds = DuckDBCredentials.from_dict(payload)
+    assert creds.database == "memory"
+
+    payload = {"path": "local.duckdb"}
+    creds = DuckDBCredentials.from_dict(payload)
+    assert creds.database == "local"
+
+    payload = {"path": "/tmp/f1234.db"}
+    creds = DuckDBCredentials.from_dict(payload)
+    assert creds.database == "f1234"
+
+    payload = {"path": "md:?token=abc123"}
+    creds = DuckDBCredentials.from_dict(payload)
+    assert creds.database == "my_db"
+
+    payload = {"path": "md:jaffle_shop?token=abc123"}
+    creds = DuckDBCredentials.from_dict(payload)
+    assert creds.database == "jaffle_shop"
+
+    payload = {"database": "memory"}
+    creds = DuckDBCredentials.from_dict(payload)
+    assert creds.database == "memory"
+
+    payload = {
+        "database": "remote",
+        "remote": {"host": "localhost", "port": 5433, "user": "test"},
+    }
+    creds = DuckDBCredentials.from_dict(payload)
+    assert creds.database == "remote"
