@@ -20,7 +20,7 @@ class BVEnvironment(Environment):
         )
 
     def __init__(self, credentials: credentials.DuckDBCredentials):
-        self.creds = credentials
+        super().__init__(credentials)
         if not self.creds.remote:
             raise Exception("BVConnection only works with a remote host")
 

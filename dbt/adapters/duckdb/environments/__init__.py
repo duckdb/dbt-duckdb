@@ -36,6 +36,13 @@ class Environment(abc.ABC):
     a remote server (like a Buena Vista instance), or even a Jupyter notebook kernel.
     """
 
+    def __init__(self, creds: DuckDBCredentials):
+        self._creds = creds
+
+    @property
+    def creds(self) -> DuckDBCredentials:
+        return self._creds
+
     @abc.abstractmethod
     def handle(self):
         pass
