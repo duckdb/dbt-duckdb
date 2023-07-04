@@ -40,7 +40,7 @@ class DuckDBConnectionManager(SQLConnectionManager):
         credentials = cls.get_credentials(connection.credentials)
         with cls._LOCK:
             try:
-                if not cls._ENV:
+                if not cls._ENV or cls._ENV.creds != credentials:
                     cls._ENV = environments.create(credentials)
                 connection.handle = cls._ENV.handle()
                 connection.state = ConnectionState.OPEN
