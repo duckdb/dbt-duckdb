@@ -28,9 +28,7 @@ class DuckDBConnectionManager(SQLConnectionManager):
     def env(cls) -> environments.Environment:
         with cls._LOCK:
             if not cls._ENV:
-                raise Exception(
-                    "DuckDBConnectionManager environment requested before creation!"
-                )
+                raise Exception("DuckDBConnectionManager environment requested before creation!")
             return cls._ENV
 
     @classmethod
@@ -48,9 +46,7 @@ class DuckDBConnectionManager(SQLConnectionManager):
                 connection.state = ConnectionState.OPEN
 
             except RuntimeError as e:
-                logger.debug(
-                    "Got an error when attempting to connect to DuckDB: '{}'".format(e)
-                )
+                logger.debug("Got an error when attempting to connect to DuckDB: '{}'".format(e))
                 connection.handle = None
                 connection.state = ConnectionState.FAIL
                 raise dbt.exceptions.FailedToConnectError(str(e))
