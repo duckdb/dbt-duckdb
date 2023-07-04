@@ -1,10 +1,15 @@
 import os
+import resource
 import subprocess
 import time
 
 import duckdb
 import pytest
 
+# Increase the number of open files allowed
+# Hack for https://github.com/dbt-labs/dbt-core/issues/7316
+soft_limit, hard_limit = resource.getrlimit(resource.RLIMIT_NOFILE)
+resource.setrlimit(resource.RLIMIT_NOFILE, (hard_limit, hard_limit))
 
 # Import the standard functional fixtures as a plugin
 # Note: fixtures with session scope need to be local
@@ -40,7 +45,7 @@ def bv_server_process(profile_type):
 
 # The profile dictionary, used to write out profiles.yml
 # dbt will supply a unique schema per test, so we do not specify 'schema' here
-@pytest.fixture(scope="class")
+@pytest.fixture(scope="session")
 def dbt_profile_target(profile_type, bv_server_process, tmp_path_factory):
     profile = {"type": "duckdb", "threads": 4}
 
