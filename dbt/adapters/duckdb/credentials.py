@@ -163,7 +163,21 @@ class DuckDBCredentials(Credentials):
         return "duckdb"
 
     def _connection_keys(self):
-        return ("database", "schema", "path")
+        return (
+            "database",
+            "schema",
+            "path",
+            "config_options",
+            "extensions",
+            "settings",
+            "external_root",
+            "use_credential_provider",
+            "attach",
+            "filesystems",
+            "remote",
+            "plugins",
+            "disable_transactions",
+        )
 
     def load_settings(self) -> Dict[str, str]:
         settings = self.settings or {}
