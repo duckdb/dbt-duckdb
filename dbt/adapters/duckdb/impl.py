@@ -42,6 +42,9 @@ class DuckDBAdapter(SQLAdapter):
     def is_cancelable(cls) -> bool:
         return False
 
+    def debug_query(self):
+        self.execute("select 1 as id")
+
     @available
     def convert_datetimes_to_strs(self, table: agate.Table) -> agate.Table:
         for column in table.columns:
