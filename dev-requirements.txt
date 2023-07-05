@@ -22,6 +22,7 @@ openpyxl
 pip-tools
 pre-commit
 psycopg2-binary
+pyiceberg
 pytest
 pytest-dotenv
 pytest-logbook
