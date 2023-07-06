@@ -53,8 +53,8 @@ class BasePlugin:
 
         try:
             mod = importlib.import_module(module)
-        except ImportError:
-            raise ImportError(f"Unable to import module '{module}'.")
+        except ImportError as e:
+            raise ImportError(f"Unable to import module '{module}': {e}")
 
         if not hasattr(mod, "Plugin"):
             raise ImportError(f"Module '{module}' does not have a Plugin class.")

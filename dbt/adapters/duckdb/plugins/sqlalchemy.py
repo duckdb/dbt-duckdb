@@ -39,3 +39,4 @@ class Plugin(BasePlugin):
 
     def __del__(self):
         self.engine.dispose()
+        self.engine = None
