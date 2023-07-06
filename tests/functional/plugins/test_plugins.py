@@ -56,6 +56,11 @@ foo_sql = """
     select foo() as foo
 """
 
+# Reads from a MD database in my test account in the cloud
+md_sql = """
+    select * FROM plugin_test.main.plugin_table
+"""
+
 
 @pytest.mark.skip_profile("buenavista", "md")
 class TestPlugins:
@@ -72,6 +77,7 @@ class TestPlugins:
         cursor.close()
         db.commit()
         db.close()
+
         yield path
 
         # verify that the external plugin operation works to write to the db
@@ -83,15 +89,18 @@ class TestPlugins:
         assert res[1] == (4, 5, 6)
         cursor.close()
         db.close()
+
         os.unlink(path)
 
     @pytest.fixture(scope="class")
     def profiles_config_update(self, dbt_profile_target, sqlite_test_db):
-        config = {"connection_url": f"sqlite:///{sqlite_test_db}"}
+        sa_config = {"connection_url": f"sqlite:///{sqlite_test_db}"}
+        md_config = {"token": "{{ env_var('MOTHERDUCK_TOKEN') }}"}
         plugins = [
             {"module": "excel"},
-            {"module": "sqlalchemy", "alias": "sql", "config": config},
+            {"module": "sqlalchemy", "alias": "sql", "config": sa_config},
             {"module": "tests.create_function_plugin"},
+            {"module": "motherduck", "config": md_config},
         ]
 
         return {
@@ -116,11 +125,12 @@ class TestPlugins:
             "sqlalchemy1.sql": sqlalchemy1_sql,
             "sqlalchemy2.sql": sqlalchemy2_sql,
             "foo.sql": foo_sql,
+            "md_table.sql": md_sql,
         }
 
     def test_plugins(self, project):
         results = run_dbt()
-        assert len(results) == 4
+        assert len(results) == 5
 
         res = project.run_sql("SELECT COUNT(1) FROM excel_file", fetch="one")
         assert res[0] == 9
@@ -155,3 +165,6 @@ class TestPlugins:
 
         res = project.run_sql("SELECT foo FROM foo", fetch="one")
         assert res[0] == 1729
+
+        res = project.run_sql("SELECT * FROM md_table", fetch="one")
+        assert res == (1, "foo")
