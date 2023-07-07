@@ -117,6 +117,11 @@ class DuckDBCredentials(Credentials):
     # be as small as possible.
     disable_transactions: bool = False
 
+    # Whether to keep the DuckDB connection open between invocations of dbt
+    # (we do this automatically for in-memory or MD connections, but not for
+    # local DuckDB files, but this is a way to override that behavior)
+    keep_open: bool = False
+
     @classmethod
     def __pre_deserialize__(cls, data: Dict[Any, Any]) -> Dict[Any, Any]:
         if duckdb.__version__ >= "0.7.0":
