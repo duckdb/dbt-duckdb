@@ -1,13 +1,13 @@
 
 {% macro duckdb__create_schema(relation) -%}
   {%- call statement('create_schema') -%}
-    create schema if not exists {{ relation.without_identifier().include(database=adapter.use_database()) }}
+    create schema if not exists {{ relation.without_identifier() }}
   {%- endcall -%}
 {% endmacro %}
 
 {% macro duckdb__drop_schema(relation) -%}
   {%- call statement('drop_schema') -%}
-    drop schema if exists {{ relation.without_identifier().include(database=adapter.use_database()) }} cascade
+    drop schema if exists {{ relation.without_identifier() }} cascade
   {%- endcall -%}
 {% endmacro %}
 
@@ -27,9 +27,7 @@
         select count(*)
         from system.information_schema.schemata
         where schema_name = '{{ schema }}'
-        {% if adapter.use_database() %}
         and catalog_name = '{{ information_schema.database }}'
-        {% endif %}
   {%- endset %}
   {{ return(run_query(sql)) }}
 {% endmacro %}
@@ -57,7 +55,7 @@
     {{ sql_header if sql_header is not none }}
 
     create {% if temporary: -%}temporary{%- endif %} table
-      {{ relation.include(database=(not temporary and adapter.use_database()), schema=(not temporary)) }}
+      {{ relation.include(database=(not temporary), schema=(not temporary)) }}
   {% if contract_config.enforced and not temporary %}
     {#-- DuckDB doesnt support constraints on temp tables --#}
     {{ get_table_columns_and_constraints() }} ;
@@ -89,7 +87,7 @@ def materialize(df, con):
         if pyarrow_available and isinstance(df, pyarrow.Table):
             # https://github.com/duckdb/duckdb/issues/6584
             import pyarrow.dataset
-    con.execute('create table {{ relation.include(database=adapter.use_database()) }} as select * from df')
+    con.execute('create table {{ relation }} as select * from df')
 {% endmacro %}
 
 {% macro duckdb__create_view_as(relation, sql) -%}
@@ -100,7 +98,7 @@ def materialize(df, con):
   {%- set sql_header = config.get('sql_header', none) -%}
 
   {{ sql_header if sql_header is not none }}
-  create view {{ relation.include(database=adapter.use_database()) }} as (
+  create view {{ relation }} as (
     {{ sql }}
   );
 {% endmacro %}
@@ -119,7 +117,7 @@ def materialize(df, con):
       {% if relation.schema %}
       and table_schema = '{{ relation.schema }}'
       {% endif %}
-      {% if adapter.use_database() and relation.database %}
+      {% if relation.database %}
       and table_catalog = '{{ relation.database }}'
       {% endif %}
       order by ordinal_position
@@ -142,22 +140,14 @@ def materialize(df, con):
         END as type
     from system.information_schema.tables
     where table_schema = '{{ schema_relation.schema }}'
-    {% if adapter.use_database() %}
     and table_catalog = '{{ schema_relation.database }}'
-    {% endif %}
   {% endcall %}
   {{ return(load_result('list_relations_without_caching').table) }}
 {% endmacro %}
 
 {% macro duckdb__drop_relation(relation) -%}
   {% call statement('drop_relation', auto_begin=False) -%}
-    drop {{ relation.type }} if exists {{ relation.include(database=adapter.use_database()) }} cascade
-  {%- endcall %}
-{% endmacro %}
-
-{% macro duckdb__truncate_relation(relation) -%}
-  {% call statement('truncate_relation') -%}
-    DELETE FROM {{ relation.include(database=adapter.use_database()) }} WHERE 1=1
+    drop {{ relation.type }} if exists {{ relation }} cascade
   {%- endcall %}
 {% endmacro %}
 
