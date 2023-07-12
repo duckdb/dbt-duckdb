@@ -9,8 +9,6 @@ from typing import Optional
 from typing import Tuple
 from urllib.parse import urlparse
 
-import duckdb
-
 import dbt.exceptions
 from dbt.adapters.base import Credentials
 from dbt.dataclass_schema import dbtClassMixin
@@ -124,36 +122,35 @@ class DuckDBCredentials(Credentials):
 
     @classmethod
     def __pre_deserialize__(cls, data: Dict[Any, Any]) -> Dict[Any, Any]:
-        if duckdb.__version__ >= "0.7.0":
-            data = super().__pre_deserialize__(data)
-            path = data.get("path")
-            path_db = None
-            if path is None or path == ":memory:":
-                path_db = "memory"
-            else:
-                parsed = urlparse(path)
-                base_file = os.path.basename(parsed.path)
-                path_db = os.path.splitext(base_file)[0]
-                # For MotherDuck, turn on disable_transactions unless
-                # it's explicitly set already by the user
-                if parsed.scheme in {"md", "motherduck"}:
-                    if "disable_transactions" not in data:
-                        data["disable_transactions"] = True
-                    if path_db == "":
-                        path_db = "my_db"
+        data = super().__pre_deserialize__(data)
+        path = data.get("path")
+        path_db = None
+        if path is None or path == ":memory:":
+            path_db = "memory"
+        else:
+            parsed = urlparse(path)
+            base_file = os.path.basename(parsed.path)
+            path_db = os.path.splitext(base_file)[0]
+            # For MotherDuck, turn on disable_transactions unless
+            # it's explicitly set already by the user
+            if parsed.scheme in {"md", "motherduck"}:
+                if "disable_transactions" not in data:
+                    data["disable_transactions"] = True
+                if path_db == "":
+                    path_db = "my_db"
 
-            if path_db and "database" not in data:
-                data["database"] = path_db
-            elif path_db and data["database"] != path_db:
-                if not data.get("remote"):
-                    raise dbt.exceptions.DbtRuntimeError(
-                        "Inconsistency detected between 'path' and 'database' fields in profile; "
-                        f"the 'database' property must be set to '{path_db}' to match the 'path'"
-                    )
-            elif not path_db:
+        if path_db and "database" not in data:
+            data["database"] = path_db
+        elif path_db and data["database"] != path_db:
+            if not data.get("remote"):
                 raise dbt.exceptions.DbtRuntimeError(
-                    "Unable to determine target database name from 'path' field in profile"
+                    "Inconsistency detected between 'path' and 'database' fields in profile; "
+                    f"the 'database' property must be set to '{path_db}' to match the 'path'"
                 )
+        elif not path_db:
+            raise dbt.exceptions.DbtRuntimeError(
+                "Unable to determine target database name from 'path' field in profile"
+            )
         return data
 
     @property
