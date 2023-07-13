@@ -12,7 +12,7 @@ class Plugin(BasePlugin):
 
     def configure_connection(self, conn: DuckDBPyConnection):
         conn.load_extension("motherduck")
-        connect_stmt = "PRAGMA md_connect()"
+        connect_stmt = "PRAGMA md_connect"
         if self._token:
             connect_stmt = f"PRAGMA md_connect('token={self._token}')"
         conn.execute(connect_stmt)
