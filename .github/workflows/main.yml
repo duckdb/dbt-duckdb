@@ -212,7 +212,7 @@ jobs:
 
     env:
       TOXENV: "md"
-      MOTHERDUCK_TOKEN: ${{ secrets.MOTHERDUCK_TOKEN }}
+      motherduck_token: ${{ secrets.MOTHERDUCK_TOKEN }}
       PYTEST_ADDOPTS: "-v --color=yes --csv motherduck_results.csv"
 
     steps:
@@ -348,7 +348,7 @@ jobs:
 
     env:
       TOXENV: "plugins"
-      MOTHERDUCK_TOKEN: ${{ secrets.MOTHERDUCK_TOKEN }}
+      motherduck_token: ${{ secrets.MOTHERDUCK_TOKEN }}
       PYTEST_ADDOPTS: "-v --color=yes --csv plugins_results.csv"
 
     steps:
