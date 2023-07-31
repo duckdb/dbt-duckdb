@@ -152,7 +152,14 @@ def _get_column_type_def(
     table_def: "GetTableResponseTypeDef",
 ) -> Optional[Sequence["ColumnTypeDef"]]:
     """Get columns definition from Glue Table Definition"""
-    return table_def.get("Table", {}).get("StorageDescriptor", {}).get("Columns")
+    raw = table_def.get("Table", {}).get("StorageDescriptor", {}).get("Columns")
+    if raw:
+        converted = []
+        for column in raw:
+            converted.append(ColumnTypeDef(Name=column["Name"], Type=column["Type"]))
+        return converted
+    else:
+        return None
 
 
 def _get_table_def(
