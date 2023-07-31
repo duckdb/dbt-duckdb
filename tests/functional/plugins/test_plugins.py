@@ -95,7 +95,7 @@ class TestPlugins:
     @pytest.fixture(scope="class")
     def profiles_config_update(self, dbt_profile_target, sqlite_test_db):
         sa_config = {"connection_url": f"sqlite:///{sqlite_test_db}"}
-        md_config = {"token": "{{ env_var('MOTHERDUCK_TOKEN') }}"}
+        md_config = {}
         plugins = [
             {"module": "excel"},
             {"module": "sqlalchemy", "alias": "sql", "config": sa_config},
