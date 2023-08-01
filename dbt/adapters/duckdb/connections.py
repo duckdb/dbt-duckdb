@@ -1,6 +1,7 @@
 import atexit
 import threading
 from contextlib import contextmanager
+from typing import Optional
 from typing import Tuple
 
 import agate
@@ -95,11 +96,15 @@ class DuckDBConnectionManager(SQLConnectionManager):
                 cls._ENV = None
 
     def execute(
-        self, sql: str, auto_begin: bool = False, fetch: bool = False, **kwargs
+        self,
+        sql: str,
+        auto_begin: bool = False,
+        fetch: bool = False,
+        limit: Optional[int] = None,
     ) -> Tuple[AdapterResponse, agate.Table]:
         if self.disable_transactions:
             auto_begin = False
-        return super().execute(sql, auto_begin, fetch, **kwargs)
+        return super().execute(sql, auto_begin, fetch, limit)
 
 
 atexit.register(DuckDBConnectionManager.close_all_connections)
