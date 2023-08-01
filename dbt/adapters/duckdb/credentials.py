@@ -120,6 +120,12 @@ class DuckDBCredentials(Credentials):
     # local DuckDB files, but this is a way to override that behavior)
     keep_open: bool = False
 
+    # A list of paths to Python modules that should be loaded into the
+    # running Python environment when dbt is invoked; this is useful for
+    # loading custom dbt-duckdb plugins or locally defined modules that
+    # provide helper functions for dbt Python models.
+    module_paths: Optional[List[str]] = None
+
     @classmethod
     def __pre_deserialize__(cls, data: Dict[Any, Any]) -> Dict[Any, Any]:
         data = super().__pre_deserialize__(data)

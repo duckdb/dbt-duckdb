@@ -1,6 +1,7 @@
 import abc
 import importlib.util
 import os
+import sys
 import tempfile
 from typing import Dict
 from typing import Optional
@@ -38,6 +39,12 @@ class Environment(abc.ABC):
 
     def __init__(self, creds: DuckDBCredentials):
         self._creds = creds
+
+        # Add any module paths to the Python path for the environment
+        if creds.module_paths:
+            for path in creds.module_paths:
+                if path not in sys.path:
+                    sys.path.append(path)
 
     @property
     def creds(self) -> DuckDBCredentials:
