@@ -1,4 +1,5 @@
 import importlib
+import os
 from typing import Any
 from typing import Dict
 from typing import Optional
@@ -23,6 +24,11 @@ class BasePlugin:
     contains a name and its configuration.
     """
 
+    # A set of built-in plugins that are included with dbt-duckdb.
+    _BUILTIN = set(
+        [x.split(".")[0] for x in os.listdir(os.path.dirname(__file__)) if "_" not in x]
+    )
+
     @classmethod
     def create(
         cls,
@@ -43,9 +49,7 @@ class BasePlugin:
         if not isinstance(module, str):
             raise TypeError("Module name must be a string.")
 
-        if "." not in module:
-            # if the module does not have a dot, assume it is a builtin
-            # plugin module and prepend the path name
+        if module in cls._BUILTIN:
             name = module
             module = f"dbt.adapters.duckdb.plugins.{module}"
         else:
