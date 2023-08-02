@@ -166,12 +166,14 @@ default:
         - module: path.to.custom_udf_module
 ```
 
-Every plugin must have a `module` property that indicates where the `Plugin` class to load is defined. Values of
-the `module` property that do not contain a "." are assumed to be one of the built-in plugins that are defined in
-[dbt.adapters.duckdb.plugins](dbt/adapters/duckdb/plugins/), while any values that do contain a "." are assumed to
-be user-defined modules that are visible on the Python path. Each plugin instance has a name for logging and reference
-purposes that defaults to the name of the module, but that may be overridden by the user by setting the `alias`
-property. Finally, modules may be initialized using an arbitrary set of key-value pairs that are defined in the
+Every plugin must have a `module` property that indicates where the `Plugin` class to load is defined. There is
+a set of built-in plugins that are defined in [dbt.adapters.duckdb.plugins](dbt/adapters/duckdb/plugins/) that
+may be referenced by their base filename (e.g., `excel` or `gsheet`), while user-defined plugins (which are
+described later in this document) should be referred to via their full module path name (e.g. a `lib.my.custom` module that defines a class named `Plugin`.)
+
+Each plugin instance has a name for logging and reference purposes that defaults to the name of the module
+but that may be overridden by the user by setting the `alias` property in the configuration. Finally,
+modules may be initialized using an arbitrary set of key-value pairs that are defined in the
 `config` dictionary. In this example, we initialize the `gsheet` plugin with the setting `method: oauth` and we
 initialize the `sqlalchemy` plugin (aliased as "sql") with a `connection_url` that is set via an environment variable.
 
@@ -181,6 +183,14 @@ Please remember that using plugins may require you to add additional dependencie
 * `gsheet` depends on `gspread` and `pandas`
 *  `iceberg` depends on `pyiceberg` and Python >= 3.8
 * `sqlalchemy` depends on `pandas`, `sqlalchemy`, and the driver(s) you need
+
+#### Using Local Python Modules
+
+In dbt-duckdb 1.6.0, we added a new profile setting named `module_paths` that allows users to specify a list
+of paths on the filesystem that contain additional Python modules that should be added to the Python processes'
+`sys.path` property. This allows users to include additional helper Python modules in their dbt projects that
+can be accessed by the running dbt process and used to define custom dbt-duckdb Plugins or library code that is
+helpful for creating dbt Python models.
 
 ### Reading and Writing External Files
 
