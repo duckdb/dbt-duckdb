@@ -1,6 +1,6 @@
 
 {% macro duckdb__get_binding_char() %}
-  {{ return('?') }}
+  {{ return(adapter.get_binding_char()) }}
 {% endmacro %}
 
 {% macro duckdb__get_batch_size() %}
@@ -8,6 +8,15 @@
 {% endmacro %}
 
 {% macro duckdb__load_csv_rows(model, agate_table) %}
+    {% if config.get('fast', true) %}
+        {% set seed_file_path = adapter.get_seed_file_path(model) %}
+        {% set sql %}
+          COPY {{ this.render() }} FROM '{{ seed_file_path }}' (FORMAT CSV, HEADER TRUE)
+        {% endset %}
+        {% do adapter.add_query(sql, abridge_sql_log=True) %}
+        {{ return(sql) }}
+    {% endif %}
+
     {% set batch_size = get_batch_size() %}
     {% set agate_table = adapter.convert_datetimes_to_strs(agate_table) %}
     {% set cols_sql = get_seed_column_quoted_csv(model, agate_table.column_names) %}

@@ -1,7 +1,8 @@
 import unittest
+from argparse import Namespace
 from unittest import mock
 
-import dbt.flags as flags
+from dbt.flags import set_from_args
 from dbt.adapters.duckdb import DuckDBAdapter
 from dbt.adapters.duckdb.connections import DuckDBConnectionManager
 from tests.unit.utils import config_from_parts_or_dicts, mock_connection
@@ -9,8 +10,7 @@ from tests.unit.utils import config_from_parts_or_dicts, mock_connection
 
 class TestDuckDBAdapter(unittest.TestCase):
     def setUp(self):
-        pass
-        flags.STRICT_MODE = True
+        set_from_args(Namespace(STRICT_MODE=True), {})
 
         profile_cfg = {
             "outputs": {
@@ -34,7 +34,7 @@ class TestDuckDBAdapter(unittest.TestCase):
             "config-version": 2,
         }
 
-        self.config = config_from_parts_or_dicts(project_cfg, profile_cfg)
+        self.config = config_from_parts_or_dicts(project_cfg, profile_cfg, cli_vars={})
         self._adapter = None
 
     @property
@@ -43,7 +43,7 @@ class TestDuckDBAdapter(unittest.TestCase):
             self._adapter = DuckDBAdapter(self.config)
         return self._adapter
 
-    @mock.patch("dbt.adapters.duckdb.connections.duckdb")
+    @mock.patch("dbt.adapters.duckdb.environments.duckdb")
     def test_acquire_connection(self, connector):
         DuckDBConnectionManager.close_all_connections()
         connection = self.adapter.acquire_connection("dummy")

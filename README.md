@@ -14,31 +14,48 @@ This project is hosted on PyPI, so you should be able to install it and the nece
 
 `pip3 install dbt-duckdb`
 
-The latest supported version targets `dbt-core` 1.4.x and `duckdb` version 0.7.x, but we work hard to ensure that newer
+The latest supported version targets `dbt-core` 1.5.x and `duckdb` version 0.7.x, but we work hard to ensure that newer
 versions of DuckDB will continue to work with the adapter as they are released. If you would like to use our new (and experimental!)
 support for persisting the tables that DuckDB creates to the [AWS Glue Catalog](https://aws.amazon.com/glue/), you should install
 `dbt-duckdb[glue]` in order to get the AWS dependencies as well.
 
 ### Configuring Your Profile
 
-A minimal dbt-duckdb profile only needs two settings, `type` and `path`:
+A super-minimal dbt-duckdb profile only needs *one* setting:
 
 ````
 default:
   outputs:
    dev:
      type: duckdb
-     path: /tmp/dbt.duckdb
   target: dev
 ````
 
-The `path` field should normally be the path to a local DuckDB file on your filesystem, but it can also be set equal to `:memory:` if you
-would like to run an in-memory only version of dbt-duckdb. Keep in mind that if you are using the in-memory mode,
-any models that you want to keep from the dbt run will need to be persisted using one of the external materialization strategies described below.
+This will run your dbt-duckdb pipeline against an in-memory DuckDB database that will not be persisted after your run completes. This may
+not seem very useful at first, but it turns out to be a powerful tool for a) testing out data pipelines, either locally or in CI jobs and
+b) running data pipelines that operate purely on external CSV, Parquet, or JSON files. More details on how to work with external data files
+in dbt-duckdb are provided in the docs on [reading and writing external files](#reading-and-writing-external-files).
+
+To have your dbt pipeline persist relations in a DuckDB file, set the `path` field in your profile to the path
+of the DuckDB file that you would like to read and write on your local filesystem. (For in-memory pipelines, the `path`
+is automatically set to the special value `:memory:`).
 
 `dbt-duckdb` also supports common profile fields like `schema` and `threads`, but the `database` property is special: it's value is automatically set
 to the basename of the file in the `path` argument with the suffix removed. For example, if the `path` is `/tmp/a/dbfile.duckdb`, the `database`
-field will be set to `dbfile`. If you are running with the `path` equal to `:memory:`, then the name of the database will be `memory`.
+field will be set to `dbfile`. If you are running in in-memory mode, then the `database` property will be automatically set to `memory`.
+
+#### Using MotherDuck
+
+As of `dbt-duckdb` 1.5.2, you can connect to a DuckDB instance running on [MotherDuck](http://www.motherduck.com) by setting your `path` to use a [md:<database> connection string](https://motherduck.com/docs/getting-started/connect-query-from-python/installation-authentication), just as you would with the DuckDB CLI
+or the Python API.
+
+MotherDuck databases generally work the same way as local DuckDB databases from the perspective of dbt, but
+there are a [few differences to be aware of](https://motherduck.com/docs/architecture-and-capabilities#considerations-and-limitations):
+1. For the moment, MotherDuck _requires_ DuckDB version `0.8.1`.
+1. MotherDuck databases do not suppport transactions, so there is a new `disable_transactions` profile
+option that will be automatically enabled if you are connecting to a MotherDuck database in your `path`.
+1. MotherDuck preloads a set of the most common DuckDB extensions for you, but does not support loading custom extensions or user-defined functions.
+1. A small subset of advanced SQL features are currently unsupported; the only impact of this on the dbt adapter is that the [dbt.listagg](https://docs.getdbt.com/reference/dbt-jinja-functions/cross-database-macros#listagg) macro and foreign-key constraints will work against a local DuckDB database, but will not work against a MotherDuck database.
 
 #### DuckDB Extensions, Settings, and Filesystems
 
@@ -94,9 +111,9 @@ Instead of specifying the credentials through the settings block, you can also u
 
 #### Attaching Additional Databases
 
-DuckDB version `0.7.0` and dbt-duckdb version `1.4.0` support [attaching additional databases](https://duckdb.org/docs/sql/statements/attach.html) to your dbt-duckdb run so that you can read
+DuckDB version `0.7.0` added support for [attaching additional databases](https://duckdb.org/docs/sql/statements/attach.html) to your dbt-duckdb run so that you can read
 and write from multiple databases. Additional databases may be configured using [dbt run hooks](https://docs.getdbt.com/docs/build/hooks-operations) or via the `attach` argument
-in your profile:
+in your profile that was added in dbt-duckdb `1.4.0`:
 
 ```
 default:
@@ -120,9 +137,64 @@ as `yet_another` instead of `another`.) Note that these additional databases do 
 DuckDB `0.7.0` ships with support for reading and writing from attached SQLite databases. You can indicate the type of the database you are connecting to via the `type` argument,
 which currently supports `duckdb` and `sqlite`.
 
-### External Materializations and Sources
+#### Configuring dbt-duckdb Plugins
 
-One of DuckDB's most powerful features is its ability to read and write CSV and Parquet files directly, without needing to import/export
+dbt-duckdb has its own [plugin](dbt/adapters/duckdb/plugins/__init__.py) system to enable advanced users to extend
+dbt-duckdb with additional functionality, including:
+
+* Defining [custom Python UDFs](https://duckdb.org/docs/api/python/function.html) on the DuckDB database connection
+so that they can be used in your SQL models
+* Loading source data from [Excel](dbt/adapters/duckdb/plugins/excel.py), [Google Sheets](dbt/adapters/duckdb/plugins/gsheet.py), or [SQLAlchemy](dbt/adapters/duckdb/plugins/sqlalchemy.py) tables
+
+You can find more details on [how to write your own plugins here](#writing-your-own-plugins). To configure a plugin for use
+in your dbt project, use the `plugins` property on the profile:
+
+```
+default:
+  outputs:
+    dev:
+      type: duckdb
+      path: /tmp/dbt.duckdb
+      plugins:
+        - module: gsheet
+          config:
+            method: oauth
+        - module: sqlalchemy
+          alias: sql
+          config:
+            connection_url: "{{ env_var('DBT_ENV_SECRET_SQLALCHEMY_URI') }}"
+        - module: path.to.custom_udf_module
+```
+
+Every plugin must have a `module` property that indicates where the `Plugin` class to load is defined. There is
+a set of built-in plugins that are defined in [dbt.adapters.duckdb.plugins](dbt/adapters/duckdb/plugins/) that
+may be referenced by their base filename (e.g., `excel` or `gsheet`), while user-defined plugins (which are
+described later in this document) should be referred to via their full module path name (e.g. a `lib.my.custom` module that defines a class named `Plugin`.)
+
+Each plugin instance has a name for logging and reference purposes that defaults to the name of the module
+but that may be overridden by the user by setting the `alias` property in the configuration. Finally,
+modules may be initialized using an arbitrary set of key-value pairs that are defined in the
+`config` dictionary. In this example, we initialize the `gsheet` plugin with the setting `method: oauth` and we
+initialize the `sqlalchemy` plugin (aliased as "sql") with a `connection_url` that is set via an environment variable.
+
+Please remember that using plugins may require you to add additional dependencies to the Python environment that your dbt-duckdb pipeline runs in:
+
+* `excel` depends on `pandas`
+* `gsheet` depends on `gspread` and `pandas`
+*  `iceberg` depends on `pyiceberg` and Python >= 3.8
+* `sqlalchemy` depends on `pandas`, `sqlalchemy`, and the driver(s) you need
+
+#### Using Local Python Modules
+
+In dbt-duckdb 1.6.0, we added a new profile setting named `module_paths` that allows users to specify a list
+of paths on the filesystem that contain additional Python modules that should be added to the Python processes'
+`sys.path` property. This allows users to include additional helper Python modules in their dbt projects that
+can be accessed by the running dbt process and used to define custom dbt-duckdb Plugins or library code that is
+helpful for creating dbt Python models.
+
+### Reading and Writing External Files
+
+One of DuckDB's most powerful features is its ability to read and write CSV, JSON, and Parquet files directly, without needing to import/export
 them from the database first.
 
 #### Writing to external files
@@ -228,8 +300,7 @@ FROM read_parquet(['s3://my-bucket/my-sources/source2a.parquet', 's3://my-bucket
 ```
 
 Note that the value of the `external_location` property does not need to be a path-like string; it can also be a function
-call, which is helpful in the case that you have an external source that is a CSV file which requires special handling for DuckDB
-to load it correctly:
+call, which is helpful in the case that you have an external source that is a CSV file which requires special handling for DuckDB to load it correctly:
 
 ```
 sources:
@@ -238,7 +309,17 @@ sources:
       - name: flights
         meta:
           external_location: "read_csv('flights.csv', types={'FlightDate': 'DATE'}, names=['FlightDate', 'UniqueCarrier'])"
+          formatter: oldstyle
 ```
+
+Note that we need to override the default `str.format` string formatting strategy for this example
+because the `types={'FlightDate': 'DATE'}` argument to the `read_csv` function will be interpreted by
+`str.format` as a template to be matched on, which will cause a `KeyError: "'FlightDate'"` when we attempt
+to parse the source in a dbt model. The `formatter` configuration option for the source indicates whether
+we should use `newstyle` string formatting (the default), `oldstyle` string formatting, or `template` string
+formatting. You can read up on the strategies the various string formatting techniques use at this
+[Stack Overflow answer](https://stackoverflow.com/questions/13451989/pythons-many-ways-of-string-formatting-are-the-older-ones-going-to-be-depre) and see examples of their use
+in this [dbt-duckdb integration test](https://github.com/jwills/dbt-duckdb/blob/master/tests/functional/adapter/test_sources.py).
 
 #### Writing to external files
 
@@ -281,12 +362,43 @@ on-run-start:
 
 dbt added support for [Python models in version 1.3.0](https://docs.getdbt.com/docs/build/python-models). For most data platforms,
 dbt will package up the Python code defined in a `.py` file and ship it off to be executed in whatever Python environment that
-data platform supports. However, in `dbt-duckdb`, the local machine *is* the data platform, and so we support executing any Python
-code that will run on your machine via an [exec](https://realpython.com/python-exec/) call. The value of the `dbt.ref` and `dbt.source`
-functions will be a [DuckDB Relation](https://duckdb.org/docs/api/python/reference/) object that can be easily converted into a
-Pandas DataFrame or Arrow table, and the return value of the `def models` function can be _any_ Python object that DuckDB knows how
-to turn into a relation, including a Pandas or Polars `DataFrame`, a DuckDB `Relation`, or an Arrow `Table`, `Dataset`, `RecordBatchReader`, or
-`Scanner`.
+data platform supports (e.g., Snowpark for Snowflake or Dataproc for BigQuery.) In dbt-duckdb, we execute Python models in the same
+process that owns the connection to the DuckDB database, which by default, is the Python process that is created when you run dbt.
+To execute the Python model, we treat the `.py` file that your model is defined in as a Python module and load it into the
+running process using [importlib](https://docs.python.org/3/library/importlib.html). We then construct the arguments to the `model`
+function that you defined (a `dbt` object that contains the names of any `ref` and `source` information your model needs and a
+`DuckDBPyConnection` object for you to interact with the underlying DuckDB database), call the `model` function, and then materialize
+the returned object as a table in DuckDB.
+
+The value of the `dbt.ref` and `dbt.source` functions inside of a Python model will be a [DuckDB Relation](https://duckdb.org/docs/api/python/reference/)
+object that can be easily converted into a Pandas/Polars DataFrame or an Arrow table. The return value of the `model` function can be
+any Python object that DuckDB knows how to turn into a table, including a Pandas/Polars `DataFrame`, a DuckDB `Relation`, or an Arrow `Table`,
+`Dataset`, `RecordBatchReader`, or `Scanner`.
+
+### Writing Your Own Plugins
+
+Defining your own dbt-duckdb plugin is as simple as creating a python module that defines a class named `Plugin` that
+inherits from [dbt.adapters.duckdb.plugins.BasePlugin](dbt/adapters/duckdb/plugins/__init__.py). There are currently
+four methods that may be implemented in your Plugin class:
+
+1. `initialize`: Takes in the `config` dictionary for the plugin that is defined in the profile to enable any
+additional configuration for the module based on the project; this method is called once when an instance of the
+`Plugin` class is created.
+1. `configure_connection`: Takes an instance of the `DuckDBPyConnection` object used to connect to the DuckDB
+database and may perform any additional configuration of that object that is needed by the plugin, like defining
+custom user-defined functions.
+1. `load`: Takes a [SourceConfig](dbt/adapters/duckdb/utils.py) instance, which encapsulates the configuration for a
+a dbt source and can optionally return a DataFrame-like object that DuckDB knows how to turn into a table (this is
+similar to a dbt-duckdb Python model, but without the ability to `ref` any models or access any information beyond
+the source config.)
+1. `store`: Takes a [TargetConfig](dbt/adapters/duckdb/utils.py) instance, which encapsulates the configuration for
+an `external` materialization and can perform additional operations once the CSV/Parquet/JSON file is written. The
+[glue](dbt/adapters/duckdb/plugins/glue.py) and [sqlalchemy](dbt/adapters/duckdb/plugins/sqlalchemy.py) are examples
+that demonstrate how to use the `store` operation to register an AWS Glue database table or upload a DataFrame to
+an external database, respectively.
+
+dbt-duckdb ships with a number of [built-in plugins](dbt/adapters/duckdb/plugins/) that can be used as examples
+for implementing your own.
 
 ### Roadmap
 
@@ -294,4 +406,3 @@ Things that we would like to add in the near future:
 
 * Support for Delta and Iceberg external table formats (both as sources and destinations)
 * Make dbt's incremental models and snapshots work with external materializations
-* Make AWS Glue registration a first-class concept and add support for Snowflake/BigQuery registrations

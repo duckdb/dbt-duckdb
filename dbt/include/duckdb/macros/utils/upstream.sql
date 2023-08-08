@@ -16,8 +16,8 @@
           schema=upstream['schema'],
           identifier=upstream['alias']
         ) -%}
-        {%- set location = upstream.config.get('location', external_location(upstream, upstream.config)) -%}
-        {%- set rendered_options = render_write_options(config) -%}
+        {%- set location = upstream.config.get('location', external_location(upstream_rel, upstream.config)) -%}
+        {%- set rendered_options = render_write_options(upstream.config) -%}
         {%- set upstream_location = adapter.external_read_location(location, rendered_options) -%}
         {% if upstream_rel.schema not in upstream_schemas %}
           {% call statement('main', language='sql') -%}
@@ -26,7 +26,7 @@
           {% do upstream_schemas.update({upstream_rel.schema: None}) %}
         {% endif %}
         {% call statement('main', language='sql') -%}
-          create or replace view {{ upstream_rel.include(database=adapter.use_database()) }} as (
+          create or replace view {{ upstream_rel }} as (
             select * from '{{ upstream_location }}'
           );
         {%- endcall %}

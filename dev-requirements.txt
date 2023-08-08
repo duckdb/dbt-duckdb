@@ -2,22 +2,27 @@
 # git+https://github.com/dbt-labs/dbt-core.git#egg=dbt-core&subdirectory=core
 # git+https://github.com/dbt-labs/dbt-core.git#egg=dbt-tests-adapter&subdirectory=tests/adapter
 
-dbt-tests-adapter==1.4.5
+dbt-tests-adapter==1.6.0
 
 boto3
 mypy-boto3-glue
 pandas
 pyarrow
-black==22.12.0
+black==23.7.0
+buenavista
 bumpversion
 flake8
 flaky
 freezegun==1.2.2
 fsspec
+gspread
 ipdb
-mypy==1.1.1
+mypy==1.4.1
+openpyxl
 pip-tools
 pre-commit
+psycopg2-binary
+pyiceberg
 pytest
 pytest-dotenv
 pytest-logbook
@@ -25,6 +30,7 @@ pytest-csv
 pytest-xdist
 pytest-mock
 pytz
+sqlalchemy
 tox>=3.13
 twine
 wheel

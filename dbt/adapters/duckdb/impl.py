@@ -1,21 +1,22 @@
-import importlib.util
 import os
-import tempfile
 from typing import List
 from typing import Optional
 from typing import Sequence
 
 import agate
-import duckdb
 
 from dbt.adapters.base import BaseRelation
 from dbt.adapters.base.column import Column
+from dbt.adapters.base.impl import ConstraintSupport
 from dbt.adapters.base.meta import available
 from dbt.adapters.duckdb.connections import DuckDBConnectionManager
-from dbt.adapters.duckdb.glue import create_or_update_table
 from dbt.adapters.duckdb.relation import DuckDBRelation
+from dbt.adapters.duckdb.utils import TargetConfig
+from dbt.adapters.duckdb.utils import TargetLocation
 from dbt.adapters.sql import SQLAdapter
 from dbt.contracts.connection import AdapterResponse
+from dbt.contracts.graph.nodes import ColumnLevelConstraint
+from dbt.contracts.graph.nodes import ConstraintType
 from dbt.exceptions import DbtInternalError
 from dbt.exceptions import DbtRuntimeError
 
@@ -24,6 +25,14 @@ class DuckDBAdapter(SQLAdapter):
     ConnectionManager = DuckDBConnectionManager
     Relation = DuckDBRelation
 
+    CONSTRAINT_SUPPORT = {
+        ConstraintType.check: ConstraintSupport.ENFORCED,
+        ConstraintType.not_null: ConstraintSupport.ENFORCED,
+        ConstraintType.unique: ConstraintSupport.ENFORCED,
+        ConstraintType.primary_key: ConstraintSupport.ENFORCED,
+        ConstraintType.foreign_key: ConstraintSupport.ENFORCED,
+    }
+
     @classmethod
     def date_function(cls) -> str:
         return "now()"
@@ -31,6 +40,9 @@ class DuckDBAdapter(SQLAdapter):
     @classmethod
     def is_cancelable(cls) -> bool:
         return False
+
+    def debug_query(self):
+        self.execute("select 1 as id")
 
     @available
     def convert_datetimes_to_strs(self, table: agate.Table) -> agate.Table:
@@ -48,6 +60,10 @@ class DuckDBAdapter(SQLAdapter):
         return table
 
     @available
+    def get_seed_file_path(self, model) -> str:
+        return os.path.join(model["root_path"], model["original_file_path"])
+
+    @available
     def location_exists(self, location: str) -> bool:
         try:
             self.execute(
@@ -60,30 +76,28 @@ class DuckDBAdapter(SQLAdapter):
             return False
 
     @available
-    def register_glue_table(
+    def store_relation(
         self,
-        glue_database: str,
-        table: str,
+        plugin_name: str,
+        relation: DuckDBRelation,
         column_list: Sequence[Column],
-        location: str,
-        file_format: str,
+        path: str,
+        format: str,
     ) -> None:
-        create_or_update_table(
-            database=glue_database,
-            table=table,
+        target_config = TargetConfig(
+            relation=relation,
             column_list=column_list,
-            s3_path=location,
-            file_format=file_format,
-            settings=self.config.credentials.settings,
+            location=TargetLocation(path=path, format=format),
         )
+        DuckDBConnectionManager.env().store_relation(plugin_name, target_config)
 
     @available
     def external_root(self) -> str:
         return self.config.credentials.external_root
 
     @available
-    def use_database(self) -> bool:
-        return duckdb.__version__ >= "0.7.0"
+    def get_binding_char(self):
+        return DuckDBConnectionManager.env().get_binding_char()
 
     @available
     def external_write_options(self, write_location: str, rendered_options: dict) -> str:
@@ -107,7 +121,12 @@ class DuckDBAdapter(SQLAdapter):
 
         ret = []
         for k, v in rendered_options.items():
-            if k.lower() in {"delimiter", "quote", "escape", "null"} and not v.startswith("'"):
+            if k.lower() in {
+                "delimiter",
+                "quote",
+                "escape",
+                "null",
+            } and not v.startswith("'"):
                 ret.append(f"{k} '{v}'")
             else:
                 ret.append(f"{k} {v}")
@@ -134,47 +153,11 @@ class DuckDBAdapter(SQLAdapter):
             pass
 
     def submit_python_job(self, parsed_model: dict, compiled_code: str) -> AdapterResponse:
-
         connection = self.connections.get_if_exists()
         if not connection:
             connection = self.connections.get_thread_connection()
-        con = connection.handle.cursor()
-
-        def load_df_function(table_name: str):
-            """
-            Currently con.table method dos not support fully qualified name - https://github.com/duckdb/duckdb/issues/5038
-
-            Can be replaced by con.table, after it is fixed.
-            """
-            return con.query(f"select * from {table_name}")
-
-        identifier = parsed_model["alias"]
-        mod_file = tempfile.NamedTemporaryFile(suffix=".py", delete=False)
-        mod_file.write(compiled_code.lstrip().encode("utf-8"))
-        mod_file.close()
-        try:
-            spec = importlib.util.spec_from_file_location(identifier, mod_file.name)
-            if not spec:
-                raise DbtRuntimeError(
-                    "Failed to load python model as module: {}".format(identifier)
-                )
-            module = importlib.util.module_from_spec(spec)
-            if spec.loader:
-                spec.loader.exec_module(module)
-            else:
-                raise DbtRuntimeError(
-                    "Python module spec is missing loader: {}".format(identifier)
-                )
-
-            # Do the actual work to run the code here
-            dbt = module.dbtObj(load_df_function)
-            df = module.model(dbt, con)
-            module.materialize(df, con)
-        except Exception as err:
-            raise DbtRuntimeError(f"Python model failed:\n" f"{err}")
-        finally:
-            os.unlink(mod_file.name)
-        return AdapterResponse(_message="OK")
+        env = DuckDBConnectionManager.env()
+        return env.submit_python_job(connection.handle, parsed_model, compiled_code)
 
     def get_rows_different_sql(
         self,
@@ -204,6 +187,30 @@ class DuckDBAdapter(SQLAdapter):
             except_op=except_operator,
         )
         return sql
+
+    @available.parse(lambda *a, **k: [])
+    def get_column_schema_from_query(self, sql: str) -> List[Column]:
+        """Get a list of the Columns with names and data types from the given sql."""
+
+        # Taking advantage of yet another amazing DuckDB SQL feature right here: the
+        # ability to DESCRIBE a query instead of a relation
+        describe_sql = f"DESCRIBE ({sql})"
+        _, cursor = self.connections.add_select_query(describe_sql)
+        ret = []
+        for row in cursor.fetchall():
+            name, dtype = row[0], row[1]
+            ret.append(Column.create(name, dtype))
+        return ret
+
+    @classmethod
+    def render_column_constraint(cls, constraint: ColumnLevelConstraint) -> Optional[str]:
+        """Render the given constraint as DDL text. Should be overriden by adapters which need custom constraint
+        rendering."""
+        if constraint.type == ConstraintType.foreign_key:
+            # DuckDB doesn't support 'foreign key' as an alias
+            return f"references {constraint.expression}"
+        else:
+            return super().render_column_constraint(constraint)
 
 
 # Change `table_a/b` to `table_aaaaa/bbbbb` to avoid duckdb binding issues when relation_a/b

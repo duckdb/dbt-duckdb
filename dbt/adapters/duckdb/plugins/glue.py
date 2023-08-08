@@ -2,26 +2,18 @@ from typing import Any
 from typing import Dict
 from typing import Optional
 from typing import Sequence
-from typing import Union
 
+import boto3
+from mypy_boto3_glue import GlueClient
+from mypy_boto3_glue.type_defs import ColumnTypeDef
+from mypy_boto3_glue.type_defs import GetTableResponseTypeDef
+from mypy_boto3_glue.type_defs import SerDeInfoTypeDef
+from mypy_boto3_glue.type_defs import StorageDescriptorTypeDef
+from mypy_boto3_glue.type_defs import TableInputTypeDef
+
+from . import BasePlugin
+from ..utils import TargetConfig
 from dbt.adapters.base.column import Column
-
-BOTO3_EXISTS = False
-
-try:
-    import boto3
-    from mypy_boto3_glue import GlueClient
-    from mypy_boto3_glue.type_defs import (
-        ColumnTypeDef,
-        GetTableResponseTypeDef,
-        SerDeInfoTypeDef,
-        StorageDescriptorTypeDef,
-        TableInputTypeDef,
-    )
-
-    BOTO3_EXISTS = True
-except ImportError:
-    pass
 
 
 class UnsupportedFormatType(Exception):
@@ -160,7 +152,14 @@ def _get_column_type_def(
     table_def: "GetTableResponseTypeDef",
 ) -> Optional[Sequence["ColumnTypeDef"]]:
     """Get columns definition from Glue Table Definition"""
-    return table_def.get("Table", {}).get("StorageDescriptor", {}).get("Columns")
+    raw = table_def.get("Table", {}).get("StorageDescriptor", {}).get("Columns")
+    if raw:
+        converted = []
+        for column in raw:
+            converted.append(ColumnTypeDef(Name=column["Name"], Type=column["Type"]))
+        return converted
+    else:
+        return None
 
 
 def _get_table_def(
@@ -168,7 +167,7 @@ def _get_table_def(
     s3_path: str,
     columns: Sequence["ColumnTypeDef"],
     file_format: str,
-    **kwargs,
+    delimiter: str,
 ):
     s3_parent = "/".join(s3_path.split("/")[:-1])
     if file_format == "csv":
@@ -176,7 +175,7 @@ def _get_table_def(
             table=table,
             s3_parent=s3_parent,
             columns=columns,
-            delimiter=kwargs.get("delimiter", ","),
+            delimiter=delimiter,
         )
     elif file_format == "parquet":
         table_def = _get_parquet_table_def(table=table, s3_parent=s3_parent, columns=columns)
@@ -185,7 +184,7 @@ def _get_table_def(
     return table_def
 
 
-def _get_glue_client(settings: Optional[Dict[str, Any]]) -> "GlueClient":
+def _get_glue_client(settings: Dict[str, Any]) -> "GlueClient":
     if settings:
         return boto3.client(
             "glue",
@@ -199,31 +198,50 @@ def _get_glue_client(settings: Optional[Dict[str, Any]]) -> "GlueClient":
 
 
 def create_or_update_table(
+    client: GlueClient,
     database: str,
     table: str,
     column_list: Sequence[Column],
     s3_path: str,
     file_format: str,
-    settings: Optional[Dict[str, Any]],
-    **kwargs: Optional[Dict[str, Union[str, int]]],
+    delimiter: str,
 ) -> None:
-    if BOTO3_EXISTS:
-        client = _get_glue_client(settings)
-        # Existing table in AWS Glue catalog
-        glue_table = _get_table(client=client, database=database, table=table)
-        columns = _convert_columns(column_list)
-        table_def = _get_table_def(
-            table=table,
-            s3_path=s3_path,
-            columns=columns,
-            file_format=file_format,
-            **kwargs,
+    # Existing table in AWS Glue catalog
+    glue_table = _get_table(client=client, database=database, table=table)
+    columns = _convert_columns(column_list)
+    table_def = _get_table_def(
+        table=table,
+        s3_path=s3_path,
+        columns=columns,
+        file_format=file_format,
+        delimiter=delimiter,
+    )
+    if glue_table:
+        # Existing columns in AWS Glue catalog
+        glue_columns = _get_column_type_def(glue_table)
+        # Create new version only if columns are changed
+        if glue_columns != columns:
+            _update_table(client=client, database=database, table_def=table_def)
+    else:
+        _create_table(client=client, database=database, table_def=table_def)
+
+
+class Plugin(BasePlugin):
+    def initialize(self, config: Dict[str, Any]):
+        self.client = _get_glue_client(config)
+        self.database = config.get("glue_database", "default")
+        self.delimiter = config.get("delimiter", ",")
+
+    def store(self, target_config: TargetConfig):
+        assert target_config.location is not None
+        assert target_config.relation.identifier is not None
+        table: str = target_config.relation.identifier
+        create_or_update_table(
+            self.client,
+            self.database,
+            table,
+            target_config.column_list,
+            target_config.location.path,
+            target_config.location.format,
+            self.delimiter,
         )
-        if glue_table:
-            # Existing columns in AWS Glue catalog
-            glue_columns = _get_column_type_def(glue_table)
-            # Create new version only if columns are changed
-            if glue_columns != columns:
-                _update_table(client=client, database=database, table_def=table_def)
-        else:
-            _create_table(client=client, database=database, table_def=table_def)

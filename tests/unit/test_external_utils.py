@@ -1,13 +1,13 @@
 import unittest
+from argparse import Namespace
 
-import dbt.flags as flags
+from dbt.flags import set_from_args
 from dbt.adapters.duckdb import DuckDBAdapter
 from tests.unit.utils import config_from_parts_or_dicts, mock_connection
 
 class TestExternalUtils(unittest.TestCase):
     def setUp(self):
-        pass
-        flags.STRICT_MODE = True
+        set_from_args(Namespace(STRICT_MODE=True), {})
 
         profile_cfg = {
             "outputs": {
@@ -27,7 +27,7 @@ class TestExternalUtils(unittest.TestCase):
             "config-version": 2,
         }
 
-        self.config = config_from_parts_or_dicts(project_cfg, profile_cfg)
+        self.config = config_from_parts_or_dicts(project_cfg, profile_cfg, cli_vars={})
         self._adapter = None
 
     @property

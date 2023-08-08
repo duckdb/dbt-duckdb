@@ -1,3 +1,5 @@
+import pytest
+
 from dbt.tests.adapter.utils.test_any_value import BaseAnyValue
 from dbt.tests.adapter.utils.test_array_append import BaseArrayAppend
 from dbt.tests.adapter.utils.test_array_concat import BaseArrayConcat
@@ -78,6 +80,8 @@ class TestLength(BaseLength):
     pass
 
 
+# NOTE: list_agg relies on an ORDER BY construct MD does not yet support
+@pytest.mark.skip_profile("md")
 class TestListagg(BaseListagg):
     pass
 
@@ -114,9 +118,12 @@ class TestArrayConcat(BaseArrayConcat):
     pass
 
 
-class TestArrayConcat(BaseArrayConstruct):
+class TestArrayConstruct(BaseArrayConstruct):
     pass
 
 
+# Skipping this while we sort out what the right default is
+# here: https://github.com/duckdb/duckdb/issues/7934
+@pytest.mark.skip
 class TestCurrentTimestamp(BaseCurrentTimestampNaive):
     pass

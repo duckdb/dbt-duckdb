@@ -1,3 +1,4 @@
+import os
 import pytest
 from dbt.tests.adapter.basic.files import (
     base_table_sql,
@@ -36,6 +37,14 @@ config_write_partition_by_id_name_sql = config_write_partition_by_id_name + mode
 
 
 class BaseExternalMaterializations:
+
+    @pytest.fixture(scope="class")
+    def dbt_profile_target(self, dbt_profile_target, tmp_path_factory):
+        extroot = str(tmp_path_factory.getbasetemp() / "write_options")
+        os.mkdir(extroot)
+        dbt_profile_target["external_root"] = extroot
+        return dbt_profile_target
+
     @pytest.fixture(scope="class")
     def models(self):
         return {

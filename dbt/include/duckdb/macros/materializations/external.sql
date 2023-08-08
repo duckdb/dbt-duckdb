@@ -2,6 +2,7 @@
 
   {%- set location = render(config.get('location', default=external_location(this, config))) -%})
   {%- set rendered_options = render_write_options(config) -%}
+  {%- set format = config.get('format', 'parquet') -%}
   {%- set write_options = adapter.external_write_options(location, rendered_options) -%}
   {%- set read_location = adapter.external_read_location(location, rendered_options) -%}
 
@@ -48,7 +49,7 @@
   {{ write_to_file(temp_relation, location, write_options) }}
   -- create a view on top of the location
   {% call statement('main', language='sql') -%}
-    create or replace view {{ intermediate_relation.include(database=adapter.use_database()) }} as (
+    create or replace view {{ intermediate_relation }} as (
         select * from '{{ read_location }}'
     );
   {%- endcall %}
@@ -75,9 +76,15 @@
   {{ drop_relation_if_exists(temp_relation) }}
 
   -- register table into glue
+  {%- set plugin_name = config.get('plugin') -%}
   {%- set glue_register = config.get('glue_register', default=false) -%}
-  {%- set glue_database = render(config.get('glue_database', default='default')) -%}
-  {% do register_glue_table(glue_register, glue_database, target_relation, location, format) %}
+  {% if plugin_name is not none or glue_register is true %}
+    {% if glue_register %}
+      {# legacy hack to set the glue database name, deprecate this #}
+      {%- set plugin_name = 'glue|' ~ config.get('glue_database', 'default') -%}
+    {% endif %}
+    {% do store_relation(plugin_name, target_relation, location, format) %}
+  {% endif %}
 
   {{ run_hooks(post_hooks, inside_transaction=False) }}
 

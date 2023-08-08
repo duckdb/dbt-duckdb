@@ -2,11 +2,11 @@ import os
 
 import duckdb
 import pytest
-import yaml
 
 from dbt.tests.util import run_dbt
 
-sources_schema_yml = """version: 2
+sources_schema_yml = """
+version: 2
 sources:
   - name: attached_source
     database: attach_test
@@ -22,7 +22,8 @@ sources:
               - not_null
 """
 
-models_source_model_sql = """select * from {{ source('attached_source', 'attached_table') }}
+models_source_model_sql = """
+    select * from {{ source('attached_source', 'attached_table') }}
 """
 
 models_target_model_sql = """
@@ -31,25 +32,27 @@ models_target_model_sql = """
 """
 
 
+@pytest.mark.skip_profile("buenavista", "md")
 class TestAttachedDatabase:
     @pytest.fixture(scope="class")
     def attach_test_db(self):
-        db = duckdb.connect("/tmp/attach_test.duckdb")
+        path = "/tmp/attach_test.duckdb"
+        db = duckdb.connect(path)
         db.execute("CREATE SCHEMA analytics")
         db.execute("CREATE TABLE analytics.attached_table AS SELECT 1 as id")
         db.close()
-        yield
-        os.unlink("/tmp/attach_test.duckdb")
+        yield path
+        os.unlink(path)
 
     @pytest.fixture(scope="class")
-    def profiles_config_update(self, attach_test_db):
+    def profiles_config_update(self, dbt_profile_target, attach_test_db):
         return {
             "test": {
                 "outputs": {
                     "dev": {
                         "type": "duckdb",
-                        "path": ":memory:",
-                        "attach": [{"path": "/tmp/attach_test.duckdb"}],
+                        "path": dbt_profile_target.get("path", ":memory:"),
+                        "attach": [{"path": attach_test_db}],
                     }
                 },
                 "target": "dev",
@@ -64,7 +67,7 @@ class TestAttachedDatabase:
             "target_model.sql": models_target_model_sql,
         }
 
-    def test_attached_databases(self, project):
+    def test_attached_databases(self, project, attach_test_db):
         results = run_dbt()
         assert len(results) == 2
 
@@ -72,7 +75,7 @@ class TestAttachedDatabase:
         assert len(test_results) == 2
 
         # check that the model is created in the attached db
-        db = duckdb.connect("/tmp/attach_test.duckdb")
+        db = duckdb.connect(attach_test_db)
         ret = db.execute(f"SELECT * FROM target_model").fetchall()
         assert ret[0][0] == 1
 

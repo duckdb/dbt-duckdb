@@ -9,6 +9,7 @@ __pycache__/
 # Distribution / packaging
 .Python
 env/
+venv/
 build/
 develop-eggs/
 dist/
@@ -46,6 +47,7 @@ coverage.xml
 *,cover
 .hypothesis/
 test.env
+.mypy_cache/
 
 # Translations
 *.mo
@@ -74,6 +76,6 @@ target/
 
 .python-version
 
-# Vim
-*.sw*
 .DS_Store
+.idea/
+.vscode/

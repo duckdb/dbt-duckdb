@@ -1,5 +1,6 @@
+import os
 import pytest
-from dbt.tests.util import run_dbt
+from dbt.tests.util import run_dbt, relation_from_name
 from dbt.adapters.duckdb import DuckDBConnectionManager
 
 upstream_model_sql = """
@@ -20,8 +21,9 @@ select range * 5 from {{ ref('upstream_model') }}
 """
 
 downstream_of_partition_model = """
-select a * 3 from {{ ref('upstream_partition_by_model') }}
+select a from {{ ref('upstream_partition_by_model') }}
 """
+
 
 # class must begin with 'Test'
 class TestRematerializeDownstreamExternalModel:
@@ -34,13 +36,12 @@ class TestRematerializeDownstreamExternalModel:
     """
 
     @pytest.fixture(scope="class")
-    def dbt_profile_target(self):
-        return {
-            "type": "duckdb",
-            "path": ":memory:",
-            "threads": 3,
-        }
-
+    def dbt_profile_target(self, dbt_profile_target, tmp_path_factory):
+        extroot = str(tmp_path_factory.getbasetemp() / "rematerialize")
+        os.mkdir(extroot)
+        dbt_profile_target["external_root"] = extroot
+        return dbt_profile_target
+    
     @pytest.fixture(scope="class")
     def project_config_update(self):
         return {
@@ -68,6 +69,11 @@ class TestRematerializeDownstreamExternalModel:
             [
                 "run",
                 "--select",
-                "downstream_model,other_downstream_model,downstream_of_partition_model",
+                "downstream_model other_downstream_model downstream_of_partition_model",
             ]
         )
+
+        # really makes sure we have created the downstream model
+        relation = relation_from_name(project.adapter, "downstream_of_partition_model")
+        result = project.run_sql(f"select count(*) as num_rows from {relation}", fetch="one")
+        assert result[0] == 5

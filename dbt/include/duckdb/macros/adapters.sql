@@ -1,20 +1,23 @@
 
 {% macro duckdb__create_schema(relation) -%}
   {%- call statement('create_schema') -%}
-    create schema if not exists {{ relation.without_identifier().include(database=adapter.use_database()) }}
+    create schema if not exists {{ relation.without_identifier() }}
   {%- endcall -%}
 {% endmacro %}
 
 {% macro duckdb__drop_schema(relation) -%}
   {%- call statement('drop_schema') -%}
-    drop schema if exists {{ relation.without_identifier().include(database=adapter.use_database()) }} cascade
+    drop schema if exists {{ relation.without_identifier() }} cascade
   {%- endcall -%}
 {% endmacro %}
 
 {% macro duckdb__list_schemas(database) -%}
   {% set sql %}
     select schema_name
-    from information_schema.schemata
+    from system.information_schema.schemata
+    {% if database is not none %}
+    where catalog_name = '{{ database }}'
+    {% endif %}
   {% endset %}
   {{ return(run_query(sql)) }}
 {% endmacro %}
@@ -22,23 +25,48 @@
 {% macro duckdb__check_schema_exists(information_schema, schema) -%}
   {% set sql -%}
         select count(*)
-        from information_schema.schemata
-        where schema_name='{{ schema }}'
+        from system.information_schema.schemata
+        where schema_name = '{{ schema }}'
+        and catalog_name = '{{ information_schema.database }}'
   {%- endset %}
   {{ return(run_query(sql)) }}
 {% endmacro %}
 
+{% macro get_column_names() %}
+  {# loop through user_provided_columns to get column names #}
+    {%- set user_provided_columns = model['columns'] -%}
+    (
+    {% for i in user_provided_columns %}
+      {% set col = user_provided_columns[i] %}
+      {{ col['name'] }} {{ "," if not loop.last }}
+    {% endfor %}
+  )
+{% endmacro %}
+
+
 {% macro duckdb__create_table_as(temporary, relation, compiled_code, language='sql') -%}
   {%- if language == 'sql' -%}
+    {% set contract_config = config.get('contract') %}
+    {% if contract_config.enforced %}
+      {{ get_assert_columns_equivalent(compiled_code) }}
+    {% endif %}
     {%- set sql_header = config.get('sql_header', none) -%}
 
     {{ sql_header if sql_header is not none }}
 
     create {% if temporary: -%}temporary{%- endif %} table
-      {{ relation.include(database=(not temporary and adapter.use_database()), schema=(not temporary)) }}
+      {{ relation.include(database=(not temporary), schema=(not temporary)) }}
+  {% if contract_config.enforced and not temporary %}
+    {#-- DuckDB doesnt support constraints on temp tables --#}
+    {{ get_table_columns_and_constraints() }} ;
+    insert into {{ relation }} {{ get_column_names() }} (
+      {{ get_select_subquery(compiled_code) }}
+    );
+  {% else %}
     as (
       {{ compiled_code }}
     );
+  {% endif %}
   {%- elif language == 'python' -%}
     {{ py_write_table(temporary=temporary, relation=relation, compiled_code=compiled_code) }}
   {%- else -%}
@@ -52,20 +80,25 @@
 def materialize(df, con):
     try:
         import pyarrow
+        pyarrow_available = True
     except ImportError:
-        pass
+        pyarrow_available = False
     finally:
-        if isinstance(df, pyarrow.Table):
+        if pyarrow_available and isinstance(df, pyarrow.Table):
             # https://github.com/duckdb/duckdb/issues/6584
             import pyarrow.dataset
-    con.execute('create table {{ relation.include(database=adapter.use_database()) }} as select * from df')
+    con.execute('create table {{ relation }} as select * from df')
 {% endmacro %}
 
 {% macro duckdb__create_view_as(relation, sql) -%}
+  {% set contract_config = config.get('contract') %}
+  {% if contract_config.enforced %}
+    {{ get_assert_columns_equivalent(sql) }}
+  {%- endif %}
   {%- set sql_header = config.get('sql_header', none) -%}
 
   {{ sql_header if sql_header is not none }}
-  create view {{ relation.include(database=adapter.use_database()) }} as (
+  create view {{ relation }} as (
     {{ sql }}
   );
 {% endmacro %}
@@ -79,11 +112,14 @@ def materialize(df, con):
           numeric_precision,
           numeric_scale
 
-      from information_schema.columns
+      from system.information_schema.columns
       where table_name = '{{ relation.identifier }}'
-        {% if relation.schema %}
-        and table_schema = '{{ relation.schema }}'
-        {% endif %}
+      {% if relation.schema %}
+      and table_schema = '{{ relation.schema }}'
+      {% endif %}
+      {% if relation.database %}
+      and table_catalog = '{{ relation.database }}'
+      {% endif %}
       order by ordinal_position
 
   {% endcall %}
@@ -102,21 +138,16 @@ def materialize(df, con):
         WHEN 'VIEW' THEN 'view'
         WHEN 'LOCAL TEMPORARY' THEN 'table'
         END as type
-    from information_schema.tables
+    from system.information_schema.tables
     where table_schema = '{{ schema_relation.schema }}'
+    and table_catalog = '{{ schema_relation.database }}'
   {% endcall %}
   {{ return(load_result('list_relations_without_caching').table) }}
 {% endmacro %}
 
 {% macro duckdb__drop_relation(relation) -%}
   {% call statement('drop_relation', auto_begin=False) -%}
-    drop {{ relation.type }} if exists {{ relation.include(database=adapter.use_database()) }} cascade
-  {%- endcall %}
-{% endmacro %}
-
-{% macro duckdb__truncate_relation(relation) -%}
-  {% call statement('truncate_relation') -%}
-    DELETE FROM {{ relation.include(database=adapter.use_database()) }} WHERE 1=1
+    drop {{ relation.type }} if exists {{ relation }} cascade
   {%- endcall %}
 {% endmacro %}
 
@@ -154,14 +185,6 @@ def materialize(df, con):
   {% do return(get_incremental_delete_insert_sql(arg_dict)) %}
 {% endmacro %}
 
-{% macro duckdb__get_incremental_delete_insert_sql(arg_dict) %}
-  {% do return(get_delete_insert_merge_sql(arg_dict["target_relation"].include(database=adapter.use_database()), arg_dict["temp_relation"], arg_dict["unique_key"], arg_dict["dest_columns"])) %}
-{% endmacro %}
-
-{% macro duckdb__get_incremental_append_sql(arg_dict) %}
-  {% do return(get_insert_into_sql(arg_dict["target_relation"].include(database=adapter.use_database()), arg_dict["temp_relation"], arg_dict["dest_columns"])) %}
-{% endmacro %}
-
 {% macro location_exists(location) -%}
   {% do return(adapter.location_exists(location)) %}
 {% endmacro %}
@@ -172,11 +195,9 @@ def materialize(df, con):
   {%- endcall %}
 {% endmacro %}
 
-{% macro register_glue_table(register, glue_database, relation, location, format) -%}
-  {% if location.startswith("s3://") and register == true %}
-    {%- set column_list = adapter.get_columns_in_relation(relation) -%}
-    {% do adapter.register_glue_table(glue_database, relation.identifier, column_list, location, format) %}
-  {% endif %}
+{% macro store_relation(plugin, relation, location, format) -%}
+  {%- set column_list = adapter.get_columns_in_relation(relation) -%}
+  {% do adapter.store_relation(plugin, relation, column_list, location, format) %}
 {% endmacro %}
 
 {% macro render_write_options(config) -%}

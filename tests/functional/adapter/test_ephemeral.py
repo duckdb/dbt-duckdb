@@ -18,6 +18,8 @@ from dbt.tests.util import check_relations_equal, run_dbt
 
 class TestEphemeralMulti(BaseEphemeralMulti):
     def test_ephemeral_multi(self, project):
+        db = project.database
+
         run_dbt(["seed"])
         results = run_dbt(["run"])
         assert len(results) == 3
@@ -31,7 +33,7 @@ class TestEphemeralMulti(BaseEphemeralMulti):
 
         sql_file = re.sub(r"\d+", "", sql_file)
         expected_sql = (
-            'create view "memory"."test_test_ephemeral"."double_dependent__dbt_tmp" as ('
+            f'create view "{db}"."test_test_ephemeral"."double_dependent__dbt_tmp" as ('
             "with __dbt__cte__base as ("
             "select * from test_test_ephemeral.seed"
             "),  __dbt__cte__base_copy as ("
@@ -59,6 +61,8 @@ class TestEphemeralNested(BaseEphemeral):
         }
 
     def test_ephemeral_nested(self, project):
+        db = project.database
+
         results = run_dbt(["run"])
         assert len(results) == 2
         assert os.path.exists("./target/run/test/models/root_view.sql")
@@ -67,9 +71,9 @@ class TestEphemeralNested(BaseEphemeral):
 
         sql_file = re.sub(r"\d+", "", sql_file)
         expected_sql = (
-            'create view "memory"."test_test_ephemeral"."root_view__dbt_tmp" as ('
+            f'create view "{db}"."test_test_ephemeral"."root_view__dbt_tmp" as ('
             "with __dbt__cte__ephemeral_level_two as ("
-            'select * from "memory"."test_test_ephemeral"."source_table"'
+            f'select * from "{db}"."test_test_ephemeral"."source_table"'
             "),  __dbt__cte__ephemeral as ("
             "select * from __dbt__cte__ephemeral_level_two"
             ")select * from __dbt__cte__ephemeral"

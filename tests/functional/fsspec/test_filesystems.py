@@ -10,13 +10,16 @@ WHERE conf = 'West'
 """
 
 
+@pytest.mark.skip_profile("buenavista", "md")
 class TestFilesystems:
     @pytest.fixture(scope="class")
-    def dbt_profile_target(self):
+    def dbt_profile_target(self, dbt_profile_target):
         return {
             "type": "duckdb",
-            "path": ":memory:",
-            "filesystems": [{"fs": "github", "org": "jwills", "repo": "nba_monte_carlo"}],
+            "path": dbt_profile_target.get("path", ":memory:"),
+            "filesystems": [
+                {"fs": "github", "org": "jwills", "repo": "nba_monte_carlo"}
+            ],
         }
 
     @pytest.fixture(scope="class")
