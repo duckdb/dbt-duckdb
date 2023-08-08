@@ -1,8 +1,7 @@
 import os
+import pathlib
 from typing import Any
 from typing import Dict
-
-import pathlib
 
 import pandas as pd
 
@@ -14,11 +13,11 @@ class Plugin(BasePlugin):
     def initialize(self, plugin_config: Dict[str, Any]):
         # Pass s3 settings to plugin environment
         if "s3_access_key_id" in plugin_config:
-            os.environ["AWS_ACCESS_KEY_ID"] = plugin_config.get("s3_access_key_id")
+            os.environ["AWS_ACCESS_KEY_ID"] = plugin_config["s3_access_key_id"]
         if "s3_secret_access_key" in plugin_config:
-            os.environ["AWS_SECRET_ACCESS_KEY"] = plugin_config.get("s3_secret_access_key")
+            os.environ["AWS_SECRET_ACCESS_KEY"] = plugin_config["s3_secret_access_key"]
         if "s3_region" in plugin_config:
-            os.environ["AWS_DEFAULT_REGION"] = plugin_config.get("s3_region")
+            os.environ["AWS_DEFAULT_REGION"] = plugin_config["s3_region"]
 
     def load(self, source_config: SourceConfig):
         ext_location = source_config["external_location"]
