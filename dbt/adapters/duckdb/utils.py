@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 from typing import Any
 from typing import Dict
+from typing import List
 from typing import Optional
 from typing import Sequence
 
@@ -16,6 +17,7 @@ class SourceConfig:
     schema: str
     database: Optional[str]
     meta: Dict[str, Any]
+    tags: List[str]
 
     def get(self, key, default=None):
         return self.meta.get(key, default)
@@ -38,6 +40,7 @@ class SourceConfig:
             "identifier": self.identifier,
             "schema": self.schema,
             "database": self.database,
+            "tags": self.tags,
         }
         base.update(self.meta)
         return base
@@ -54,6 +57,7 @@ class SourceConfig:
             schema=source.schema,
             database=source.database,
             meta=meta,
+            tags=source.tags or [],
         )
 
 
