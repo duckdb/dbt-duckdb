@@ -13,17 +13,17 @@ from ..utils import SourceConfig
 class Plugin(BasePlugin):
     def initialize(self, plugin_config: Dict[str, Any]):
         # Pass s3 settings to plugin environment
-        if 's3_access_key_id' in plugin_config:
-            os.environ['AWS_ACCESS_KEY_ID'] = plugin_config.get('s3_access_key_id')
-        if 's3_secret_access_key' in plugin_config:
-            os.environ['AWS_SECRET_ACCESS_KEY'] = plugin_config.get('s3_secret_access_key')
-        if 's3_region' in plugin_config:
-            os.environ['AWS_DEFAULT_REGION'] = plugin_config.get('s3_region')
+        if "s3_access_key_id" in plugin_config:
+            os.environ["AWS_ACCESS_KEY_ID"] = plugin_config.get("s3_access_key_id")
+        if "s3_secret_access_key" in plugin_config:
+            os.environ["AWS_SECRET_ACCESS_KEY"] = plugin_config.get("s3_secret_access_key")
+        if "s3_region" in plugin_config:
+            os.environ["AWS_DEFAULT_REGION"] = plugin_config.get("s3_region")
 
     def load(self, source_config: SourceConfig):
         ext_location = source_config["external_location"]
         ext_location = ext_location.format(**source_config.as_dict())
-        if 's3' in ext_location:
+        if "s3" in ext_location:
             # Possible to add some treatment in the future
             source_location = ext_location
         else:
