@@ -95,12 +95,10 @@ class TestPlugins:
     @pytest.fixture(scope="class")
     def profiles_config_update(self, dbt_profile_target, sqlite_test_db):
         sa_config = {"connection_url": f"sqlite:///{sqlite_test_db}"}
-        md_config = {}
         plugins = [
             {"module": "excel"},
             {"module": "sqlalchemy", "alias": "sql", "config": sa_config},
             {"module": "tests.create_function_plugin"},
-            {"module": "motherduck", "config": md_config},
         ]
 
         return {
@@ -125,12 +123,11 @@ class TestPlugins:
             "sqlalchemy1.sql": sqlalchemy1_sql,
             "sqlalchemy2.sql": sqlalchemy2_sql,
             "foo.sql": foo_sql,
-            "md_table.sql": md_sql,
         }
 
     def test_plugins(self, project):
         results = run_dbt()
-        assert len(results) == 5
+        assert len(results) == 4
 
         res = project.run_sql("SELECT COUNT(1) FROM excel_file", fetch="one")
         assert res[0] == 9
@@ -166,5 +163,33 @@ class TestPlugins:
         res = project.run_sql("SELECT foo FROM foo", fetch="one")
         assert res[0] == 1729
 
+
+@pytest.mark.skip_profile("buenavista", "file", "memory")
+class TestMDPlugin:
+    @pytest.fixture(scope="class")
+    def profiles_config_update(self, dbt_profile_target):
+        md_config = {}
+        plugins = [{"module": "motherduck", "config": md_config}]
+        return {
+            "test": {
+                "outputs": {
+                    "dev": {
+                        "type": "duckdb",
+                        "path": dbt_profile_target.get("path", ":memory:"),
+                        "plugins": plugins,
+                    }
+                },
+                "target": "dev",
+            }
+        }
+
+    @pytest.fixture(scope="class")
+    def models(self):
+        return {
+            "md_table.sql": md_sql,
+        }
+
+    def test_plugins(self, project):
+        run_dbt()
         res = project.run_sql("SELECT * FROM md_table", fetch="one")
         assert res == (1, "foo")
