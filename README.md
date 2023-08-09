@@ -291,7 +291,7 @@ LEFT JOIN {{ source('upstream', 'source') }} s USING (id)
 
 | Option | Default | Description
 | :---:    |  :---:    | ---
-| location | [external_location](/dbt/include/duckdb/macros/utils/external_location.sql) macro | The path to write the external materialization to. See below for more details.
+| location | [external_location](dbt/include/duckdb/macros/utils/external_location.sql) macro | The path to write the external materialization to. See below for more details.
 | format | parquet | The format of the external file (parquet, csv, or json)
 | delimiter | ,    | For CSV files, the delimiter to use for fields.
 | options | None | Any other options to pass to DuckDB's `COPY` operation (e.g., `partition_by`, `codec`, etc.)
