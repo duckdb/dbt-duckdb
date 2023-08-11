@@ -52,4 +52,21 @@ class Plugin(BasePlugin):
         else:
             sheet = doc.sheet1
 
-        return pd.DataFrame(sheet.get_all_records())
+        if "range" in source_config:
+            range = source_config["range"]
+            df = pd.DataFrame(sheet.get(range))
+            if "headers" in source_config:
+                headers = source_config["headers"]
+                if len(headers) == len(df.columns):
+                    df.columns = headers
+                    return df
+                else:
+                    raise Exception(
+                        f"Number of configured headers ({len(headers)}) does not match number of columns in fetched range ({len(df.columns)})."
+                    )
+            else:
+                df.rename(columns=df.iloc[0]).drop(df.index[0]).reset_index(drop=True)
+                return df
+
+        else:
+            return pd.DataFrame(sheet.get_all_records())
