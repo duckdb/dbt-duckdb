@@ -8,7 +8,7 @@ boto3
 mypy-boto3-glue
 pandas==2.0.0
 pyarrow
-black==23.7.0
+black==23.9.1
 buenavista
 bumpversion
 flake8
