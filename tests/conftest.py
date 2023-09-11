@@ -64,6 +64,10 @@ def dbt_profile_target(profile_type, bv_server_process, tmp_path_factory):
         profile["path"] = str(tmp_path_factory.getbasetemp() / "tmp.db")
     elif profile_type == "md":
         # Test against MotherDuck
+        if "MOTHERDUCK_TOKEN" not in os.environ:
+            raise ValueError(
+                "Please set the MOTHERDUCK_TOKEN environment variable to run tests against MotherDuck"
+            )
         profile["disable_transactions"] = True
         profile["path"] = "md:test"
     elif profile_type == "memory":
