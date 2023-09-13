@@ -202,6 +202,10 @@ def materialize(df, con):
 
 {% macro render_write_options(config) -%}
   {% set options = config.get('options', {}) %}
+  {% if options is not mapping %}
+    {% do exceptions.raise_compiler_error("The options argument must be a dictionary") %}
+  {% endif %}
+
   {% for k in options %}
     {% if options[k] is string %}
       {% set _ = options.update({k: render(options[k])}) %}
