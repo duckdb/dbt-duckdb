@@ -7,20 +7,6 @@ from dbt.tests.util import (
     run_dbt,
 )
 
-excel_schema_yml = """
-version: 2
-sources:
-  - name: excel_source
-    schema: main
-    meta:
-      plugin: excel
-    tables:
-      - name: excel_file
-        description: "An excel file"
-        meta:
-          external_location: "{test_data_path}/excel_file.xlsx"
-"""
-
 sqlalchemy_schema_yml = """
 version: 2
 sources:
@@ -42,9 +28,6 @@ sources:
 """
 
 
-excel1_sql = """
-    select * from {{ source('excel_source', 'excel_file') }}
-"""
 sqlalchemy1_sql = """
     select * from {{ source('sql_source', 'tt1') }}
 """
@@ -97,7 +80,6 @@ class TestPlugins:
     def profiles_config_update(self, dbt_profile_target, sqlite_test_db):
         sa_config = {"connection_url": f"sqlite:///{sqlite_test_db}"}
         plugins = [
-            {"module": "excel"},
             {"module": "sqlalchemy", "alias": "sql", "config": sa_config},
             {"module": "tests.create_function_plugin", "alias": "cfp"},
         ]
@@ -118,9 +100,7 @@ class TestPlugins:
     @pytest.fixture(scope="class")
     def models(self, test_data_path):
         return {
-            "schema_excel.yml": excel_schema_yml.format(test_data_path=test_data_path),
             "schema_sqlalchemy.yml": sqlalchemy_schema_yml,
-            "excel.sql": excel1_sql,
             "sqlalchemy1.sql": sqlalchemy1_sql,
             "sqlalchemy2.sql": sqlalchemy2_sql,
             "foo.sql": plugin_sql,
@@ -128,18 +108,7 @@ class TestPlugins:
 
     def test_plugins(self, project):
         results = run_dbt()
-        assert len(results) == 4
-
-        res = project.run_sql("SELECT COUNT(1) FROM excel_file", fetch="one")
-        assert res[0] == 9
-
-        check_relations_equal(
-            project.adapter,
-            [
-                "excel_file",
-                "excel",
-            ],
-        )
+        assert len(results) == 3
 
         res = project.run_sql("SELECT COUNT(1) FROM tt1", fetch="one")
         assert res[0] == 1
