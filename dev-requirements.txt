@@ -6,7 +6,7 @@ dbt-tests-adapter==1.6.2
 
 boto3
 mypy-boto3-glue
-pandas==2.0.0
+pandas==2.1.0
 pyarrow
 black==23.9.1
 buenavista
