@@ -26,8 +26,8 @@ A super-minimal dbt-duckdb profile only needs *one* setting:
 ````
 default:
   outputs:
-   dev:
-     type: duckdb
+    dev:
+      type: duckdb
   target: dev
 ````
 
@@ -40,7 +40,7 @@ To have your dbt pipeline persist relations in a DuckDB file, set the `path` fie
 of the DuckDB file that you would like to read and write on your local filesystem. (For in-memory pipelines, the `path`
 is automatically set to the special value `:memory:`).
 
-`dbt-duckdb` also supports common profile fields like `schema` and `threads`, but the `database` property is special: it's value is automatically set
+`dbt-duckdb` also supports common profile fields like `schema` and `threads`, but the `database` property is special: its value is automatically set
 to the basename of the file in the `path` argument with the suffix removed. For example, if the `path` is `/tmp/a/dbfile.duckdb`, the `database`
 field will be set to `dbfile`. If you are running in in-memory mode, then the `database` property will be automatically set to `memory`.
 
@@ -80,7 +80,7 @@ default:
   target: dev
 ```
 
-As of verion `1.4.1`, we have added (experimental!) support for DuckDB's (experimental!) support for filesystems
+As of version `1.4.1`, we have added (experimental!) support for DuckDB's (experimental!) support for filesystems
 implemented via [fsspec](https://duckdb.org/docs/guides/python/filesystems.html). The `fsspec` library provides
 support for reading and writing files from a [variety of cloud data storage systems](https://filesystem-spec.readthedocs.io/en/latest/api.html#other-known-implementations)
 including S3, GCS, and Azure Blob Storage. You can configure a list of fsspec-compatible implementations for use with your dbt-duckdb project by installing the relevant Python modules
@@ -199,7 +199,7 @@ them from the database first.
 
 #### Reading from external files
 
-You may reference external files in your dbt model's either directly or as dbt `source`s by configuring the `external_location`
+You may reference external files in your dbt models either directly or as dbt `source`s by configuring the `external_location`
 meta option on the source:
 
 ```
