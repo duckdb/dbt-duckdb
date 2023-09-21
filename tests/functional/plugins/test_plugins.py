@@ -52,7 +52,8 @@ sqlalchemy2_sql = """
    {{ config(materialized='external', plugin='sql') }}
     select * from {{ source('sql_source', 'tt2') }}
 """
-foo_sql = """
+plugin_sql = """
+    {{ config(materialized='external', plugin='cfp', key='value') }}
     select foo() as foo
 """
 
@@ -98,7 +99,7 @@ class TestPlugins:
         plugins = [
             {"module": "excel"},
             {"module": "sqlalchemy", "alias": "sql", "config": sa_config},
-            {"module": "tests.create_function_plugin"},
+            {"module": "tests.create_function_plugin", "alias": "cfp"},
         ]
 
         return {
@@ -122,7 +123,7 @@ class TestPlugins:
             "excel.sql": excel1_sql,
             "sqlalchemy1.sql": sqlalchemy1_sql,
             "sqlalchemy2.sql": sqlalchemy2_sql,
-            "foo.sql": foo_sql,
+            "foo.sql": plugin_sql,
         }
 
     def test_plugins(self, project):
