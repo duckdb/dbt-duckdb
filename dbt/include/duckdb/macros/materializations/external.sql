@@ -83,7 +83,7 @@
       {# legacy hack to set the glue database name, deprecate this #}
       {%- set plugin_name = 'glue|' ~ config.get('glue_database', 'default') -%}
     {% endif %}
-    {% do store_relation(plugin_name, target_relation, location, format) %}
+    {% do store_relation(plugin_name, target_relation, location, format, config) %}
   {% endif %}
 
   {{ run_hooks(post_hooks, inside_transaction=False) }}

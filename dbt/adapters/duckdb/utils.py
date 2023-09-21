@@ -7,6 +7,7 @@ from typing import Sequence
 
 from dbt.adapters.base.column import Column
 from dbt.adapters.base.relation import BaseRelation
+from dbt.context.providers import RuntimeConfigObject
 from dbt.contracts.graph.nodes import SourceDefinition
 
 
@@ -74,12 +75,14 @@ class TargetLocation:
 class TargetConfig:
     relation: BaseRelation
     column_list: Sequence[Column]
+    config: RuntimeConfigObject
     location: Optional[TargetLocation] = None
 
     def as_dict(self) -> Dict[str, Any]:
         base = {
             "relation": self.relation.to_dict(),
             "column_list": [{"column": c.column, "dtype": c.dtype} for c in self.column_list],
+            "config": self.config,
         }
         if self.location:
             base["location"] = self.location.as_dict()
