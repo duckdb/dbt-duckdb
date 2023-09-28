@@ -17,6 +17,19 @@ class DuckDBRelation(BaseRelation):
 
     @classmethod
     def create_from_source(cls: Type[Self], source: SourceDefinition, **kwargs: Any) -> Self:
+        """
+        This method creates a new DuckDBRelation instance from a source definition.
+        It first checks if a 'plugin' is defined in the meta argument for the source or its parent configuration.
+        If a 'plugin' is defined, it uses the environment associated with this run to get the name of the source that we should reference in the compiled model.
+        If an 'external_location' is defined, it formats the location based on the 'formatter' defined in the source configuration.
+        If the 'formatter' is not recognized, it raises a ValueError.
+        Finally, it calls the parent class's create_from_source method to create the DuckDBRelation instance.
+
+        :param cls: The class that this method is a part of.
+        :param source: The source definition to create the DuckDBRelation from.
+        :param kwargs: Additional keyword arguments.
+        :return: A new DuckDBRelation instance.
+        """
         source_config = SourceConfig.create_from_source(source)
         # First check to see if a 'plugin' is defined in the meta argument for
         # the source or its parent configuration, and if it is, use the environment

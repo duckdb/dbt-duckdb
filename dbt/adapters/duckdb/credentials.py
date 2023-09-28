@@ -161,6 +161,11 @@ class DuckDBCredentials(Credentials):
 
     @property
     def unique_field(self) -> str:
+        """
+        This property returns a unique field for the database connection.
+        If the connection is remote, it returns the host and port as a string.
+        If the connection is local, it returns the path and external root as a string.
+        """
         if self.remote:
             return self.remote.host + str(self.remote.port)
         else:
@@ -201,12 +206,19 @@ class DuckDBCredentials(Credentials):
 
 
 def _get_ttl_hash(seconds=300):
-    """Return the same value withing `seconds` time period"""
     return round(time.time() / seconds)
 
 
 @lru_cache()
 def _load_aws_credentials(ttl=None) -> Dict[str, Any]:
+    """
+    Load AWS credentials from the environment.
+
+    This function is cached to prevent unnecessary calls to the AWS API.
+
+    :param ttl: Time to live for the cache. If None, the cache will not expire.
+    :return: A dictionary containing the AWS credentials which can be used to configure DuckDB settings.
+    """
     del ttl  # make mypy happy
     import boto3.session
 
