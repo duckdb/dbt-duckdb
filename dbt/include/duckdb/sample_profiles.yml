@@ -1,0 +1,11 @@
+default:
+  outputs:
+    dev:
+      type: duckdb
+      path: dev.duckdb
+
+    prod:
+      type: duckdb
+      path: prod.duckdb
+
+  target: dev
