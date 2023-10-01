@@ -34,3 +34,4 @@ sqlalchemy
 tox>=3.13
 twine
 wheel
+deltalake
