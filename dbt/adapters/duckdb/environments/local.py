@@ -6,8 +6,7 @@ from .. import utils
 from dbt.contracts.connection import AdapterResponse
 from dbt.exceptions import DbtRuntimeError
 
-_REGISTERED_DF = {}
-
+_REGISTERED_DF: dict = {}
 
 class DuckDBCursorWrapper:
     def __init__(self, cursor):
@@ -17,10 +16,12 @@ class DuckDBCursorWrapper:
     def __getattr__(self, name):
         return getattr(self._cursor, name)
 
-    def execute(self, sql, bindings=None):
-        # register_df(self._cursor, _REGISTERED_DF)
+    def execute(self, sql, bindings=None):   
+        #register all dfs 
+        #TODO is this okey to be here? 
         for df_name, df in _REGISTERED_DF.items():
             self._cursor.register(df_name, df)
+            
         try:
             if bindings is None:
                 return self._cursor.execute(sql)
@@ -75,7 +76,6 @@ class LocalEnvironment(Environment):
                 self.conn = self.initialize_db(self.creds, self._plugins)
             self.handle_count += 1
         cursor = self.initialize_cursor(self.creds, self.conn.cursor())
-        # register_df(cursor, self._registered_df)
         return DuckDBConnectionWrapper(cursor, self)
 
     def submit_python_job(
@@ -118,11 +118,12 @@ class LocalEnvironment(Environment):
                     # Nothing to do (we ignore the existing table)
                     return
         df = plugin.load(source_config)
-        df_name = source_config.identifier + "_df"
         assert df is not None
+        df_name = source_config.identifier + "_df"
+        #this can be problem with other plugins because they will be loaded into memory e.g excel
+        _REGISTERED_DF[df_name] = df
+
         if plugin_name == "delta":
-            _REGISTERED_DF[df_name] = df
-            cursor.register_df(df_name, df)
             materialization = source_config.meta.get("materialization", "view")
         else:
             materialization = source_config.meta.get("materialization", "table")
@@ -130,6 +131,7 @@ class LocalEnvironment(Environment):
         cursor.execute(
             f"CREATE OR REPLACE {materialization} {source_config.table_name()} AS SELECT * FROM {df_name}"
         )
+        
         cursor.close()
         handle.close()
 
@@ -159,8 +161,3 @@ class LocalEnvironment(Environment):
 
     def __del__(self):
         self.close()
-
-
-def register_df(cursor, df_dict):
-    for df_name, df in df_dict.items():
-        cursor.register(df_name, df)

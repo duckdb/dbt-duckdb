@@ -19,7 +19,7 @@ class Plugin(BasePlugin):
             raise Exception(
                 "'delta_table_path' is a required argument for the delta table!"
             )
-        logger.debug(source_config)
+        #logger.debug(source_config)
         table_path = source_config["delta_table_path"]
         storage_options = source_config.get("storage", None)
 
@@ -33,23 +33,12 @@ class Plugin(BasePlugin):
         as_of_datetime = source_config.get("as_of_datetime", None)
 
         if as_of_version:
-            dt.load_version(1)
+            dt.load_version(as_of_version)
 
         if as_of_datetime:
             dt.load_with_datetime(as_of_datetime)
 
-        # prunning attributes
-        pruning_filter = source_config.get("pruning_filter", "1=1")
-        pruning_projection = source_config.get("pruning_projection", "*")
-
-        df_db = duckdb.arrow(dt.to_pyarrow_table())
-        df_db_pruned = df_db.filter(pruning_filter).project(pruning_projection)
-
-        logger.debug(df_db_pruned.explain())
-        return df_db_pruned
-
-
-# TODO each node calls plugin.load indipendent which is maybe overhead?
+        return dt.to_pyarrow_table()
 
 # Future
 # TODO add deltalake storage options

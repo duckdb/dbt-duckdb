@@ -32,17 +32,6 @@ delta1_sql = """
     select * from {{ source('delta_source', 'table_1') }}
 """
 
-# plugin_sql = """
-#     {{ config(materialized='external', plugin='cfp', key='value') }}
-#     select foo() as foo
-# """
-
-# # Reads from a MD database in my test account in the cloud
-# md_sql = """
-#     select * FROM plugin_test.main.plugin_table
-# """
-
-
 @pytest.mark.skip_profile("buenavista", "md")
 class TestPlugins:
     @pytest.fixture(scope="class")
