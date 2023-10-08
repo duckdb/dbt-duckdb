@@ -106,11 +106,18 @@ class Environment(abc.ABC):
         return conn
 
     @classmethod
-    def initialize_cursor(cls, creds: DuckDBCredentials, cursor):
+    def initialize_cursor(cls, creds: DuckDBCredentials, cursor, plugins: Optional[Dict[str, BasePlugin]] = None):
         for key, value in creds.load_settings().items():
             # Okay to set these as strings because DuckDB will cast them
             # to the correct type
             cursor.execute(f"SET {key} = '{value}'")
+
+        #update cursor if something is lost in the copy 
+        #of the parent connection 
+        if plugins:
+            for plugin in plugins.values():
+                plugin.configure_cursor(cursor)
+
         return cursor
 
     @classmethod

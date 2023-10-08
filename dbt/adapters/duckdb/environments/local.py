@@ -6,7 +6,6 @@ from .. import utils
 from dbt.contracts.connection import AdapterResponse
 from dbt.exceptions import DbtRuntimeError
 
-_REGISTERED_DF: dict = {}
 
 class DuckDBCursorWrapper:
     def __init__(self, cursor):
@@ -17,11 +16,6 @@ class DuckDBCursorWrapper:
         return getattr(self._cursor, name)
 
     def execute(self, sql, bindings=None):   
-        #register all dfs 
-        #TODO is this okey to be here? 
-        for df_name, df in _REGISTERED_DF.items():
-            self._cursor.register(df_name, df)
-            
         try:
             if bindings is None:
                 return self._cursor.execute(sql)
@@ -29,10 +23,6 @@ class DuckDBCursorWrapper:
                 return self._cursor.execute(sql, bindings)
         except RuntimeError as e:
             raise DbtRuntimeError(str(e))
-
-    def register_df(self, df_name, df):
-        self._cursor.register(df_name, df)
-
 
 class DuckDBConnectionWrapper:
     def __init__(self, cursor, env):
@@ -75,7 +65,8 @@ class LocalEnvironment(Environment):
             if self.conn is None:
                 self.conn = self.initialize_db(self.creds, self._plugins)
             self.handle_count += 1
-        cursor = self.initialize_cursor(self.creds, self.conn.cursor())
+            
+        cursor = self.initialize_cursor(self.creds, self.conn.cursor(), self._plugins)
         return DuckDBConnectionWrapper(cursor, self)
 
     def submit_python_job(
@@ -119,18 +110,14 @@ class LocalEnvironment(Environment):
                     return
         df = plugin.load(source_config)
         assert df is not None
-        df_name = source_config.identifier + "_df"
-        #this can be problem with other plugins because they will be loaded into memory e.g excel
-        _REGISTERED_DF[df_name] = df
 
-        if plugin_name == "delta":
-            materialization = source_config.meta.get("materialization", "view")
+        if plugin_name == "delta": # potentially should all plugins use configure_cursor
+            plugin.configure_cursor(cursor)
         else:
             materialization = source_config.meta.get("materialization", "table")
-
-        cursor.execute(
-            f"CREATE OR REPLACE {materialization} {source_config.table_name()} AS SELECT * FROM {df_name}"
-        )
+            cursor.execute(
+                f"CREATE OR REPLACE {materialization} {source_config.table_name()} AS SELECT * FROM df"
+            )
         
         cursor.close()
         handle.close()

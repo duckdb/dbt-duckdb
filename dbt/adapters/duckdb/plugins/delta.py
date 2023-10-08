@@ -11,8 +11,15 @@ from dbt.logger import GLOBAL_LOGGER as logger
 
 class Plugin(BasePlugin):
     def initialize(self, config: Dict[str, Any]):
-        # place for init catalog in the future
-        pass
+        self._REGISTERED_DF: dict = {}
+    
+    def configure_cursor(self, cursor):
+        for source_table_name, df in self._REGISTERED_DF.items():
+            df_name = source_table_name.replace(".", "_") + "_df"
+            cursor.register(df_name, df)
+            cursor.execute(
+                f"CREATE OR REPLACE VIEW {source_table_name} AS SELECT * FROM {df_name}"
+            )
 
     def load(self, source_config: SourceConfig):
         if "delta_table_path" not in source_config:
@@ -38,8 +45,12 @@ class Plugin(BasePlugin):
         if as_of_datetime:
             dt.load_with_datetime(as_of_datetime)
 
-        return dt.to_pyarrow_table()
+        df = dt.to_pyarrow_table()
+
+        ##save to register it later 
+        self._REGISTERED_DF[source_config.table_name()] = df
+
+        return df
 
 # Future
-# TODO add deltalake storage options
 # TODO add databricks catalog
