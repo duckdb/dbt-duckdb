@@ -111,9 +111,7 @@ class LocalEnvironment(Environment):
         df = plugin.load(source_config)
         assert df is not None
 
-        if plugin_name == "delta": # potentially should all plugins use configure_cursor
-            plugin.configure_cursor(cursor)
-        else:
+        if plugin_name not in ["delta"]: # plugins which configure cursor itselfs
             materialization = source_config.meta.get("materialization", "table")
             cursor.execute(
                 f"CREATE OR REPLACE {materialization} {source_config.table_name()} AS SELECT * FROM df"
