@@ -125,7 +125,9 @@ class Environment(abc.ABC):
         return ret
 
     @classmethod
-    def run_python_job(cls, con, load_df_function, identifier: str, compiled_code: str):
+    def run_python_job(
+        cls, con, load_df_function, identifier: str, compiled_code: str, creds: DuckDBCredentials
+    ):
         mod_file = tempfile.NamedTemporaryFile(suffix=".py", delete=False)
         mod_file.write(compiled_code.lstrip().encode("utf-8"))
         mod_file.close()
@@ -149,7 +151,7 @@ class Environment(abc.ABC):
                 )
 
             # Create a separate read cursor to enable batched reads/writes
-            cur = self.initialize_cursor(self.creds, con.cursor())
+            cur = cls.initialize_cursor(creds, con.cursor())
             # Do the actual work to run the code here
             dbt = module.dbtObj(load_df_function)
             df = module.model(dbt, cur)
