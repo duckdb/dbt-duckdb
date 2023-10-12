@@ -148,9 +148,11 @@ class Environment(abc.ABC):
                     "Python module spec is missing loader: {}".format(identifier)
                 )
 
+            # Create a separate read cursor to enable batched reads/writes
+            cur = con.cursor()
             # Do the actual work to run the code here
             dbt = module.dbtObj(load_df_function)
-            df = module.model(dbt, con)
+            df = module.model(dbt, cur)
             module.materialize(df, con)
         except Exception as err:
             raise DbtRuntimeError(f"Python model failed:\n" f"{err}")
