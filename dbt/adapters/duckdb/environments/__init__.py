@@ -125,7 +125,9 @@ class Environment(abc.ABC):
         return ret
 
     @classmethod
-    def run_python_job(cls, con, load_df_function, identifier: str, compiled_code: str):
+    def run_python_job(
+        cls, con, load_df_function, identifier: str, compiled_code: str, creds: DuckDBCredentials
+    ):
         mod_file = tempfile.NamedTemporaryFile(suffix=".py", delete=False)
         mod_file.write(compiled_code.lstrip().encode("utf-8"))
         mod_file.close()
@@ -148,9 +150,11 @@ class Environment(abc.ABC):
                     "Python module spec is missing loader: {}".format(identifier)
                 )
 
+            # Create a separate read cursor to enable batched reads/writes
+            cur = cls.initialize_cursor(creds, con.cursor())
             # Do the actual work to run the code here
             dbt = module.dbtObj(load_df_function)
-            df = module.model(dbt, con)
+            df = module.model(dbt, cur)
             module.materialize(df, con)
         except Exception as err:
             raise DbtRuntimeError(f"Python model failed:\n" f"{err}")

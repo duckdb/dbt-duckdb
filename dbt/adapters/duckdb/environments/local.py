@@ -75,7 +75,7 @@ class LocalEnvironment(Environment):
         def ldf(table_name):
             return con.query(f"select * from {table_name}")
 
-        self.run_python_job(con, ldf, parsed_model["alias"], compiled_code)
+        self.run_python_job(con, ldf, parsed_model["alias"], compiled_code, self.creds)
         return AdapterResponse(_message="OK")
 
     def load_source(self, plugin_name: str, source_config: utils.SourceConfig):
