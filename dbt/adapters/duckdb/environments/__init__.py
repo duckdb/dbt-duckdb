@@ -149,7 +149,7 @@ class Environment(abc.ABC):
                 )
 
             # Create a separate read cursor to enable batched reads/writes
-            cur = con.cursor()
+            cur = self.initialize_cursor(self.creds, con.cursor())
             # Do the actual work to run the code here
             dbt = module.dbtObj(load_df_function)
             df = module.model(dbt, cur)
