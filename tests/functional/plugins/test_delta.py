@@ -1,6 +1,4 @@
-import os
 import pytest
-import sqlite3
 from pathlib import Path
 import shutil
 import pandas as pd
@@ -15,15 +13,24 @@ delta_schema_yml = """
 version: 2
 sources:
   - name: delta_source
-    schema: main
     meta:
       plugin: delta
     tables:
       - name: table_1
         description: "An delta table"
         meta:
-          materialization: "view"
-          delta_table_path: "{test_delta_path}"
+          delta_table_path: "{test_delta_path1}"
+
+  - name: delta_source_test
+    schema: test
+    meta:
+      plugin: delta
+    tables:
+      - name: table_2
+        description: "An delta table"
+        meta:
+          delta_table_path: "{test_delta_path2}"
+          as_of_version: 0
 """
 
 
@@ -31,15 +38,45 @@ delta1_sql = """
     {{ config(materialized='table') }}
     select * from {{ source('delta_source', 'table_1') }}
 """
+delta2_sql = """
+    {{ config(materialized='table') }}
+    select * from {{ source('delta_source', 'table_1') }} limit 1
+"""
+delta3_sql = """
+    {{ config(materialized='table') }}
+    select * as a from {{ source('delta_source_test', 'table_2') }} WHERE y = 'd'
+"""
+
 
 @pytest.mark.skip_profile("buenavista", "md")
 class TestPlugins:
     @pytest.fixture(scope="class")
-    def delta_test_table(self):
+    def delta_test_table1(self):
         path = Path("/tmp/test_delta")
-        table_path = path / "test_delta_table"
+        table_path = path / "test_delta_table1"
 
         df = pd.DataFrame({"x": [1, 2, 3]})
+        write_deltalake(table_path, df, mode="overwrite")
+
+        yield table_path
+
+        shutil.rmtree(table_path)
+
+    @pytest.fixture(scope="class")
+    def delta_test_table2(self):
+        path = Path("/workspaces/dbt-duckdb/.vscode/test_delta")
+        table_path = path / "test_delta_table2"
+
+        df = pd.DataFrame({
+            "x": [1, 2, 3, 2, 3, 4, 5, 6],
+            "y": ["a", "b", "b", "c", "d", "c", "d", "a"]                   
+        })
+        write_deltalake(table_path, df, mode="overwrite")
+
+        df = pd.DataFrame({
+            "x": [1, 2],
+            "y": ["a","b"]                   
+        })
         write_deltalake(table_path, df, mode="overwrite")
 
         yield table_path
@@ -63,14 +100,20 @@ class TestPlugins:
         }
 
     @pytest.fixture(scope="class")
-    def models(self, delta_test_table):
+    def models(self, delta_test_table1,delta_test_table2):
         return {
             "source_schema.yml": delta_schema_yml.format(
-                test_delta_path=delta_test_table
+                test_delta_path1=delta_test_table1,
+                test_delta_path2=delta_test_table2
             ),
-            "delta_table.sql": delta1_sql,
+            "delta_table1.sql": delta1_sql,
+            "delta_table2.sql": delta2_sql,
+            "delta_table3.sql": delta3_sql,
         }
 
     def test_plugins(self, project):
         results = run_dbt()
-        assert len(results) == 1
+        assert len(results) == 3
+
+        # res = project.run_sql("SELECT count(1) FROM 'delta_table3'", fetch="one")
+        # assert res[0] == 2

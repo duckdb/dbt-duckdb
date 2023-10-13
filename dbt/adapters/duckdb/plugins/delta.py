@@ -1,6 +1,5 @@
 from typing import Any
 from typing import Dict
-import duckdb
 
 from deltalake import DeltaTable
 
@@ -26,12 +25,12 @@ class Plugin(BasePlugin):
             raise Exception(
                 "'delta_table_path' is a required argument for the delta table!"
             )
-        #logger.debug(source_config)
+        
         table_path = source_config["delta_table_path"]
-        storage_options = source_config.get("storage", None)
+        storage_options = source_config.get("storage_options", None)
 
         if storage_options:
-            dt = DeltaTable(table_path, storage_options)
+            dt = DeltaTable(table_path, storage_options=storage_options)
         else:
             dt = DeltaTable(table_path)
 
@@ -46,7 +45,7 @@ class Plugin(BasePlugin):
             dt.load_with_datetime(as_of_datetime)
 
         df = dt.to_pyarrow_table()
-
+        
         ##save to register it later 
         self._REGISTERED_DF[source_config.table_name()] = df
 

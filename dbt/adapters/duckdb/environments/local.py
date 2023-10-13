@@ -89,6 +89,10 @@ class LocalEnvironment(Environment):
         plugin = self._plugins[plugin_name]
         handle = self.handle()
         cursor = handle.cursor()
+
+        if source_config.schema:
+            cursor.execute(f"CREATE SCHEMA IF NOT EXISTS {source_config.schema}")
+
         save_mode = source_config.get("save_mode", "overwrite")
         if save_mode in ("ignore", "error_if_exists"):
             params = [source_config.schema, source_config.identifier]
