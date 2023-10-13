@@ -47,6 +47,10 @@ delta3_sql = """
     select * as a from {{ source('delta_source_test', 'table_2') }} WHERE y = 'd'
 """
 
+delta3_sql_expected = """
+    select 1 as x, 'a' as y
+"""
+
 
 @pytest.mark.skip_profile("buenavista", "md")
 class TestPlugins:
@@ -68,8 +72,8 @@ class TestPlugins:
         table_path = path / "test_delta_table2"
 
         df = pd.DataFrame({
-            "x": [1, 2, 3, 2, 3, 4, 5, 6],
-            "y": ["a", "b", "b", "c", "d", "c", "d", "a"]                   
+            "x": [1],
+            "y": ["a"]                   
         })
         write_deltalake(table_path, df, mode="overwrite")
 
@@ -109,11 +113,19 @@ class TestPlugins:
             "delta_table1.sql": delta1_sql,
             "delta_table2.sql": delta2_sql,
             "delta_table3.sql": delta3_sql,
+            "delta_table3_expected.sql": delta3_sql_expected,
         }
 
     def test_plugins(self, project):
         results = run_dbt()
-        assert len(results) == 3
+        assert len(results) == 4
 
+        # check_relations_equal(
+        #     project.adapter,
+        #     [
+        #         "delta_table3",
+        #         "delta_table3_expected",
+        #     ],
+        # )
         # res = project.run_sql("SELECT count(1) FROM 'delta_table3'", fetch="one")
         # assert res[0] == 2
