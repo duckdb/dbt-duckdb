@@ -183,7 +183,7 @@ Please remember that using plugins may require you to add additional dependencie
 * `gsheet` depends on `gspread` and `pandas`
 *  `iceberg` depends on `pyiceberg` and Python >= 3.8
 * `sqlalchemy` depends on `pandas`, `sqlalchemy`, and the driver(s) you need
-* `delta` depends on `deltalake`, [a example project](https://github.com/milicevica23/dbt-duckdb-delta-plugin-demo)
+* `delta` depends on `deltalake`, [an example project](https://github.com/milicevica23/dbt-duckdb-delta-plugin-demo)
 
 #### Using Local Python Modules
 
