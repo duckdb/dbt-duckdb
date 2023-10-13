@@ -154,8 +154,8 @@ class Environment(abc.ABC):
             cur = cls.initialize_cursor(creds, con.cursor())
             # Do the actual work to run the code here
             dbt = module.dbtObj(load_df_function)
-            df = module.model(dbt, cur)
-            module.materialize(df, con)
+            df = module.model(dbt, con)
+            module.materialize(df, cur)
         except Exception as err:
             raise DbtRuntimeError(f"Python model failed:\n" f"{err}")
         finally:
