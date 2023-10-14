@@ -334,7 +334,7 @@ any Python object that DuckDB knows how to turn into a table, including a Pandas
 
 #### Batch processing with Python models
 
-As of version 1.7.0, it is possible to both read and write data in chunks, which allows for larger-than-memory
+As of version 1.6.1, it is possible to both read and write data in chunks, which allows for larger-than-memory
 datasets to be manipulated in Python models. Here is a basic example:
 ```
 import pyarrow as pa
