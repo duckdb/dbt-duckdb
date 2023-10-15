@@ -150,12 +150,17 @@ class Environment(abc.ABC):
                     "Python module spec is missing loader: {}".format(identifier)
                 )
 
-            # Create a separate read cursor to enable batched reads/writes
-            cur = cls.initialize_cursor(creds, con.cursor())
             # Do the actual work to run the code here
             dbt = module.dbtObj(load_df_function)
             df = module.model(dbt, con)
-            module.materialize(df, cur)
+            if isinstance(df, duckdb.DuckDBPyRelation):
+                # a duckdb relation might contain references to temporary tables
+                # that cannot cross cursor boundaries
+                module.materialize(df, con)
+            else:
+                # Create a separate read cursor to enable batched reads/writes
+                cur = cls.initialize_cursor(creds, con.cursor())
+                module.materialize(df, cur)
         except Exception as err:
             raise DbtRuntimeError(f"Python model failed:\n" f"{err}")
         finally:

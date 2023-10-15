@@ -103,6 +103,30 @@ class TestEmptyPythonModel:
         )
         assert result == [("a", "VARCHAR"), ("b", "BOOLEAN")]
 
+temp_upstream_model_python = """
+def model(dbt, con):
+    dbt.config(
+        materialized='table',
+    )
+    con.execute("create temp table t(a int)")
+    return con.table("t")
+"""
+
+
+class TestTempTablePythonModel:
+    """
+    This test ensures that Python models returning a DuckDBPyRelation based
+    on a temporary duckdb table can still be materialized
+    """
+
+    @pytest.fixture(scope="class")
+    def models(self):
+        return {
+            "upstream_model.py": temp_upstream_model_python,
+        }
+    
+    def test_run(self, project):
+        run_dbt(["run"])
 
 python_pyarrow_table_model = """
 import pyarrow as pa
