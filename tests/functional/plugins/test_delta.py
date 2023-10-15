@@ -1,7 +1,7 @@
 import pytest
 from pathlib import Path
-import shutil
 import pandas as pd
+import tempfile
 
 from dbt.tests.util import (
     check_relations_equal,
@@ -56,7 +56,8 @@ delta3_sql_expected = """
 class TestPlugins:
     @pytest.fixture(scope="class")
     def delta_test_table1(self):
-        path = Path("/tmp/test_delta")
+        td = tempfile.TemporaryDirectory() 
+        path = Path(td.name)
         table_path = path / "test_delta_table1"
 
         df = pd.DataFrame({"x": [1, 2, 3]})
@@ -64,11 +65,12 @@ class TestPlugins:
 
         yield table_path
 
-        shutil.rmtree(table_path)
+        td.cleanup()
 
     @pytest.fixture(scope="class")
     def delta_test_table2(self):
-        path = Path("/workspaces/dbt-duckdb/.vscode/test_delta")
+        td = tempfile.TemporaryDirectory() 
+        path = Path(td.name)
         table_path = path / "test_delta_table2"
 
         df = pd.DataFrame({
@@ -85,7 +87,7 @@ class TestPlugins:
 
         yield table_path
 
-        shutil.rmtree(table_path)
+        td.cleanup()
 
     @pytest.fixture(scope="class")
     def profiles_config_update(self, dbt_profile_target):
