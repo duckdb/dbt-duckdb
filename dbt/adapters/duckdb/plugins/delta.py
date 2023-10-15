@@ -44,7 +44,7 @@ class Plugin(BasePlugin):
         if as_of_datetime:
             dt.load_with_datetime(as_of_datetime)
 
-        df = dt.to_pyarrow_table()
+        df = dt.to_pyarrow_dataset()
         
         ##save to register it later 
         self._REGISTERED_DF[source_config.table_name()] = df
