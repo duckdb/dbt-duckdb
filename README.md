@@ -179,7 +179,7 @@ initialize the `sqlalchemy` plugin (aliased as "sql") with a `connection_url` th
 
 Please remember that using plugins may require you to add additional dependencies to the Python environment that your dbt-duckdb pipeline runs in:
 
-* `excel` depends on `pandas`
+* `excel` depends on `pandas`, and `openpyxl` or `xlsxwriter` to perform writes
 * `gsheet` depends on `gspread` and `pandas`
 *  `iceberg` depends on `pyiceberg` and Python >= 3.8
 * `sqlalchemy` depends on `pandas`, `sqlalchemy`, and the driver(s) you need
