@@ -14,7 +14,7 @@ This project is hosted on PyPI, so you should be able to install it and the nece
 
 `pip3 install dbt-duckdb`
 
-The latest supported version targets `dbt-core` 1.6.x and `duckdb` version 0.8.x, but we work hard to ensure that newer
+The latest supported version targets `dbt-core` 1.6.x and `duckdb` version 0.9.x, but we work hard to ensure that newer
 versions of DuckDB will continue to work with the adapter as they are released. If you would like to use our new (and experimental!)
 support for persisting the tables that DuckDB creates to the [AWS Glue Catalog](https://aws.amazon.com/glue/), you should install
 `dbt-duckdb[glue]` in order to get the AWS dependencies as well.
