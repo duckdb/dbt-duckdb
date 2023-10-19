@@ -10,22 +10,17 @@ from dbt.logger import GLOBAL_LOGGER as logger
 
 class Plugin(BasePlugin):
     def initialize(self, config: Dict[str, Any]):
-        self._REGISTERED_DF: dict = {}
-    
+        pass
+
     def configure_cursor(self, cursor):
-        for source_table_name, df in self._REGISTERED_DF.items():
-            df_name = source_table_name.replace(".", "_") + "_df"
-            cursor.register(df_name, df)
-            cursor.execute(
-                f"CREATE OR REPLACE VIEW {source_table_name} AS SELECT * FROM {df_name}"
-            )
+        pass
 
     def load(self, source_config: SourceConfig):
         if "delta_table_path" not in source_config:
             raise Exception(
                 "'delta_table_path' is a required argument for the delta table!"
             )
-        
+
         table_path = source_config["delta_table_path"]
         storage_options = source_config.get("storage_options", None)
 
@@ -45,9 +40,6 @@ class Plugin(BasePlugin):
             dt.load_with_datetime(as_of_datetime)
 
         df = dt.to_pyarrow_dataset()
-        
-        ##save to register it later 
-        self._REGISTERED_DF[source_config.table_name()] = df
 
         return df
 

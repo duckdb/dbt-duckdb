@@ -52,6 +52,7 @@ class LocalEnvironment(Environment):
             or credentials.path.startswith("md:")
             or credentials.path.startswith("motherduck:")
         )
+        self._REGISTERED_DF: dict = {}
 
     def notify_closed(self):
         with self.lock:
@@ -65,8 +66,10 @@ class LocalEnvironment(Environment):
             if self.conn is None:
                 self.conn = self.initialize_db(self.creds, self._plugins)
             self.handle_count += 1
-            
-        cursor = self.initialize_cursor(self.creds, self.conn.cursor(), self._plugins)
+
+        cursor = self.initialize_cursor(
+            self.creds, self.conn.cursor(), self._plugins, self._REGISTERED_DF
+        )
         return DuckDBConnectionWrapper(cursor, self)
 
     def submit_python_job(
@@ -115,12 +118,20 @@ class LocalEnvironment(Environment):
         df = plugin.load(source_config)
         assert df is not None
 
-        if plugin_name not in ["delta"]: # plugins which configure cursor itselfs
-            materialization = source_config.meta.get("materialization", "table")
-            cursor.execute(
-                f"CREATE OR REPLACE {materialization} {source_config.table_name()} AS SELECT * FROM df"
-            )
-        
+        materialization = source_config.meta.get("materialization", "table")
+        source_table_name = source_config.table_name()
+        df_name = source_table_name.replace(".", "_") + "_df"
+
+        cursor.register(df_name, df)
+
+        if materialization == "view":
+            ##save to df instance to register on each cursor creation
+            self._REGISTERED_DF[df_name] = df
+
+        cursor.execute(
+            f"CREATE OR REPLACE {materialization} {source_table_name} AS SELECT * FROM {df_name}"
+        )
+
         cursor.close()
         handle.close()
 
