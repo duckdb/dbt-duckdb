@@ -5,7 +5,6 @@ from deltalake import DeltaTable
 
 from . import BasePlugin
 from ..utils import SourceConfig
-from dbt.logger import GLOBAL_LOGGER as logger
 
 
 class Plugin(BasePlugin):
@@ -17,9 +16,7 @@ class Plugin(BasePlugin):
 
     def load(self, source_config: SourceConfig):
         if "delta_table_path" not in source_config:
-            raise Exception(
-                "'delta_table_path' is a required argument for the delta table!"
-            )
+            raise Exception("'delta_table_path' is a required argument for the delta table!")
 
         table_path = source_config["delta_table_path"]
         storage_options = source_config.get("storage_options", None)
@@ -42,6 +39,7 @@ class Plugin(BasePlugin):
         df = dt.to_pyarrow_dataset()
 
         return df
+
 
 # Future
 # TODO add databricks catalog

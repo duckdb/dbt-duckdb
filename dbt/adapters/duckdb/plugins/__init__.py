@@ -114,7 +114,7 @@ class BasePlugin:
 
     def configure_cursor(self, cursor):
         """
-        Configure each copy of the DuckDB cursor. 
+        Configure each copy of the DuckDB cursor.
         This method should be overridden by subclasses to provide additional
         attributes to the connection which are lost in the copy of the parent connection.
 

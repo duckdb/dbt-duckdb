@@ -15,7 +15,7 @@ class DuckDBCursorWrapper:
     def __getattr__(self, name):
         return getattr(self._cursor, name)
 
-    def execute(self, sql, bindings=None):   
+    def execute(self, sql, bindings=None):
         try:
             if bindings is None:
                 return self._cursor.execute(sql)
@@ -23,6 +23,7 @@ class DuckDBCursorWrapper:
                 return self._cursor.execute(sql, bindings)
         except RuntimeError as e:
             raise DbtRuntimeError(str(e))
+
 
 class DuckDBConnectionWrapper:
     def __init__(self, cursor, env):
@@ -72,9 +73,7 @@ class LocalEnvironment(Environment):
         )
         return DuckDBConnectionWrapper(cursor, self)
 
-    def submit_python_job(
-        self, handle, parsed_model: dict, compiled_code: str
-    ) -> AdapterResponse:
+    def submit_python_job(self, handle, parsed_model: dict, compiled_code: str) -> AdapterResponse:
         con = handle.cursor()
 
         def ldf(table_name):
@@ -109,9 +108,7 @@ class LocalEnvironment(Environment):
                 params.append(source_config.database)
             if cursor.execute(q, params).fetchone()[0]:
                 if save_mode == "error_if_exists":
-                    raise Exception(
-                        f"Source {source_config.table_name()} already exists!"
-                    )
+                    raise Exception(f"Source {source_config.table_name()} already exists!")
                 else:
                     # Nothing to do (we ignore the existing table)
                     return
@@ -125,7 +122,7 @@ class LocalEnvironment(Environment):
         cursor.register(df_name, df)
 
         if materialization == "view":
-            ##save to df instance to register on each cursor creation
+            # save to df instance to register on each cursor creation
             self._REGISTERED_DF[df_name] = df
 
         cursor.execute(
@@ -135,9 +132,7 @@ class LocalEnvironment(Environment):
         cursor.close()
         handle.close()
 
-    def store_relation(
-        self, plugin_name: str, target_config: utils.TargetConfig
-    ) -> None:
+    def store_relation(self, plugin_name: str, target_config: utils.TargetConfig) -> None:
         if plugin_name not in self._plugins:
             if plugin_name.startswith("glue|"):
                 from ..plugins import glue
