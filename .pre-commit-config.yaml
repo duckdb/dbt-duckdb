@@ -5,7 +5,7 @@ exclude: "^tests/.*"
 
 
 default_language_version:
-  python: python3.11
+  python: python3.8
 
 repos:
 - repo: https://github.com/pre-commit/pre-commit-hooks
