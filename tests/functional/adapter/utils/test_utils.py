@@ -11,10 +11,14 @@ from dbt.tests.adapter.utils.test_current_timestamp import BaseCurrentTimestampN
 from dbt.tests.adapter.utils.test_date_trunc import BaseDateTrunc
 from dbt.tests.adapter.utils.test_dateadd import BaseDateAdd
 from dbt.tests.adapter.utils.test_datediff import BaseDateDiff
+from dbt.tests.adapter.utils.test_date_spine import BaseDateSpine
 from dbt.tests.adapter.utils.test_escape_single_quotes import (
     BaseEscapeSingleQuotesQuote,
 )
 from dbt.tests.adapter.utils.test_except import BaseExcept
+from dbt.tests.adapter.utils.test_generate_series import BaseGenerateSeries
+from dbt.tests.adapter.utils.test_get_intervals_between import BaseGetIntervalsBetween
+from dbt.tests.adapter.utils.test_get_powers_of_two import BaseGetPowersOfTwo
 from dbt.tests.adapter.utils.test_hash import BaseHash
 from dbt.tests.adapter.utils.test_intersect import BaseIntersect
 from dbt.tests.adapter.utils.test_last_day import BaseLastDay
@@ -52,11 +56,26 @@ class TestDateDiff(BaseDateDiff):
     pass
 
 
+class TestDateSpine(BaseDateSpine):
+    pass
+
 class TestDateTrunc(BaseDateTrunc):
     pass
 
 
 class TestEscapeSingleQuotes(BaseEscapeSingleQuotesQuote):
+    pass
+
+
+class TestGenerateSeries(BaseGenerateSeries):
+    pass
+
+
+class TestGetIntervalsBetween(BaseGetIntervalsBetween):
+    pass
+
+
+class TestGetPowersOfTwo(BaseGetPowersOfTwo):
     pass
 
 
