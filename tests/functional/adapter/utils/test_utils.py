@@ -56,6 +56,9 @@ class TestDateDiff(BaseDateDiff):
     pass
 
 
+# Skipping this b/c the upstream utils test
+# is irritatingly adapter-specific at the moment
+@pytest.mark.skip
 class TestDateSpine(BaseDateSpine):
     pass
 
@@ -71,6 +74,9 @@ class TestGenerateSeries(BaseGenerateSeries):
     pass
 
 
+# Skipping this b/c the upstream utils test
+# is irritatingly adapter-specific at the moment
+@pytest.mark.skip
 class TestGetIntervalsBetween(BaseGetIntervalsBetween):
     pass
 
