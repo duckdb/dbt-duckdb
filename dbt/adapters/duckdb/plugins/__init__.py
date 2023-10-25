@@ -121,3 +121,6 @@ class BasePlugin:
         :param cursor: A DuckDBPyConnection instance to be configured.
         """
         pass
+
+    def default_materialization(self):
+        return "table"

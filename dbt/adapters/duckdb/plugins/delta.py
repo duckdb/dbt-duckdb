@@ -40,6 +40,8 @@ class Plugin(BasePlugin):
 
         return df
 
+    def default_materialization(self):
+        return "view"
 
 # Future
 # TODO add databricks catalog

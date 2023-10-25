@@ -115,7 +115,7 @@ class LocalEnvironment(Environment):
         df = plugin.load(source_config)
         assert df is not None
 
-        materialization = source_config.meta.get("materialization", "table")
+        materialization = source_config.meta.get("materialization", plugin.default_materialization())
         source_table_name = source_config.table_name()
         df_name = source_table_name.replace(".", "_") + "_df"
 
