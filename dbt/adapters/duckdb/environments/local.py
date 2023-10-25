@@ -53,6 +53,7 @@ class LocalEnvironment(Environment):
             or credentials.path.startswith("md:")
             or credentials.path.startswith("motherduck:")
         )
+        self._REGISTERED_DF: dict = {}
 
     def notify_closed(self):
         with self.lock:
@@ -66,7 +67,10 @@ class LocalEnvironment(Environment):
             if self.conn is None:
                 self.conn = self.initialize_db(self.creds, self._plugins)
             self.handle_count += 1
-        cursor = self.initialize_cursor(self.creds, self.conn.cursor())
+
+        cursor = self.initialize_cursor(
+            self.creds, self.conn.cursor(), self._plugins, self._REGISTERED_DF
+        )
         return DuckDBConnectionWrapper(cursor, self)
 
     def submit_python_job(self, handle, parsed_model: dict, compiled_code: str) -> AdapterResponse:
@@ -87,6 +91,10 @@ class LocalEnvironment(Environment):
         plugin = self._plugins[plugin_name]
         handle = self.handle()
         cursor = handle.cursor()
+
+        if source_config.schema:
+            cursor.execute(f"CREATE SCHEMA IF NOT EXISTS {source_config.schema}")
+
         save_mode = source_config.get("save_mode", "overwrite")
         if save_mode in ("ignore", "error_if_exists"):
             params = [source_config.schema, source_config.identifier]
@@ -106,10 +114,23 @@ class LocalEnvironment(Environment):
                     return
         df = plugin.load(source_config)
         assert df is not None
-        materialization = source_config.meta.get("materialization", "table")
-        cursor.execute(
-            f"CREATE OR REPLACE {materialization} {source_config.table_name()} AS SELECT * FROM df"
+
+        materialization = source_config.meta.get(
+            "materialization", plugin.default_materialization()
         )
+        source_table_name = source_config.table_name()
+        df_name = source_table_name.replace(".", "_") + "_df"
+
+        cursor.register(df_name, df)
+
+        if materialization == "view":
+            # save to df instance to register on each cursor creation
+            self._REGISTERED_DF[df_name] = df
+
+        cursor.execute(
+            f"CREATE OR REPLACE {materialization} {source_table_name} AS SELECT * FROM {df_name}"
+        )
+
         cursor.close()
         handle.close()
 
