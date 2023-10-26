@@ -188,7 +188,7 @@ Please remember that using plugins may require you to add additional dependencie
 
 * `delta` depends on `deltalake`, [an example project](https://github.com/milicevica23/dbt-duckdb-delta-plugin-demo)
 
-**Note:** Be aware that experimental features can change over time, and we would like your feedback on config and possible different use cases. 
+**Note:** Be aware that experimental features can change over time, and we would like your feedback on config and possible different use cases.
 
 #### Using Local Python Modules
 
