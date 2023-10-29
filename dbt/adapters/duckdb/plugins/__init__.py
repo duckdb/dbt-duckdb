@@ -109,7 +109,7 @@ class BasePlugin:
         """
         raise NotImplementedError(f"load method not implemented for {self.name}")
 
-    def store(self, target_config: TargetConfig):
+    def store(self, target_config: TargetConfig, df = None):
         raise NotImplementedError(f"store method not implemented for {self.name}")
 
     def configure_cursor(self, cursor):
