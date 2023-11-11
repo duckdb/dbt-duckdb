@@ -13,8 +13,7 @@ from ..utils import TargetConfig
 
 class Plugin(BasePlugin):
     def initialize(self, plugin_config: Dict[str, Any]):
-        self.engine = create_engine(plugin_config.pop("connection_url"), 
-            **plugin_config)
+        self.engine = create_engine(plugin_config.pop("connection_url"), **plugin_config)
 
     def load(self, source_config: SourceConfig) -> pd.DataFrame:
         if "query" in source_config:
