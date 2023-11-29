@@ -71,6 +71,11 @@ class Remote(dbtClassMixin):
 
 
 @dataclass
+class Retries(dbtClassMixin):
+    max_attempts: int
+
+
+@dataclass
 class DuckDBCredentials(Credentials):
     database: str = "main"
     schema: str = "main"
@@ -134,6 +139,11 @@ class DuckDBCredentials(Credentials):
     # loading custom dbt-duckdb plugins or locally defined modules that
     # provide helper functions for dbt Python models.
     module_paths: Optional[List[str]] = None
+
+    # An optional strategy for allowing retries when certain types of
+    # exceptions occur on a model run (e.g., IOExceptions that were caused
+    # by networking issues)
+    retries: Optional[Retries] = None
 
     @classmethod
     def __pre_deserialize__(cls, data: Dict[Any, Any]) -> Dict[Any, Any]:

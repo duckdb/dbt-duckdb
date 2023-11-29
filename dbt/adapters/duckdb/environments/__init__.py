@@ -3,12 +3,14 @@ import importlib.util
 import os
 import sys
 import tempfile
+import time
 from typing import Dict
 from typing import Optional
 
 import duckdb
 
 from ..credentials import DuckDBCredentials
+from ..credentials import Retries
 from ..plugins import BasePlugin
 from ..utils import SourceConfig
 from ..utils import TargetConfig
@@ -29,6 +31,44 @@ def _ensure_event_loop():
         # If the current thread doesn't have an event loop, create one
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
+
+
+class RetryableCursor:
+    _RETRYABLE_EXCEPTIONS = {duckdb.duckdb.IOException}
+
+    def __init__(self, cursor, retries: Retries):
+        self._cursor = cursor
+        self._retries = retries
+
+    def execute(self, sql: str, bindings=None):
+        attempt, success, exc = 0, False, None
+        while not success and attempt < self._retries.max_attempts:
+            try:
+                if bindings is None:
+                    self._cursor.execute(sql)
+                else:
+                    self._cursor.execute(sql, bindings)
+                success = True
+            except Exception as e:
+                if type(e) not in self._RETRYABLE_EXCEPTIONS:
+                    raise e
+                else:
+                    # TODO: this is crude and should be made smarter
+                    time.sleep(2**attempt)
+                    exc = e
+                    attempt += 1
+        if not success:
+            if exc:
+                raise exc
+            else:
+                raise RuntimeError(
+                    "execute call failed, but no exceptions raised- this should be impossible"
+                )
+        return self
+
+    # forward along all non-execute() methods/attribute look-ups
+    def __getattr__(self, name):
+        return getattr(self._cursor, name)
 
 
 class Environment(abc.ABC):
@@ -126,6 +166,9 @@ class Environment(abc.ABC):
 
         for df_name, df in registered_df.items():
             cursor.register(df_name, df)
+
+        if creds.retries:
+            cursor = RetryableCursor(cursor, creds.retries)
 
         return cursor
 
