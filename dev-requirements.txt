@@ -13,7 +13,7 @@ buenavista
 bumpversion
 flake8
 flaky
-freezegun==1.2.2
+freezegun==1.3.0
 fsspec
 gspread
 ipdb
