@@ -50,13 +50,10 @@ class RetryableCursor:
                     self._cursor.execute(sql, bindings)
                 success = True
             except Exception as e:
-                if type(e) not in self._RETRYABLE_EXCEPTIONS:
-                    raise e
-                else:
-                    # TODO: this is crude and should be made smarter
-                    time.sleep(2**attempt)
-                    exc = e
-                    attempt += 1
+                print(f"Retry cursor caught exception of type {type(e)}: {e}")
+                time.sleep(2**attempt)
+                exc = e
+                attempt += 1
         if not success:
             if exc:
                 raise exc
