@@ -3,7 +3,7 @@ from argparse import Namespace
 
 from dbt.flags import set_from_args
 from dbt.adapters.duckdb import DuckDBAdapter
-from tests.unit.utils import config_from_parts_or_dicts, mock_connection
+from tests.unit.utils import config_from_parts_or_dicts
 
 class TestExternalUtils(unittest.TestCase):
     def setUp(self):

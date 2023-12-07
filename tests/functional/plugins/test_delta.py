@@ -4,7 +4,6 @@ import pandas as pd
 import tempfile
 
 from dbt.tests.util import (
-    check_relations_equal,
     run_dbt,
 )
 from deltalake.writer import write_deltalake

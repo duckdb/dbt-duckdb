@@ -4,7 +4,7 @@ Note that all imports should be inside the functions to avoid import/mocking
 issues.
 """
 import os
-from unittest import TestCase, mock
+from unittest import mock
 
 from dbt.config.project import PartialProject
 
@@ -37,7 +37,6 @@ def profile_from_dict(profile, profile_name, cli_vars="{}"):
     from dbt.config import Profile
     from dbt.config.renderer import ProfileRenderer
     from dbt.config.utils import parse_cli_vars
-    from dbt.context.base import generate_base_context
 
     if not isinstance(cli_vars, dict):
         cli_vars = parse_cli_vars(cli_vars)
