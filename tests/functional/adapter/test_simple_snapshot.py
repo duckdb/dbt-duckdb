@@ -1,4 +1,3 @@
-import pytest
 from dbt.tests.adapter.simple_snapshot.test_snapshot import (
     BaseSnapshotCheck,
     BaseSimpleSnapshot,

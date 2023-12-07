@@ -1,10 +1,7 @@
-import json
-import pandas
 import pytest
 import sqlite3
 from pathlib import Path
 from dbt.tests.util import (
-    check_relations_equal,
     run_dbt,
 )
 

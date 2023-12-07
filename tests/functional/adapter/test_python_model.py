@@ -95,7 +95,7 @@ class TestEmptyPythonModel:
     def test_run(self, project):
         run_dbt(["run"])
         result = project.run_sql(
-            f"""
+            """
             select column_name, data_type from system.information_schema.columns
             where table_name='upstream_model' order by column_name
             """,
