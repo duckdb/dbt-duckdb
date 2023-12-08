@@ -35,5 +35,5 @@ class DuckDBColumn(Column):
             "short",
             "int",
             "signed",
-            "long"
+            "long",
         }
