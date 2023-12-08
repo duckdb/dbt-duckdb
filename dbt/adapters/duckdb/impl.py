@@ -6,7 +6,7 @@ from typing import Sequence
 import agate
 
 from dbt.adapters.base import BaseRelation
-from dbt.adapters.base.column import Column
+from dbt.adapters.base.column import Column as BaseColumn
 from dbt.adapters.base.impl import ConstraintSupport
 from dbt.adapters.base.meta import available
 from dbt.adapters.duckdb.column import DuckDBColumn
@@ -83,7 +83,7 @@ class DuckDBAdapter(SQLAdapter):
         self,
         plugin_name: str,
         relation: DuckDBRelation,
-        column_list: Sequence[Column],
+        column_list: Sequence[BaseColumn],
         path: str,
         format: str,
         config: RuntimeConfigObject,
@@ -194,7 +194,7 @@ class DuckDBAdapter(SQLAdapter):
         return sql
 
     @available.parse(lambda *a, **k: [])
-    def get_column_schema_from_query(self, sql: str) -> List[Column]:
+    def get_column_schema_from_query(self, sql: str) -> List[BaseColumn]:
         """Get a list of the Columns with names and data types from the given sql."""
 
         # Taking advantage of yet another amazing DuckDB SQL feature right here: the
@@ -204,7 +204,7 @@ class DuckDBAdapter(SQLAdapter):
         ret = []
         for row in cursor.fetchall():
             name, dtype = row[0], row[1]
-            ret.append(Column.create(name, dtype))
+            ret.append(DuckDBColumn.create(name, dtype))
         return ret
 
     @classmethod

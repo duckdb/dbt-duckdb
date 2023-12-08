@@ -2,6 +2,7 @@ from dataclasses import dataclass
 
 from dbt.adapters.base.column import Column
 
+
 @dataclass
 class DuckDBColumn(Column):
     def is_float(self):
