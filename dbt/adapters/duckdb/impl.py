@@ -9,6 +9,7 @@ from dbt.adapters.base import BaseRelation
 from dbt.adapters.base.column import Column
 from dbt.adapters.base.impl import ConstraintSupport
 from dbt.adapters.base.meta import available
+from dbt.adapters.duckdb.column import DuckDBColumn
 from dbt.adapters.duckdb.connections import DuckDBConnectionManager
 from dbt.adapters.duckdb.relation import DuckDBRelation
 from dbt.adapters.duckdb.utils import TargetConfig
@@ -24,6 +25,7 @@ from dbt.exceptions import DbtRuntimeError
 
 class DuckDBAdapter(SQLAdapter):
     ConnectionManager = DuckDBConnectionManager
+    Column = DuckDBColumn
     Relation = DuckDBRelation
 
     CONSTRAINT_SUPPORT = {
