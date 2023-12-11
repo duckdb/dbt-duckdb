@@ -51,7 +51,7 @@ or the Python API.
 
 MotherDuck databases generally work the same way as local DuckDB databases from the perspective of dbt, but
 there are a [few differences to be aware of](https://motherduck.com/docs/architecture-and-capabilities#considerations-and-limitations):
-1. For the moment, MotherDuck _requires_ DuckDB version `0.9.1`.
+1. For the moment, MotherDuck _requires_ DuckDB version `0.9.2`.
 1. MotherDuck databases do not suppport transactions, so there is a new `disable_transactions` profile.
 option that will be automatically enabled if you are connecting to a MotherDuck database in your `path`.
 1. MotherDuck preloads a set of the most common DuckDB extensions for you, but does not support loading custom extensions or user-defined functions.
