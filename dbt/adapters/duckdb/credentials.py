@@ -16,8 +16,12 @@ from dbt.dataclass_schema import dbtClassMixin
 
 @dataclass
 class Attachment(dbtClassMixin):
-    # The path to the database to be attached (may be a URL)
+    # The path to the database to be attached (may be a URL or Postgres dsn)
     path: str
+
+    # Any other options for the attachment path (e.g., the Postgres attachment type has
+    # source_schema, sink_schema, and overwrite options)
+    options: Optional[Dict[str, Any]] = None
 
     # The type of the attached database (defaults to duckdb, but may be supported by an extension)
     type: Optional[str] = None
@@ -29,16 +33,21 @@ class Attachment(dbtClassMixin):
     read_only: bool = False
 
     def to_sql(self) -> str:
-        base = f"ATTACH '{self.path}'"
+        if self.options:
+            opts = ", ".join([f"{key} = '{value}'" for key, value in self.options.items()])
+            base = f"ATTACH ('{self.path}', {opts})"
+        else:
+            base = f"ATTACH '{self.path}'"
         if self.alias:
             base += f" AS {self.alias}"
-        options = []
+
+        type_options = []
         if self.type:
-            options.append(f"TYPE {self.type}")
+            type_options.append(f"TYPE {self.type}")
         if self.read_only:
-            options.append("READ_ONLY")
-        if options:
-            joined = ", ".join(options)
+            type_options.append("READ_ONLY")
+        if type_options:
+            joined = ", ".join(type_options)
             base += f" ({joined})"
         return base
 

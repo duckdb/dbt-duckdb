@@ -40,12 +40,15 @@ def test_load_aws_creds(mock_session_class):
 
 def test_attachments():
     creds = DuckDBCredentials()
+    opts = {"source_schema": "public", "sink_schema": "snk"}
     creds.attach = [
         {"path": "/tmp/f1234.db"},
         {"path": "/tmp/g1234.db", "alias": "g"},
         {"path": "/tmp/h5678.db", "read_only": 1},
         {"path": "/tmp/i9101.db", "type": "sqlite"},
         {"path": "/tmp/jklm.db", "alias": "jk", "read_only": 1, "type": "sqlite"},
+        {"path": "dbname=prod host=127.0.0.1 user=postgres", "type": "postgres"},
+        {"path": "dbname=postgres", "options": opts, "alias": "pg"}
     ]
 
     expected_sql = [
@@ -54,6 +57,8 @@ def test_attachments():
         "ATTACH '/tmp/h5678.db' (READ_ONLY)",
         "ATTACH '/tmp/i9101.db' (TYPE sqlite)",
         "ATTACH '/tmp/jklm.db' AS jk (TYPE sqlite, READ_ONLY)",
+        "ATTACH 'dbname=prod host=127.0.0.1 user=postgres' (TYPE postgres)",
+        "ATTACH ('dbname=postgres', source_schema = 'public', sink_schema = 'snk') AS pg"
     ]
 
     for i, a in enumerate(creds.attach):
