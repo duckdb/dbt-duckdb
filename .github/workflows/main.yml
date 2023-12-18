@@ -104,7 +104,7 @@ jobs:
         id: date
         run: echo "date=$(date +'%Y-%m-%dT%H_%M_%S')" >> $GITHUB_OUTPUT #no colons allowed for artifacts
 
-      - uses: actions/upload-artifact@v3
+      - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: unit_results_${{ matrix.python-version }}-${{ steps.date.outputs.date }}.csv
@@ -149,7 +149,7 @@ jobs:
         id: date
         run: echo "date=$(date +'%Y-%m-%dT%H_%M_%S')" >> $GITHUB_OUTPUT #no colons allowed for artifacts
 
-      - uses: actions/upload-artifact@v3
+      - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: functional_results_${{ matrix.python-version }}-${{ steps.date.outputs.date }}.csv
@@ -194,7 +194,7 @@ jobs:
         id: date
         run: echo "date=$(date +'%Y-%m-%dT%H_%M_%S')" >> $GITHUB_OUTPUT #no colons allowed for artifacts
 
-      - uses: actions/upload-artifact@v3
+      - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: filebased_results_${{ matrix.python-version }}-${{ steps.date.outputs.date }}.csv
@@ -240,7 +240,7 @@ jobs:
         id: date
         run: echo "date=$(date +'%Y-%m-%dT%H_%M_%S')" >> $GITHUB_OUTPUT #no colons allowed for artifacts
 
-      - uses: actions/upload-artifact@v3
+      - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: motherduck_results_${{ matrix.python-version }}-${{ steps.date.outputs.date }}.csv
@@ -285,7 +285,7 @@ jobs:
         id: date
         run: echo "date=$(date +'%Y-%m-%dT%H_%M_%S')" >> $GITHUB_OUTPUT #no colons allowed for artifacts
 
-      - uses: actions/upload-artifact@v3
+      - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: buenavista_results_${{ matrix.python-version }}-${{ steps.date.outputs.date }}.csv
@@ -330,7 +330,7 @@ jobs:
         id: date
         run: echo "date=$(date +'%Y-%m-%dT%H_%M_%S')" >> $GITHUB_OUTPUT #no colons allowed for artifacts
 
-      - uses: actions/upload-artifact@v3
+      - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: fsspec_results_${{ matrix.python-version }}-${{ steps.date.outputs.date }}.csv
@@ -376,7 +376,7 @@ jobs:
         id: date
         run: echo "date=$(date +'%Y-%m-%dT%H_%M_%S')" >> $GITHUB_OUTPUT #no colons allowed for artifacts
 
-      - uses: actions/upload-artifact@v3
+      - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: plugins_results_${{ matrix.python-version }}-${{ steps.date.outputs.date }}.csv
@@ -415,7 +415,7 @@ jobs:
         run: |
           check-wheel-contents dist/*.whl --ignore W002,W007,W008
 
-      - uses: actions/upload-artifact@v3
+      - uses: actions/upload-artifact@v4
         with:
           name: dist
           path: dist/
