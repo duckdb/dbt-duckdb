@@ -72,7 +72,16 @@ class Remote(dbtClassMixin):
 
 @dataclass
 class Retries(dbtClassMixin):
-    max_attempts: int
+    # The number of times to attempt the initial duckdb.connect call
+    # (to wait for another process to free the lock on the DB file)
+    connect_attempts: int = 1
+
+    # The number of times to attempt to execute a DuckDB query that throws
+    # one of the retryable exceptions
+    query_attempts: Optional[int] = None
+
+    # The list of exceptions that we are willing to retry on
+    retryable_exceptions: List[str] = ["IOException"]
 
 
 @dataclass

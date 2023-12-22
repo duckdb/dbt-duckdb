@@ -5,12 +5,12 @@ import sys
 import tempfile
 import time
 from typing import Dict
+from typing import List
 from typing import Optional
 
 import duckdb
 
 from ..credentials import DuckDBCredentials
-from ..credentials import Retries
 from ..plugins import BasePlugin
 from ..utils import SourceConfig
 from ..utils import TargetConfig
@@ -34,15 +34,14 @@ def _ensure_event_loop():
 
 
 class RetryableCursor:
-    _RETRYABLE_EXCEPTIONS = {duckdb.duckdb.IOException}
-
-    def __init__(self, cursor, retries: Retries):
+    def __init__(self, cursor, retry_attempts: int, retryable_exceptions: List[str]):
         self._cursor = cursor
-        self._retries = retries
+        self._retry_attempts = retry_attempts
+        self._retryable_exceptions = retryable_exceptions
 
     def execute(self, sql: str, bindings=None):
         attempt, success, exc = 0, False, None
-        while not success and attempt < self._retries.max_attempts:
+        while not success and attempt < self._retry_attempts:
             try:
                 if bindings is None:
                     self._cursor.execute(sql)
@@ -50,10 +49,14 @@ class RetryableCursor:
                     self._cursor.execute(sql, bindings)
                 success = True
             except Exception as e:
-                print(f"Retry cursor caught exception of type {type(e)}: {e}")
-                time.sleep(2**attempt)
-                exc = e
-                attempt += 1
+                exception_name = type(e).__name__
+                if exception_name in self._retryable_exceptions:
+                    time.sleep(2**attempt)
+                    exc = e
+                    attempt += 1
+                else:
+                    print(f"Did not retry exception named '{exception_name}'")
+                    raise e
         if not success:
             if exc:
                 raise exc
@@ -111,7 +114,32 @@ class Environment(abc.ABC):
         cls, creds: DuckDBCredentials, plugins: Optional[Dict[str, BasePlugin]] = None
     ):
         config = creds.config_options or {}
-        conn = duckdb.connect(creds.path, read_only=False, config=config)
+
+        if creds.retries:
+            success, attempt, exc = False, 0, None
+            while not success and attempt < creds.retries.connect_attempts:
+                try:
+                    conn = duckdb.connect(creds.path, read_only=False, config=config)
+                    success = True
+                except Exception as e:
+                    exception_name = type(e).__name__
+                    if exception_name in creds.retries.retryable_exceptions:
+                        time.sleep(2**attempt)
+                        exc = e
+                        attempt += 1
+                    else:
+                        print(f"Did not retry exception named '{exception_name}'")
+                        raise e
+            if not success:
+                if exc:
+                    raise exc
+                else:
+                    raise RuntimeError(
+                        "connect call failed, but no exceptions raised- this should be impossible"
+                    )
+
+        else:
+            conn = duckdb.connect(creds.path, read_only=False, config=config)
 
         # install any extensions on the connection
         if creds.extensions is not None:
@@ -164,8 +192,10 @@ class Environment(abc.ABC):
         for df_name, df in registered_df.items():
             cursor.register(df_name, df)
 
-        if creds.retries:
-            cursor = RetryableCursor(cursor, creds.retries)
+        if creds.retries and creds.retries.query_attempts:
+            cursor = RetryableCursor(
+                cursor, creds.retries.query_attempts, creds.retries.retryable_exceptions
+            )
 
         return cursor
 
