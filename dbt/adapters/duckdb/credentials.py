@@ -1,6 +1,7 @@
 import os
 import time
 from dataclasses import dataclass
+from dataclasses import field
 from functools import lru_cache
 from typing import Any
 from typing import Dict
@@ -81,7 +82,7 @@ class Retries(dbtClassMixin):
     query_attempts: Optional[int] = None
 
     # The list of exceptions that we are willing to retry on
-    retryable_exceptions: List[str] = ["IOException"]
+    retryable_exceptions: List[str] = field(default_factory=lambda: ["IOException"])
 
 
 @dataclass

@@ -15,36 +15,39 @@ class TestRetryableCursor:
 
     @pytest.fixture
     def mock_retries(self):
-        return Retries(max_attempts=3)
+        return Retries(query_attempts=3)
 
-    def test_successful_execute(self, mock_cursor, mock_retries):
+    @pytest.fixture
+    def retry_cursor(self, mock_cursor, mock_retries):
+        return RetryableCursor(
+            mock_cursor,
+            mock_retries.query_attempts,
+            mock_retries.retryable_exceptions)
+
+    def test_successful_execute(self, mock_cursor, retry_cursor):
         """ Test that execute successfully runs the SQL query. """
-        retry_cursor = RetryableCursor(mock_cursor, mock_retries)
         sql_query = "SELECT * FROM table"
         retry_cursor.execute(sql_query)
         mock_cursor.execute.assert_called_once_with(sql_query)
 
-    def test_retry_on_failure(self, mock_cursor, mock_retries):
+    def test_retry_on_failure(self, mock_cursor, retry_cursor):
         """ Test that execute retries the SQL query on failure. """
         mock_cursor.execute.side_effect = [duckdb.duckdb.IOException, None]
-        retry_cursor = RetryableCursor(mock_cursor, mock_retries)
         sql_query = "SELECT * FROM table"
         retry_cursor.execute(sql_query)
         assert mock_cursor.execute.call_count == 2
 
-    def test_no_retry_on_non_retryable_exception(self, mock_cursor, mock_retries):
+    def test_no_retry_on_non_retryable_exception(self, mock_cursor, retry_cursor):
         """ Test that a non-retryable exception is not retried. """
         mock_cursor.execute.side_effect = ValueError
-        retry_cursor = RetryableCursor(mock_cursor, mock_retries)
         sql_query = "SELECT * FROM table"
         with pytest.raises(ValueError):
             retry_cursor.execute(sql_query)
         mock_cursor.execute.assert_called_once_with(sql_query)
 
-    def test_exponential_backoff(self, mock_cursor, mock_retries):
+    def test_exponential_backoff(self, mock_cursor, retry_cursor):
         """ Test that exponential backoff is applied between retries. """
         mock_cursor.execute.side_effect = [duckdb.duckdb.IOException, duckdb.duckdb.IOException, None]
-        retry_cursor = RetryableCursor(mock_cursor, mock_retries)
         sql_query = "SELECT * FROM table"
 
         with patch("time.sleep") as mock_sleep:
