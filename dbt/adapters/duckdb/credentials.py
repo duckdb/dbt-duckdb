@@ -1,6 +1,7 @@
 import os
 import time
 from dataclasses import dataclass
+from dataclasses import field
 from functools import lru_cache
 from typing import Any
 from typing import Dict
@@ -59,6 +60,20 @@ class Remote(dbtClassMixin):
     port: int
     user: str
     password: Optional[str] = None
+
+
+@dataclass
+class Retries(dbtClassMixin):
+    # The number of times to attempt the initial duckdb.connect call
+    # (to wait for another process to free the lock on the DB file)
+    connect_attempts: int = 1
+
+    # The number of times to attempt to execute a DuckDB query that throws
+    # one of the retryable exceptions
+    query_attempts: Optional[int] = None
+
+    # The list of exceptions that we are willing to retry on
+    retryable_exceptions: List[str] = field(default_factory=lambda: ["IOException"])
 
 
 @dataclass
@@ -125,6 +140,11 @@ class DuckDBCredentials(Credentials):
     # loading custom dbt-duckdb plugins or locally defined modules that
     # provide helper functions for dbt Python models.
     module_paths: Optional[List[str]] = None
+
+    # An optional strategy for allowing retries when certain types of
+    # exceptions occur on a model run (e.g., IOExceptions that were caused
+    # by networking issues)
+    retries: Optional[Retries] = None
 
     @classmethod
     def __pre_deserialize__(cls, data: Dict[Any, Any]) -> Dict[Any, Any]:
