@@ -91,6 +91,7 @@ class TestPlugins:
                         "type": "duckdb",
                         "path": dbt_profile_target.get("path", ":memory:"),
                         "plugins": plugins,
+                        "retries": {"query_attempts": 2},
                     }
                 },
                 "target": "dev",
