@@ -227,8 +227,7 @@ def create_or_update_table(
         s3_path=s3_path,
         columns=columns,
         file_format=file_format,
-        delimiter=delimiter,
-        partition_columns=partition_columns
+        delimiter=delimiter
     )
     table_def = _add_partition_columns(table_def, partition_columns)
     if glue_table:
