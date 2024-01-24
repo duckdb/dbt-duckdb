@@ -2,6 +2,7 @@ from typing import Any
 from typing import Dict
 from typing import Optional
 from typing import Sequence
+from typing import List
 
 import boto3
 from mypy_boto3_glue import GlueClient
@@ -161,6 +162,17 @@ def _get_column_type_def(
     else:
         return None
 
+def _add_partition_columns(table_def: TableInputTypeDef, partition_columns: List[Dict[str, str]]) -> TableInputTypeDef:
+    if 'PartitionKeys' not in table_def:
+        table_def['PartitionKeys'] = []
+        for column_dict in partition_columns:
+            for column, column_type in column_dict.items():
+                column_type_def = ColumnTypeDef(
+                    Name=column,
+                    Type=column_type
+                )
+            table_def['PartitionKeys'].append(column_type_def)
+    return table_def
 
 def _get_table_def(
     table: str,
@@ -205,6 +217,7 @@ def create_or_update_table(
     s3_path: str,
     file_format: str,
     delimiter: str,
+    partition_columns: List[Dict[str, str]],
 ) -> None:
     # Existing table in AWS Glue catalog
     glue_table = _get_table(client=client, database=database, table=table)
@@ -215,7 +228,9 @@ def create_or_update_table(
         columns=columns,
         file_format=file_format,
         delimiter=delimiter,
+        partition_columns=partition_columns
     )
+    table_def = _add_partition_columns(table_def, partition_columns)
     if glue_table:
         # Existing columns in AWS Glue catalog
         glue_columns = _get_column_type_def(glue_table)
@@ -236,6 +251,8 @@ class Plugin(BasePlugin):
         assert target_config.location is not None
         assert target_config.relation.identifier is not None
         table: str = target_config.relation.identifier
+        partition_columns = target_config.config.get('partition_columns', [])
+
         create_or_update_table(
             self.client,
             self.database,
@@ -244,4 +261,5 @@ class Plugin(BasePlugin):
             target_config.location.path,
             target_config.location.format,
             self.delimiter,
+            partition_columns
         )
