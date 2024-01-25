@@ -165,13 +165,12 @@ def _get_column_type_def(
 def _add_partition_columns(table_def: TableInputTypeDef, partition_columns: List[Dict[str, str]]) -> TableInputTypeDef:
     if 'PartitionKeys' not in table_def:
         table_def['PartitionKeys'] = []
-        for column_dict in partition_columns:
-            for column, column_type in column_dict.items():
-                column_type_def = ColumnTypeDef(
-                    Name=column,
-                    Type=column_type
-                )
-            table_def['PartitionKeys'].append(column_type_def)
+    for column in partition_columns:
+        column_type_def = ColumnTypeDef(
+            Name=column['name'],
+            Type=column['type']
+        )
+        table_def['PartitionKeys'].append(column_type_def)
     return table_def
 
 def _get_table_def(
@@ -217,7 +216,7 @@ def create_or_update_table(
     s3_path: str,
     file_format: str,
     delimiter: str,
-    partition_columns: List[Dict[str, str]],
+    partition_columns: List[Dict[str, str]] = [],
 ) -> None:
     # Existing table in AWS Glue catalog
     glue_table = _get_table(client=client, database=database, table=table)
@@ -229,7 +228,9 @@ def create_or_update_table(
         file_format=file_format,
         delimiter=delimiter
     )
-    table_def = _add_partition_columns(table_def, partition_columns)
+    # Add partition columns
+    if partition_columns != []:
+        table_def = _add_partition_columns(table_def, partition_columns)
     if glue_table:
         # Existing columns in AWS Glue catalog
         glue_columns = _get_column_type_def(glue_table)
