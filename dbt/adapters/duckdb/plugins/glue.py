@@ -163,22 +163,22 @@ def _get_column_type_def(
         return None
 
 
-def _add_partition_columns(
-    table_def: TableInputTypeDef, partition_columns: List[Dict[str, str]]
-) -> TableInputTypeDef:
+def _add_partition_columns(table_def: TableInputTypeDef, partition_columns) -> TableInputTypeDef:
+    partition_keys = []
     if "PartitionKeys" not in table_def:
         table_def["PartitionKeys"] = []
     for column in partition_columns:
-        column_type_def = ColumnTypeDef(Name=column["name"], Type=column["type"])
-        table_def["PartitionKeys"].append(column_type_def)
+        partition_column = ColumnTypeDef(Name=column["Name"], Type=column["Type"])
+        partition_keys.append(partition_column)
+    table_def["PartitionKeys"] = partition_keys
     # Remove columns from StorageDescriptor if they match with partition columns to avoid duplicate columns
     for partition_column in partition_columns:
         table_def["StorageDescriptor"]["Columns"] = [
             column
             for column in table_def["StorageDescriptor"]["Columns"]
             if not (
-                column["Name"] == partition_column["name"]
-                and column["Type"] == partition_column["type"]
+                column["Name"] == partition_column["Name"]
+                and column["Type"] == partition_column["Type"]
             )
         ]
     return table_def
