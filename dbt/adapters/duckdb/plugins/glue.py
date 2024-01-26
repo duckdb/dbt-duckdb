@@ -162,7 +162,7 @@ def _get_column_type_def(
     else:
         return None
 
-def _add_partition_columns(table_def: TableInputTypeDef, partition_columns: List[Dict[str, str]]) -> TableInputTypeDef:
+def _add_partition_columns(table_def: TableInputTypeDef, partition_columns: List[ColumnTypeDef]) -> TableInputTypeDef:
     if 'PartitionKeys' not in table_def:
         table_def['PartitionKeys'] = []
     for column in partition_columns:
