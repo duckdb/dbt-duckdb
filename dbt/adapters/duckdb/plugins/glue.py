@@ -1,8 +1,8 @@
 from typing import Any
 from typing import Dict
+from typing import List
 from typing import Optional
 from typing import Sequence
-from typing import List
 
 import boto3
 from mypy_boto3_glue import GlueClient
@@ -162,19 +162,27 @@ def _get_column_type_def(
     else:
         return None
 
-def _add_partition_columns(table_def: TableInputTypeDef, partition_columns: List[ColumnTypeDef]) -> TableInputTypeDef:
-    if 'PartitionKeys' not in table_def:
-        table_def['PartitionKeys'] = []
+
+def _add_partition_columns(
+    table_def: TableInputTypeDef, partition_columns: List[Dict[str, str]]
+) -> TableInputTypeDef:
+    if "PartitionKeys" not in table_def:
+        table_def["PartitionKeys"] = []
     for column in partition_columns:
-        column_type_def = ColumnTypeDef(
-            Name=column['name'],
-            Type=column['type']
-        )
-        table_def['PartitionKeys'].append(column_type_def)
+        column_type_def = ColumnTypeDef(Name=column["name"], Type=column["type"])
+        table_def["PartitionKeys"].append(column_type_def)
     # Remove columns from StorageDescriptor if they match with partition columns to avoid duplicate columns
     for partition_column in partition_columns:
-        table_def['StorageDescriptor']['Columns'] = [column for column in table_def['StorageDescriptor']['Columns'] if not (column['Name'] == partition_column['name'] and column['Type'] == partition_column['type'])]
+        table_def["StorageDescriptor"]["Columns"] = [
+            column
+            for column in table_def["StorageDescriptor"]["Columns"]
+            if not (
+                column["Name"] == partition_column["name"]
+                and column["Type"] == partition_column["type"]
+            )
+        ]
     return table_def
+
 
 def _get_table_def(
     table: str,
@@ -183,7 +191,6 @@ def _get_table_def(
     file_format: str,
     delimiter: str,
 ):
-
     if file_format == "csv":
         table_def = _get_csv_table_def(
             table=table,
@@ -235,7 +242,7 @@ def create_or_update_table(
         s3_parent=s3_parent,
         columns=columns,
         file_format=file_format,
-        delimiter=delimiter
+        delimiter=delimiter,
     )
     # Add partition columns
     if partition_columns != []:
@@ -260,7 +267,7 @@ class Plugin(BasePlugin):
         assert target_config.location is not None
         assert target_config.relation.identifier is not None
         table: str = target_config.relation.identifier
-        partition_columns = target_config.config.get('partition_columns', [])
+        partition_columns = target_config.config.get("partition_columns", [])
 
         create_or_update_table(
             self.client,
@@ -270,5 +277,5 @@ class Plugin(BasePlugin):
             target_config.location.path,
             target_config.location.format,
             self.delimiter,
-            partition_columns
+            partition_columns,
         )
