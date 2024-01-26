@@ -171,16 +171,19 @@ def _add_partition_columns(table_def: TableInputTypeDef, partition_columns: List
             Type=column['type']
         )
         table_def['PartitionKeys'].append(column_type_def)
+    # Remove columns from StorageDescriptor if they match with partition columns to avoid duplicate columns
+    for partition_column in partition_columns:
+        table_def['StorageDescriptor']['Columns'] = [column for column in table_def['StorageDescriptor']['Columns'] if not (column['Name'] == partition_column['name'] and column['Type'] == partition_column['type'])]
     return table_def
 
 def _get_table_def(
     table: str,
-    s3_path: str,
+    s3_parent: str,
     columns: Sequence["ColumnTypeDef"],
     file_format: str,
     delimiter: str,
 ):
-    s3_parent = "/".join(s3_path.split("/")[:-1])
+
     if file_format == "csv":
         table_def = _get_csv_table_def(
             table=table,
@@ -218,12 +221,18 @@ def create_or_update_table(
     delimiter: str,
     partition_columns: List[Dict[str, str]] = [],
 ) -> None:
+    # Set s3 original path if partitioning is used, else use parent path
+    if partition_columns != []:
+        s3_parent = s3_path
+    if partition_columns == []:
+        s3_parent = "/".join(s3_path.split("/")[:-1])
+
     # Existing table in AWS Glue catalog
     glue_table = _get_table(client=client, database=database, table=table)
     columns = _convert_columns(column_list)
     table_def = _get_table_def(
         table=table,
-        s3_path=s3_path,
+        s3_parent=s3_parent,
         columns=columns,
         file_format=file_format,
         delimiter=delimiter
