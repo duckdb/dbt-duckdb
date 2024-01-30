@@ -1,9 +1,8 @@
 {% materialization incremental, adapter="duckdb", supported_languages=['sql', 'python'] -%}
 
   {%- set language = model['language'] -%}
-  {%- set duckdb_path = adapter.config.credentials.path -%}
   -- only create temp tables if using local duckdb, as it is not currently supported for remote databases
-  {%- set temporary = not duckdb_path.startswith("md:") and not duckdb_path.startswith("motherduck:") -%}
+  {%- set temporary = not adapter.config.credentials.is_motherduck -%}
 
   -- relations
   {%- set existing_relation = load_cached_relation(this) -%}
