@@ -8,6 +8,7 @@ import boto3
 from mypy_boto3_glue import GlueClient
 from mypy_boto3_glue.type_defs import ColumnTypeDef
 from mypy_boto3_glue.type_defs import GetTableResponseTypeDef
+from mypy_boto3_glue.type_defs import PartitionInputTypeDef
 from mypy_boto3_glue.type_defs import SerDeInfoTypeDef
 from mypy_boto3_glue.type_defs import StorageDescriptorTypeDef
 from mypy_boto3_glue.type_defs import TableInputTypeDef
@@ -132,12 +133,64 @@ def _convert_columns(column_list: Sequence[Column]) -> Sequence["ColumnTypeDef"]
     return column_types
 
 
-def _create_table(client: "GlueClient", database: str, table_def: "TableInputTypeDef") -> None:
+def _create_table(
+    client: "GlueClient", database: str, table_def: "TableInputTypeDef", partition_columns
+) -> None:
     client.create_table(DatabaseName=database, TableInput=table_def)
+    # Create partition if relevant
+    if partition_columns != []:
+        partition_names = [column["Name"] for column in partition_columns]
+        partition_values = [column["Value"] for column in partition_columns]
+
+        partition_location = table_def["StorageDescriptor"]["Location"]
+        for name, value in zip(partition_names, partition_values):
+            partition_location += f"/{name}={value}"
+
+        partition_input = PartitionInputTypeDef()
+        partition_input["Values"] = partition_values
+        partition_input["StorageDescriptor"] = table_def["StorageDescriptor"]
+        partition_input["StorageDescriptor"]["Location"] = partition_location
+
+        client.create_partition(
+            DatabaseName=database, TableName=table_def["Name"], PartitionInput=partition_input
+        )
 
 
-def _update_table(client: "GlueClient", database: str, table_def: "TableInputTypeDef") -> None:
+def _update_table(
+    client: "GlueClient", database: str, table_def: "TableInputTypeDef", partition_columns
+) -> None:
     client.update_table(DatabaseName=database, TableInput=table_def)
+    # Update or create partition if relevant
+    if partition_columns != []:
+        partition_names = [column["Name"] for column in partition_columns]
+        partition_values = [column["Value"] for column in partition_columns]
+
+        partition_location = table_def["StorageDescriptor"]["Location"]
+        for name, value in zip(partition_names, partition_values):
+            partition_location += f"/{name}={value}"
+
+        partition_input = PartitionInputTypeDef()
+        partition_input["Values"] = partition_values
+        partition_input["StorageDescriptor"] = table_def["StorageDescriptor"]
+        partition_input["StorageDescriptor"]["Location"] = partition_location
+
+        try:
+            client.get_partition(
+                DatabaseName=database,
+                TableName=table_def["Name"],
+                PartitionValues=partition_values,
+            )
+            client.update_partition(
+                DatabaseName=database,
+                TableName=table_def["Name"],
+                PartitionValueList=partition_values,
+                PartitionInput=partition_input,
+            )
+
+        except client.exceptions.EntityNotFoundException:
+            client.create_partition(
+                DatabaseName=database, TableName=table_def["Name"], PartitionInput=partition_input
+            )
 
 
 def _get_table(
@@ -252,9 +305,19 @@ def create_or_update_table(
         glue_columns = _get_column_type_def(glue_table)
         # Create new version only if columns are changed
         if glue_columns != columns:
-            _update_table(client=client, database=database, table_def=table_def)
+            _update_table(
+                client=client,
+                database=database,
+                table_def=table_def,
+                partition_columns=partition_columns,
+            )
     else:
-        _create_table(client=client, database=database, table_def=table_def)
+        _create_table(
+            client=client,
+            database=database,
+            table_def=table_def,
+            partition_columns=partition_columns,
+        )
 
 
 class Plugin(BasePlugin):
