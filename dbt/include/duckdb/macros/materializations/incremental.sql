@@ -1,6 +1,9 @@
 {% materialization incremental, adapter="duckdb", supported_languages=['sql', 'python'] -%}
 
   {%- set language = model['language'] -%}
+  {%- set duckdb_path = adapter.config.credentials.path -%}
+  -- only create temp tables if using local duckdb, as it is not currently supported for remote databases
+  {%- set temporary = not duckdb_path.startswith("md:") and not duckdb_path.startswith("motherduck:") -%}
 
   -- relations
   {%- set existing_relation = load_cached_relation(this) -%}
@@ -45,7 +48,9 @@
         {{- build_python }}
       {% endcall %}
     {% else %} {# SQL #}
-      {% do run_query(create_table_as(True, temp_relation, compiled_code, language)) %}
+      {% do run_query(create_table_as(temporary, temp_relation, compiled_code, language)) %}
+      -- if not using a temporary table, i.e. for a remote database, drop the table at end of transaction
+      {% set need_drop_temp = not temporary %}
     {% endif %}
     {% do adapter.expand_target_column_types(
              from_relation=temp_relation,
@@ -74,6 +79,10 @@
       {% do adapter.rename_relation(target_relation, backup_relation) %}
       {% do adapter.rename_relation(intermediate_relation, target_relation) %}
       {% do to_drop.append(backup_relation) %}
+  {% endif %}
+
+  {% if need_drop_temp %}
+      {% do to_drop.append(temp_relation) %}
   {% endif %}
 
   {% set should_revoke = should_revoke(existing_relation, full_refresh_mode) %}
