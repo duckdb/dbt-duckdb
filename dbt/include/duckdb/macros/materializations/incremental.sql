@@ -49,7 +49,7 @@
       {% endcall %}
     {% else %} {# SQL #}
       {% do run_query(create_table_as(temporary, temp_relation, compiled_code, language)) %}
-      -- if not using a temporary table, i.e. for a remote database, drop the table at end of transaction
+      -- if not using a temporary table, i.e. for a remote database, drop the temp relation after we insert the data into the target relation
       {% set need_drop_temp = not temporary %}
     {% endif %}
     {% do adapter.expand_target_column_types(
