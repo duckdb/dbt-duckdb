@@ -65,19 +65,18 @@ class TestMDPlugin:
             "random_logs_test.sql": random_logs_sql,
             "summary_of_logs_test.sql": summary_of_logs_sql,
         }
-    
+
     @pytest.fixture(autouse=True)
     def run_dbt_scope(self, project):
         project.run_sql("CREATE DATABASE IF NOT EXISTS plugin_test")
-        project.run_sql("CREATE SCHEMA IF NOT EXISTS plugin_test.temp")
         project.run_sql("CREATE OR REPLACE TABLE plugin_table (i integer, j string)")
         project.run_sql("INSERT INTO plugin_table (i, j) VALUES (1, 'foo')")
         yield
         project.run_sql("DROP VIEW md_table")
-        project.run_sql("DROP TABLE plugin_table")
         project.run_sql("DROP TABLE random_logs_test")
         project.run_sql("DROP TABLE summary_of_logs_test")
-        project.run_sql("DROP SCHEMA plugin_test.temp;")
+        project.run_sql("DROP SCHEMA plugin_test.temp")
+        project.run_sql("DROP TABLE plugin_table")
 
     def test_motherduck(self, project):
         run_dbt()
