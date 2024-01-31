@@ -41,18 +41,19 @@
     {% set build_sql = create_table_as(False, intermediate_relation, compiled_code, language) %}
     {% set need_swap = true %}
   {% else %}
+    {% if not temporary or language == 'python' %}
+      -- if not using a temporary table we will add the temp relation to the schema "temp" on the target database
+      {% set temp_relation = temp_relation.incorporate(path={"schema": "temp", "database": target_relation.database}) %}
+      -- and drop the temp relation after we insert the incremental data into the target relation
+      {% set need_drop_temp = True %}
+    {% endif %}
     {% if language == 'python' %}
       {% set build_python = create_table_as(False, temp_relation, compiled_code, language) %}
-      -- drop the temp relation after we insert the incremental data into the target relation
-      {% set need_drop_temp = True %}
       {% call statement("pre", language=language) %}
         {{- build_python }}
       {% endcall %}
     {% else %} {# SQL #}
       {% do run_query(create_table_as(temporary, temp_relation, compiled_code, language)) %}
-      -- if not using a temporary table, i.e. for a remote database,
-      -- drop the temp relation after we insert the incremental data into the target relation
-      {% set need_drop_temp = not temporary %}
     {% endif %}
     {% do adapter.expand_target_column_types(
              from_relation=temp_relation,
