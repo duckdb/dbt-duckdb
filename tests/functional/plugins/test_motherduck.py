@@ -67,8 +67,13 @@ class TestMDPlugin:
         }
     
     @pytest.fixture(autouse=True)
-    def cleanup_incremental_db(self, project):
+    def run_dbt_scope(self, project):
+        project.run_sql("CREATE DATABASE IF NOT EXISTS plugin_test")
+        project.run_sql("CREATE OR REPLACE TABLE plugin_table (i integer, j string)")
+        project.run_sql("INSERT INTO plugin_table (i, j) VALUES (1, 'foo')")
         yield
+        project.run_sql("DROP VIEW md_table")
+        project.run_sql("DROP TABLE plugin_test")
         project.run_sql("DROP TABLE random_logs_test")
         project.run_sql("DROP TABLE summary_of_logs_test")
 

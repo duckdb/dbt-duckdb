@@ -43,6 +43,7 @@
   {% else %}
     {% if language == 'python' %}
       {% set build_python = create_table_as(False, temp_relation, compiled_code, language) %}
+      {% set need_drop_temp = True %}
       {% call statement("pre", language=language) %}
         {{- build_python }}
       {% endcall %}
