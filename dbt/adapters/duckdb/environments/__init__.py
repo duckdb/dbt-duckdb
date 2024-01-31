@@ -166,7 +166,10 @@ class Environment(abc.ABC):
         # connection that they need to do
         if plugins:
             for plugin in plugins.values():
-                plugin.configure_connection(conn)
+                # Only connect to MotherDuck if this is not already
+                # done by default by connecting to "md:<ddb name>"
+                if not creds.is_motherduck:
+                    plugin.configure_connection(conn)
 
         return conn
 

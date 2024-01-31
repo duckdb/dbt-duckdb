@@ -69,7 +69,7 @@ def dbt_profile_target(profile_type, bv_server_process, tmp_path_factory):
                 "Please set the MOTHERDUCK_TOKEN environment variable to run tests against MotherDuck"
             )
         profile["disable_transactions"] = True
-        profile["path"] = "md:test"
+        profile["path"] = "md:plugin_test"
     elif profile_type == "memory":
         pass  # use the default path-less profile
     else:
