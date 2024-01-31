@@ -1,7 +1,7 @@
 import os
 from typing import List
 from typing import Optional
-from typing import Sequence
+from typing import Sequence, Mapping, Any
 
 import agate
 
@@ -19,9 +19,12 @@ from dbt.context.providers import RuntimeConfigObject
 from dbt.contracts.connection import AdapterResponse
 from dbt.contracts.graph.nodes import ColumnLevelConstraint
 from dbt.contracts.graph.nodes import ConstraintType
+from dbt.contracts.relation import Path
+from dbt.contracts.relation import RelationType
 from dbt.exceptions import DbtInternalError
 from dbt.exceptions import DbtRuntimeError
 
+DEFAULT_TEMP_SCHEMA_NAME = "dbt_temp"
 
 class DuckDBAdapter(SQLAdapter):
     ConnectionManager = DuckDBConnectionManager
@@ -217,6 +220,34 @@ class DuckDBAdapter(SQLAdapter):
         else:
             return super().render_column_constraint(constraint)
 
+    def _get_temp_schema_name(self, model):
+        return DEFAULT_TEMP_SCHEMA_NAME
+
+    @available
+    def get_temp_relation_path(self, model):
+        """This is a workaround for enabling remote temporary tables as used in
+        incremental models. Instead of CREATE TEMPORARY TABLE, it runs
+        CREATE TABLE with a relation in a temporary schema (dbt_temp by default).
+        The relation will be dropped at the end of the incremental macro, or
+        if the model fails, it is dropped in the post-model hook.
+        """
+        return Path(**{
+            "schema": self._get_temp_schema_name(model),
+            "database": model.database,
+            "identifier": f"{model.schema}__{model.identifier}"
+        })
+
+    def post_model_hook(self, config: Mapping[str, Any], context: Any) -> None:
+        """A hook for cleaning up the remote temporary table if the incremental 
+        model materialization fails.
+        """
+        if "incremental" == config.model.get_materialization():
+            temp_relation = self.Relation(
+                path=self.get_temp_relation_path(config.model),
+                type=RelationType.Table
+            )
+            self.drop_relation(temp_relation)
+        super().post_model_hook(config, context)
 
 # Change `table_a/b` to `table_aaaaa/bbbbb` to avoid duckdb binding issues when relation_a/b
 # is called "table_a" or "table_b" in some of the dbt tests

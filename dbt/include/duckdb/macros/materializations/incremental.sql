@@ -43,7 +43,7 @@
   {% else %}
     {% if not temporary or language == 'python' %}
       -- if not using a temporary table we will add the temp relation to the schema "temp" on the target database
-      {% set temp_relation = temp_relation.incorporate(path={"schema": "temp", "database": target_relation.database}) %}
+      {% set temp_relation = temp_relation.incorporate(path=adapter.get_temp_relation_path(this)) %}
       {% do run_query(create_schema(temp_relation)) %}
       -- and drop the temp relation after we insert the incremental data into the target relation
       {% set need_drop_temp = True %}
