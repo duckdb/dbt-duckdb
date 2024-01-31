@@ -40,11 +40,6 @@ plugin_sql = """
     select foo() as foo
 """
 
-# Reads from a MD database in my test account in the cloud
-md_sql = """
-    select * FROM plugin_test.main.plugin_table
-"""
-
 
 @pytest.mark.skip_profile("buenavista", "md")
 class TestPlugins:
@@ -133,34 +128,3 @@ class TestPlugins:
 
         res = project.run_sql("SELECT foo FROM foo", fetch="one")
         assert res[0] == 1729
-
-
-@pytest.mark.skip_profile("buenavista", "file", "memory")
-class TestMDPlugin:
-    @pytest.fixture(scope="class")
-    def profiles_config_update(self, dbt_profile_target):
-        md_config = {}
-        plugins = [{"module": "motherduck", "config": md_config}]
-        return {
-            "test": {
-                "outputs": {
-                    "dev": {
-                        "type": "duckdb",
-                        "path": dbt_profile_target.get("path", ":memory:"),
-                        "plugins": plugins,
-                    }
-                },
-                "target": "dev",
-            }
-        }
-
-    @pytest.fixture(scope="class")
-    def models(self):
-        return {
-            "md_table.sql": md_sql,
-        }
-
-    def test_plugins(self, project):
-        run_dbt()
-        res = project.run_sql("SELECT * FROM md_table", fetch="one")
-        assert res == (1, "foo")

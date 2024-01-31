@@ -72,6 +72,11 @@ class TestMDPlugin:
         project.run_sql("DROP TABLE random_logs_test")
         project.run_sql("DROP TABLE summary_of_logs_test")
 
+    def test_motherduck(self, project):
+        run_dbt()
+        res = project.run_sql("SELECT * FROM md_table", fetch="one")
+        assert res == (1, "foo")
+
     def test_incremental(self, project):
         run_dbt()
         res = project.run_sql("SELECT count(*) FROM summary_of_logs_test", fetch="one")
