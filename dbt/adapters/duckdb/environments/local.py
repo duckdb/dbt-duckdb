@@ -50,8 +50,7 @@ class LocalEnvironment(Environment):
         self._keep_open = (
             credentials.keep_open
             or credentials.path == ":memory:"
-            or credentials.path.startswith("md:")
-            or credentials.path.startswith("motherduck:")
+            or credentials.is_motherduck
         )
         self._REGISTERED_DF: dict = {}
 
