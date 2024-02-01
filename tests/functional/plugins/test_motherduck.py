@@ -97,3 +97,6 @@ class TestMDPlugin:
         run_dbt()
         res = project.run_sql("SELECT count(*) FROM summary_of_logs_test", fetch="one")
         assert res == (105,)
+
+        res = project.run_sql("SELECT schema_name FROM information_schema.schemata WHERE catalog_name = 'test'", fetch="all")
+        assert "dbt_temp_test" in [_r for (_r,) in res]
