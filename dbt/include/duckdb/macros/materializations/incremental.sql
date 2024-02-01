@@ -46,7 +46,7 @@
       {% set temp_relation = temp_relation.incorporate(path=adapter.get_temp_relation_path(this)) %}
       {% do run_query(create_schema(temp_relation)) %}
       -- then drop the temp relation after we insert the incremental data into the target relation
-      {% set need_drop_temp = True %}
+      {% do to_drop.append(temp_relation) %}
     {% endif %}
     {% if language == 'python' %}
       {% set build_python = create_table_as(False, temp_relation, compiled_code, language) %}
@@ -83,10 +83,6 @@
       {% do adapter.rename_relation(target_relation, backup_relation) %}
       {% do adapter.rename_relation(intermediate_relation, target_relation) %}
       {% do to_drop.append(backup_relation) %}
-  {% endif %}
-
-  {% if need_drop_temp %}
-      {% do to_drop.append(temp_relation) %}
   {% endif %}
 
   {% set should_revoke = should_revoke(existing_relation, full_refresh_mode) %}
