@@ -1,7 +1,8 @@
 import os
+from typing import Any
 from typing import List
 from typing import Optional
-from typing import Sequence, Any
+from typing import Sequence
 
 import agate
 
@@ -26,6 +27,7 @@ from dbt.exceptions import DbtRuntimeError
 
 TEMP_SCHEMA_NAME = "temp_schema_name"
 DEFAULT_TEMP_SCHEMA_NAME = "dbt_temp"
+
 
 class DuckDBAdapter(SQLAdapter):
     ConnectionManager = DuckDBConnectionManager
@@ -226,10 +228,10 @@ class DuckDBAdapter(SQLAdapter):
             return super().render_column_constraint(constraint)
 
     def pre_model_hook(self, config: RuntimeConfigObject) -> None:
-        """A hook for reading
-        """
+        """A hook for reading"""
         self._temp_schema_name = config.model.config.meta.get(
-            TEMP_SCHEMA_NAME, DEFAULT_TEMP_SCHEMA_NAME)
+            TEMP_SCHEMA_NAME, DEFAULT_TEMP_SCHEMA_NAME
+        )
         super().pre_model_hook(config)
 
     @available
@@ -239,9 +241,7 @@ class DuckDBAdapter(SQLAdapter):
         table that is dropped at the end of the incremental macro or post-model hook.
         """
         return Path(
-            schema=self._temp_schema_name,
-            database=model.database,
-            identifier=model.identifier
+            schema=self._temp_schema_name, database=model.database, identifier=model.identifier
         )
 
     def post_model_hook(self, config: RuntimeConfigObject, context: Any) -> None:
@@ -251,11 +251,11 @@ class DuckDBAdapter(SQLAdapter):
         if self.is_motherduck():
             if "incremental" == config.model.get_materialization():
                 temp_relation = self.Relation(
-                    path=self.get_temp_relation_path(config.model),
-                    type=RelationType.Table
+                    path=self.get_temp_relation_path(config.model), type=RelationType.Table
                 )
                 self.drop_relation(temp_relation)
         super().post_model_hook(config, context)
+
 
 # Change `table_a/b` to `table_aaaaa/bbbbb` to avoid duckdb binding issues when relation_a/b
 # is called "table_a" or "table_b" in some of the dbt tests
