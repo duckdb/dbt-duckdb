@@ -51,6 +51,10 @@ class DuckDBAdapter(SQLAdapter):
         self.execute("select 1 as id")
 
     @available
+    def is_motherduck(self):
+        return self.config.credentials.is_motherduck
+
+    @available
     def convert_datetimes_to_strs(self, table: agate.Table) -> agate.Table:
         for column in table.columns:
             if isinstance(column.data_type, agate.DateTime):

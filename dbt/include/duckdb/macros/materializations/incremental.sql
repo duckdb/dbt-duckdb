@@ -2,7 +2,7 @@
 
   {%- set language = model['language'] -%}
   -- only create temp tables if using local duckdb, as it is not currently supported for remote databases
-  {%- set temporary = not adapter.config.credentials.is_motherduck -%}
+  {%- set temporary = not adapter.is_motherduck() -%}
 
   -- relations
   {%- set existing_relation = load_cached_relation(this) -%}
