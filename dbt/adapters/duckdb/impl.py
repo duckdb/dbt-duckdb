@@ -1,4 +1,5 @@
 import os
+from typing import Any
 from typing import List
 from typing import Optional
 from typing import Sequence
@@ -19,8 +20,13 @@ from dbt.context.providers import RuntimeConfigObject
 from dbt.contracts.connection import AdapterResponse
 from dbt.contracts.graph.nodes import ColumnLevelConstraint
 from dbt.contracts.graph.nodes import ConstraintType
+from dbt.contracts.relation import Path
+from dbt.contracts.relation import RelationType
 from dbt.exceptions import DbtInternalError
 from dbt.exceptions import DbtRuntimeError
+
+TEMP_SCHEMA_NAME = "temp_schema_name"
+DEFAULT_TEMP_SCHEMA_NAME = "dbt_temp"
 
 
 class DuckDBAdapter(SQLAdapter):
@@ -36,6 +42,9 @@ class DuckDBAdapter(SQLAdapter):
         ConstraintType.foreign_key: ConstraintSupport.ENFORCED,
     }
 
+    # can be overridden via the model config metadata
+    _temp_schema_name = DEFAULT_TEMP_SCHEMA_NAME
+
     @classmethod
     def date_function(cls) -> str:
         return "now()"
@@ -46,6 +55,10 @@ class DuckDBAdapter(SQLAdapter):
 
     def debug_query(self):
         self.execute("select 1 as id")
+
+    @available
+    def is_motherduck(self):
+        return self.config.credentials.is_motherduck
 
     @available
     def convert_datetimes_to_strs(self, table: agate.Table) -> agate.Table:
@@ -216,6 +229,35 @@ class DuckDBAdapter(SQLAdapter):
             return f"references {constraint.expression}"
         else:
             return super().render_column_constraint(constraint)
+
+    def pre_model_hook(self, config: Any) -> None:
+        """A hook for getting the temp schema name from the model config"""
+        self._temp_schema_name = config.model.config.meta.get(
+            TEMP_SCHEMA_NAME, self._temp_schema_name
+        )
+        super().pre_model_hook(config)
+
+    @available
+    def get_temp_relation_path(self, model: Any):
+        """This is a workaround to enable incremental models on MotherDuck because it
+        currently doesn't support remote temporary tables. Instead we use a regular
+        table that is dropped at the end of the incremental macro or post-model hook.
+        """
+        return Path(
+            schema=self._temp_schema_name, database=model.database, identifier=model.identifier
+        )
+
+    def post_model_hook(self, config: Any, context: Any) -> None:
+        """A hook for cleaning up the remote temporary table on MotherDuck if the
+        incremental model materialization fails to do so.
+        """
+        if self.is_motherduck():
+            if "incremental" == config.model.get_materialization():
+                temp_relation = self.Relation(
+                    path=self.get_temp_relation_path(config.model), type=RelationType.Table
+                )
+                self.drop_relation(temp_relation)
+        super().post_model_hook(config, context)
 
 
 # Change `table_a/b` to `table_aaaaa/bbbbb` to avoid duckdb binding issues when relation_a/b
