@@ -75,7 +75,6 @@ class TestMDPlugin:
         project.run_sql("DROP VIEW md_table")
         project.run_sql("DROP TABLE random_logs_test")
         project.run_sql("DROP TABLE summary_of_logs_test")
-        project.run_sql("DROP SCHEMA plugin_test.temp")
         project.run_sql("DROP TABLE plugin_table")
 
     def test_motherduck(self, project):
