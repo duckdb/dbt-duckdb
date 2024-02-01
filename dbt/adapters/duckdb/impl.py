@@ -231,7 +231,7 @@ class DuckDBAdapter(SQLAdapter):
             return super().render_column_constraint(constraint)
 
     def pre_model_hook(self, config: Any) -> None:
-        """A hook for reading"""
+        """A hook for getting the temp schema name from the model config"""
         self._temp_schema_name = config.model.config.meta.get(
             TEMP_SCHEMA_NAME, self._temp_schema_name
         )
