@@ -34,11 +34,6 @@ from {{ ref('random_logs_test') }}
 group by all
 """
 
-# Reads from a MD database in my test account in the cloud
-md_sql = """
-    select * FROM plugin_test.main.plugin_table
-"""
-
 @pytest.mark.skip_profile("buenavista", "file", "memory")
 class TestMDPlugin:
     @pytest.fixture(scope="class")
@@ -59,7 +54,18 @@ class TestMDPlugin:
         }
 
     @pytest.fixture(scope="class")
-    def models(self):
+    def database_name(self, dbt_profile_target):
+        return dbt_profile_target["path"].replace("md:", "")
+    
+    @pytest.fixture(scope="class")
+    def md_sql(self, database_name):
+        # Reads from a MD database in my test account in the cloud
+        return f"""
+            select * FROM {database_name}.main.plugin_table
+        """
+
+    @pytest.fixture(scope="class")
+    def models(self, md_sql):
         return {
             "md_table.sql": md_sql,
             "random_logs_test.sql": random_logs_sql,
@@ -67,8 +73,8 @@ class TestMDPlugin:
         }
 
     @pytest.fixture(autouse=True)
-    def run_dbt_scope(self, project):
-        project.run_sql("CREATE DATABASE IF NOT EXISTS plugin_test")
+    def run_dbt_scope(self, project, database_name):
+        project.run_sql(f"CREATE DATABASE IF NOT EXISTS {database_name}")
         project.run_sql("CREATE OR REPLACE TABLE plugin_table (i integer, j string)")
         project.run_sql("INSERT INTO plugin_table (i, j) VALUES (1, 'foo')")
         yield
