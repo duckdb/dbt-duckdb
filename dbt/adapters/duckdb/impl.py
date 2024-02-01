@@ -42,6 +42,9 @@ class DuckDBAdapter(SQLAdapter):
         ConstraintType.foreign_key: ConstraintSupport.ENFORCED,
     }
 
+    # can be overridden via the model config metadata
+    _temp_schema_name = DEFAULT_TEMP_SCHEMA_NAME
+
     @classmethod
     def date_function(cls) -> str:
         return "now()"
@@ -230,7 +233,7 @@ class DuckDBAdapter(SQLAdapter):
     def pre_model_hook(self, config: Any) -> None:
         """A hook for reading"""
         self._temp_schema_name = config.model.config.meta.get(
-            TEMP_SCHEMA_NAME, DEFAULT_TEMP_SCHEMA_NAME
+            TEMP_SCHEMA_NAME, self._temp_schema_name
         )
         super().pre_model_hook(config)
 
