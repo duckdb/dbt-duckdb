@@ -227,7 +227,7 @@ class DuckDBAdapter(SQLAdapter):
         else:
             return super().render_column_constraint(constraint)
 
-    def pre_model_hook(self, config: RuntimeConfigObject) -> None:
+    def pre_model_hook(self, config: Any) -> None:
         """A hook for reading"""
         self._temp_schema_name = config.model.config.meta.get(
             TEMP_SCHEMA_NAME, DEFAULT_TEMP_SCHEMA_NAME
@@ -235,7 +235,7 @@ class DuckDBAdapter(SQLAdapter):
         super().pre_model_hook(config)
 
     @available
-    def get_temp_relation_path(self, model: Relation):
+    def get_temp_relation_path(self, model: Any):
         """This is a workaround to enable incremental models on MotherDuck because it
         currently doesn't support remote temporary tables. Instead we use a regular
         table that is dropped at the end of the incremental macro or post-model hook.
@@ -244,7 +244,7 @@ class DuckDBAdapter(SQLAdapter):
             schema=self._temp_schema_name, database=model.database, identifier=model.identifier
         )
 
-    def post_model_hook(self, config: RuntimeConfigObject, context: Any) -> None:
+    def post_model_hook(self, config: Any, context: Any) -> None:
         """A hook for cleaning up the remote temporary table on MotherDuck if the
         incremental model materialization fails to do so.
         """
