@@ -41,7 +41,7 @@
     {% set build_sql = create_table_as(False, intermediate_relation, compiled_code, language) %}
     {% set need_swap = true %}
   {% else %}
-    {% if not temporary or language == 'python' %}
+    {% if not temporary %}
       -- if not using a temporary table we will add the temp relation to the schema "temp" on the target database
       {% set temp_relation = temp_relation.incorporate(path=adapter.get_temp_relation_path(this)) %}
       {% do run_query(create_schema(temp_relation)) %}

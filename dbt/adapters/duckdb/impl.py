@@ -1,7 +1,7 @@
 import os
 from typing import List
 from typing import Optional
-from typing import Sequence, Mapping, Any
+from typing import Sequence, Any
 
 import agate
 
@@ -24,6 +24,7 @@ from dbt.contracts.relation import RelationType
 from dbt.exceptions import DbtInternalError
 from dbt.exceptions import DbtRuntimeError
 
+TEMP_SCHEMA_NAME = "temp_schema_name"
 DEFAULT_TEMP_SCHEMA_NAME = "dbt_temp"
 
 class DuckDBAdapter(SQLAdapter):
@@ -224,33 +225,36 @@ class DuckDBAdapter(SQLAdapter):
         else:
             return super().render_column_constraint(constraint)
 
-    def _get_temp_schema_name(self, model):
-        return DEFAULT_TEMP_SCHEMA_NAME
+    def pre_model_hook(self, config: RuntimeConfigObject) -> None:
+        """A hook for reading
+        """
+        self._temp_schema_name = config.model.config.meta.get(
+            TEMP_SCHEMA_NAME, DEFAULT_TEMP_SCHEMA_NAME)
+        super().pre_model_hook(config)
 
     @available
-    def get_temp_relation_path(self, model):
-        """This is a workaround for enabling remote temporary tables as used in
-        incremental models. Instead of CREATE TEMPORARY TABLE, it runs
-        CREATE TABLE with a relation in a temporary schema (dbt_temp by default).
-        The relation will be dropped at the end of the incremental macro, or
-        if the model fails, it is dropped in the post-model hook.
+    def get_temp_relation_path(self, model: Relation):
+        """This is a workaround to enable incremental models on MotherDuck because it
+        currently doesn't support remote temporary tables. Instead we use a regular
+        table that is dropped at the end of the incremental macro or post-model hook.
         """
-        return Path(**{
-            "schema": self._get_temp_schema_name(model),
-            "database": model.database,
-            "identifier": f"{model.schema}__{model.identifier}"
-        })
+        return Path(
+            schema=self._temp_schema_name,
+            database=model.database,
+            identifier=model.identifier
+        )
 
-    def post_model_hook(self, config: Mapping[str, Any], context: Any) -> None:
-        """A hook for cleaning up the remote temporary table if the incremental 
-        model materialization fails.
+    def post_model_hook(self, config: RuntimeConfigObject, context: Any) -> None:
+        """A hook for cleaning up the remote temporary table on MotherDuck if the
+        incremental model materialization fails to do so.
         """
-        if "incremental" == config.model.get_materialization():
-            temp_relation = self.Relation(
-                path=self.get_temp_relation_path(config.model),
-                type=RelationType.Table
-            )
-            self.drop_relation(temp_relation)
+        if self.is_motherduck():
+            if "incremental" == config.model.get_materialization():
+                temp_relation = self.Relation(
+                    path=self.get_temp_relation_path(config.model),
+                    type=RelationType.Table
+                )
+                self.drop_relation(temp_relation)
         super().post_model_hook(config, context)
 
 # Change `table_a/b` to `table_aaaaa/bbbbb` to avoid duckdb binding issues when relation_a/b

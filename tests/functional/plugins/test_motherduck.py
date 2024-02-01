@@ -4,7 +4,7 @@ from dbt.tests.util import (
 )
 
 random_logs_sql = """
-{{ config(materialized='table') }}
+{{ config(materialized='table', meta=dict(temp_schema_name='dbt_temp_test')) }}
 
 select 
   uuid()::varchar as log_id,
@@ -16,7 +16,8 @@ from generate_series(1, 10000) g(x)
 summary_of_logs_sql = """
 {{
     config(
-        materialized='incremental'
+        materialized='incremental',
+        meta=dict(temp_schema_name='dbt_temp_test'),
     )
 }}
 
