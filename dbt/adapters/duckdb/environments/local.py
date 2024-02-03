@@ -48,10 +48,7 @@ class LocalEnvironment(Environment):
         self.handle_count = 0
         self.lock = threading.RLock()
         self._keep_open = (
-            credentials.keep_open
-            or credentials.path == ":memory:"
-            or credentials.path.startswith("md:")
-            or credentials.path.startswith("motherduck:")
+            credentials.keep_open or credentials.path == ":memory:" or credentials.is_motherduck
         )
         self._REGISTERED_DF: dict = {}
 

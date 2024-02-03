@@ -313,6 +313,8 @@ with an extension that matches the `format` argument (`parquet`, `csv`, or `json
 relative to the current working directory, but you can change the default directory (or S3 bucket/prefix) by specifying the
 `external_root` setting in your DuckDB profile.
 
+dbt-duckdb supports the `delete+insert` and `append` strategies for incremental `table` models, but unfortunately it does not yet support incremental materialization strategies for `external` models.
+
 #### Re-running external models with an in-memory version of dbt-duckdb
 When using `:memory:` as the DuckDB database, subsequent dbt runs can fail when selecting a subset of models that depend on external tables. This is because external files are only registered as  DuckDB views when they are created, not when they are referenced. To overcome this issue we have provided the `register_upstream_external_models` macro that can be triggered at the beginning of a run. To enable this automatic registration, place the following in your `dbt_project.yml` file:
 

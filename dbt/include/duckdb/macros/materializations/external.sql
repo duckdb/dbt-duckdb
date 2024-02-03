@@ -79,6 +79,7 @@
   -- register table into glue
   {%- set plugin_name = config.get('plugin') -%}
   {%- set glue_register = config.get('glue_register', default=false) -%}
+  {%- set partition_columns = config.get('partition_columns', []) -%}
   {% if plugin_name is not none or glue_register is true %}
     {% if glue_register %}
       {# legacy hack to set the glue database name, deprecate this #}

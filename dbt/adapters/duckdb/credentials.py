@@ -146,6 +146,15 @@ class DuckDBCredentials(Credentials):
     # by networking issues)
     retries: Optional[Retries] = None
 
+    @property
+    def is_motherduck(self):
+        parsed = urlparse(self.path)
+        return self._is_motherduck(parsed.scheme)
+
+    @staticmethod
+    def _is_motherduck(scheme: str) -> bool:
+        return scheme in {"md", "motherduck"}
+
     @classmethod
     def __pre_deserialize__(cls, data: Dict[Any, Any]) -> Dict[Any, Any]:
         data = super().__pre_deserialize__(data)
@@ -159,7 +168,7 @@ class DuckDBCredentials(Credentials):
             path_db = os.path.splitext(base_file)[0]
             # For MotherDuck, turn on disable_transactions unless
             # it's explicitly set already by the user
-            if parsed.scheme in {"md", "motherduck"}:
+            if cls._is_motherduck(parsed.scheme):
                 if "disable_transactions" not in data:
                     data["disable_transactions"] = True
                 if path_db == "":
