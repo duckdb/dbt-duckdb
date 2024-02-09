@@ -119,7 +119,7 @@ class Environment(abc.ABC):
             user_agent = f"dbt/{__version__}"
             if "custom_user_agent" in config:
                 user_agent = f"{user_agent} {config['custom_user_agent']}"
-                
+
             config["custom_user_agent"] = user_agent
 
         if creds.retries:
