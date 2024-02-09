@@ -1,7 +1,11 @@
 import pytest
+from unittest import mock
 from dbt.tests.util import (
     run_dbt,
 )
+from dbt.adapters.duckdb.environments import Environment
+from dbt.adapters.duckdb.credentials import DuckDBCredentials
+from dbt.version import __version__
 
 random_logs_sql = """
 {{ config(materialized='table', meta=dict(temp_schema_name='dbt_temp_test')) }}
@@ -100,3 +104,17 @@ class TestMDPlugin:
 
         res = project.run_sql("SELECT schema_name FROM information_schema.schemata WHERE catalog_name = 'test'", fetch="all")
         assert "dbt_temp_test" in [_r for (_r,) in res]
+
+def test_motherduck_user_agent(dbt_profile_target):
+    test_path = dbt_profile_target["path"]
+    creds = DuckDBCredentials(path=test_path)
+    with mock.patch("dbt.adapters.duckdb.environments.duckdb.connect") as mock_connect:
+        Environment.initialize_db(creds)
+        if creds.is_motherduck:
+            kwargs = {
+                'read_only': False,
+                'config': {'custom_user_agent': f'dbt/{__version__}'}
+            }
+            mock_connect.assert_called_with(test_path, **kwargs)
+        else:
+            mock_connect.assert_called_with(test_path, read_only=False, config = {})
