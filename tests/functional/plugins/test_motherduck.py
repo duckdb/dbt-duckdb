@@ -115,3 +115,11 @@ def test_motherduck_user_agent(dbt_profile_target):
     with mock.patch("dbt.adapters.duckdb.environments.duckdb.connect") as mock_connect:
         Environment.initialize_db(creds)
         mock_connect.assert_called_with(test_path, **kwargs)
+
+
+def test_no_motherduck_user_agent(dbt_profile_target):
+    test_path = ":memory:"
+    creds = DuckDBCredentials(path=test_path)
+    with mock.patch("dbt.adapters.duckdb.environments.duckdb.connect") as mock_connect:
+        Environment.initialize_db(creds)
+        mock_connect.assert_called_with(test_path, read_only=False, config = {})
