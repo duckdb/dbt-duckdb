@@ -5,6 +5,7 @@ from dbt.tests.util import (
 )
 from dbt.adapters.duckdb.environments import Environment
 from dbt.adapters.duckdb.credentials import DuckDBCredentials
+from dbt.version import __version__
 
 random_logs_sql = """
 {{ config(materialized='table', meta=dict(temp_schema_name='dbt_temp_test')) }}
@@ -37,10 +38,6 @@ from {{ ref('random_logs_test') }}
 {% endif %}
 group by all
 """
-
-@pytest.fixture
-def test_path():
-    return "md:test"
 
 @pytest.mark.skip_profile("buenavista", "file", "memory")
 class TestMDPlugin:
@@ -108,10 +105,11 @@ class TestMDPlugin:
         res = project.run_sql("SELECT schema_name FROM information_schema.schemata WHERE catalog_name = 'test'", fetch="all")
         assert "dbt_temp_test" in [_r for (_r,) in res]
 
-def test_motherduck_user_agent(test_path):
+def test_motherduck_user_agent(dbt_profile_target):
+    test_path = dbt_profile_target["path"]
     kwargs = {
         'read_only': False,
-        'config': {'custom_user_agent': 'dbt/1.7.6'}
+        'config': {'custom_user_agent': f'dbt/{__version__}'}
     }
     creds = DuckDBCredentials(path=test_path)
     with mock.patch("dbt.adapters.duckdb.environments.duckdb.connect") as mock_connect:
