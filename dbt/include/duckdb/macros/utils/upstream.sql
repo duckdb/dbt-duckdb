@@ -1,3 +1,6 @@
+-- todo: understand this function 
+-- we call to create all views over the location but this doesnt work for df registration 
+-- so we have to call some adapter function which takes the config and register the df and create view over that  
 {%- macro register_upstream_external_models() -%}
 {% if execute %}
 {% set upstream_nodes = {} %}

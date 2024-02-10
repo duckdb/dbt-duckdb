@@ -1,5 +1,6 @@
 from typing import Any
 from typing import Dict
+from duckdb import DuckDBPyRelation
 
 import pandas as pd
 from sqlalchemy import create_engine
@@ -30,7 +31,7 @@ class Plugin(BasePlugin):
             with self.engine.connect() as conn:
                 return pd.read_sql_table(table, con=conn)
 
-    def store(self, target_config: TargetConfig):
+    def store(self, df: DuckDBPyRelation, target_config: TargetConfig):
         # first, load the data frame from the external location
         df = pd_utils.target_to_df(target_config)
         table_name = target_config.relation.identifier

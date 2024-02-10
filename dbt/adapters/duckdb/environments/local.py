@@ -6,7 +6,9 @@ from .. import utils
 from dbt.contracts.connection import AdapterResponse
 from dbt.exceptions import DbtRuntimeError
 
+import duckdb
 
+duckdb.sql()
 class DuckDBCursorWrapper:
     def __init__(self, cursor):
         self._cursor = cursor
@@ -24,7 +26,7 @@ class DuckDBCursorWrapper:
         except RuntimeError as e:
             raise DbtRuntimeError(str(e))
 
-
+    
 class DuckDBConnectionWrapper:
     def __init__(self, cursor, env):
         self._cursor = DuckDBCursorWrapper(cursor)
@@ -132,21 +134,32 @@ class LocalEnvironment(Environment):
         handle.close()
 
     def store_relation(self, plugin_name: str, target_config: utils.TargetConfig) -> None:
-        if plugin_name not in self._plugins:
-            if plugin_name.startswith("glue|"):
-                from ..plugins import glue
+        # some plugin have to be initialized on the fly? glue for example?
 
-                _, glue_db = plugin_name.split("|")
-                config = (self.creds.settings or {}).copy()
-                config["glue_database"] = glue_db
-                self._plugins[plugin_name] = glue.Plugin(plugin_name, config)
-            else:
-                raise Exception(
-                    f"Plugin {plugin_name} not found; known plugins are: "
-                    + ",".join(self._plugins.keys())
-                )
+        if plugin_name not in self._plugins:
+            raise Exception(
+                f"Plugin {plugin_name} not found; known plugins are: "
+                + ",".join(self._plugins.keys())
+            )
         plugin = self._plugins[plugin_name]
-        plugin.store(target_config)
+        
+
+        #export data with the store model 
+        handle = self.handle()
+        cursor = handle.cursor()        
+        
+        df = cursor.sql(target_config.config.model.compiled_code)
+        #hand over Duckdb format that each plugin can choose which type of integration to use
+        plugin.store(df, target_config)
+
+        cursor.close()
+        handle.close()
+
+        # all are by default false, has to be turned on per plugin
+        if plugin.can_be_upstream_referenced():
+            #create df and view which can be referenced in the run following run
+            source_config = plugin.create_source_config(target_config)
+            plugin.load(plugin_name, source_config)
 
     def close(self):
         if self.conn:

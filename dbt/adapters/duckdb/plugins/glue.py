@@ -5,6 +5,7 @@ from typing import Optional
 from typing import Sequence
 
 import boto3
+from duckdb import DuckDBPyRelation
 from mypy_boto3_glue import GlueClient
 from mypy_boto3_glue.type_defs import ColumnTypeDef
 from mypy_boto3_glue.type_defs import GetTableResponseTypeDef
@@ -263,7 +264,7 @@ class Plugin(BasePlugin):
         self.database = config.get("glue_database", "default")
         self.delimiter = config.get("delimiter", ",")
 
-    def store(self, target_config: TargetConfig):
+    def store(self, df: DuckDBPyRelation, target_config: TargetConfig):
         assert target_config.location is not None
         assert target_config.relation.identifier is not None
         table: str = target_config.relation.identifier

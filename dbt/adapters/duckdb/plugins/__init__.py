@@ -4,7 +4,7 @@ from typing import Any
 from typing import Dict
 from typing import Optional
 
-from duckdb import DuckDBPyConnection
+from duckdb import DuckDBPyConnection, DuckDBPyRelation
 
 from ..utils import SourceConfig
 from ..utils import TargetConfig
@@ -109,8 +109,14 @@ class BasePlugin:
         """
         raise NotImplementedError(f"load method not implemented for {self.name}")
 
-    def store(self, target_config: TargetConfig):
+    def store(self, df: DuckDBPyRelation, target_config: TargetConfig):
         raise NotImplementedError(f"store method not implemented for {self.name}")
+
+    def create_source_config(target_config: TargetConfig) -> SourceConfig:
+        raise NotImplementedError(f"store method not implemented for {self.name}")
+    
+    def can_be_upstream_referenced():
+        return False
 
     def configure_cursor(self, cursor):
         """

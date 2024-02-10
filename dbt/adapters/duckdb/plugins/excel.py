@@ -3,6 +3,7 @@ import pathlib
 from threading import Lock
 from typing import Any
 from typing import Dict
+from duckdb import DuckDBPyRelation
 
 import pandas as pd
 from pandas.io.formats import excel
@@ -42,7 +43,7 @@ class Plugin(BasePlugin):
         sheet_name = source_config.get("sheet_name", 0)
         return pd.read_excel(source_location, sheet_name=sheet_name)
 
-    def store(self, target_config: TargetConfig):
+    def store(self, df: DuckDBPyRelation, target_config: TargetConfig):
         plugin_output_config = self._config["output"]
 
         # Create the writer on the first instance of the call to store.

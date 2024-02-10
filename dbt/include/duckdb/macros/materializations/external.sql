@@ -7,14 +7,11 @@
   {%- set read_location = adapter.external_read_location(location, rendered_options) -%}
 
   -- set language - python or sql
-  -- i have to learn general about python models
   {%- set language = model['language'] -%}
 
   {%- set target_relation = this.incorporate(type='view') %}
 
   -- Continue as normal materialization
-  -- Why do we have temp and intermediate relation? 
-  -- What does load_cached_relation do?
   {%- set existing_relation = load_cached_relation(this) -%}
   {%- set temp_relation =  make_intermediate_relation(this.incorporate(type='table'), suffix='__dbt_tmp') -%}
   {%- set intermediate_relation =  make_intermediate_relation(target_relation, suffix='__dbt_int') -%}
@@ -30,8 +27,6 @@
   {%- set backup_relation = make_backup_relation(target_relation, backup_relation_type) -%}
   -- as above, the backup_relation should not already exist
   {%- set preexisting_backup_relation = load_cached_relation(backup_relation) -%}
-  
-  --What is grants here?
   -- grab current tables grants config for comparision later on
   {% set grant_config = config.get('grants') %}
 
@@ -67,11 +62,10 @@
   {{ adapter.rename_relation(intermediate_relation, target_relation) }}
 
   {{ run_hooks(post_hooks, inside_transaction=True) }}
-  -- What is should_revoke?
+
   {% set should_revoke = should_revoke(existing_relation, full_refresh_mode=True) %}
   {% do apply_grants(target_relation, grant_config, should_revoke=should_revoke) %}
 
-  --What does that do?
   {% do persist_docs(target_relation, model) %}
 
   -- `COMMIT` happens here
@@ -82,10 +76,9 @@
   {{ drop_relation_if_exists(temp_relation) }}
 
   -- register table into glue
-  --I dont know glue so can you explain me a bit about that?
   {%- set plugin_name = config.get('plugin') -%}
   {%- set glue_register = config.get('glue_register', default=false) -%}
-  {%- set partition_columns = config.get('partition_columns', []) -%} -- this one is never used?
+  {%- set partition_columns = config.get('partition_columns', []) -%}
   {% if plugin_name is not none or glue_register is true %}
     {% if glue_register %}
       {# legacy hack to set the glue database name, deprecate this #}
@@ -96,6 +89,6 @@
 
   {{ run_hooks(post_hooks, inside_transaction=False) }}
 
-  {{ return({'relations': [target_relation]}) }} -- to what i return?
+  {{ return({'relations': [target_relation]}) }}
 
 {% endmaterialization %}
