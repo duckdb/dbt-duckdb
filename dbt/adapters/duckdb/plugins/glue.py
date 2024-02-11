@@ -213,11 +213,11 @@ def _add_partition_columns(
         partition_keys.append(partition_column)
     table_def["PartitionKeys"] = partition_keys
     # Remove columns from StorageDescriptor if they match with partition columns to avoid duplicate columns
-    for column in partition_columns:
+    for p_column in partition_columns:
         table_def["StorageDescriptor"]["Columns"] = [
             column
             for column in table_def["StorageDescriptor"]["Columns"]
-            if not (column["Name"] == column["Name"] and column["Type"] == column["Type"])
+            if not (column["Name"] == p_column["Name"] and column["Type"] == p_column["Type"])
         ]
     return table_def
 
