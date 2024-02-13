@@ -154,7 +154,7 @@ class DuckDBCredentials(Credentials):
     @staticmethod
     def _is_motherduck(scheme: str) -> bool:
         return scheme in {"md", "motherduck"}
-    
+
     @property
     def motherduck_token(self) -> str:
         plugins = self.plugins or []
