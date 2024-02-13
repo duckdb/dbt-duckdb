@@ -12,6 +12,3 @@ class Plugin(BasePlugin):
 
     def configure_connection(self, conn: DuckDBPyConnection):
         conn.load_extension("motherduck")
-        if self._token:
-            connect_stmt = f"SET motherduck_token={self._token}')"
-            conn.execute(connect_stmt)

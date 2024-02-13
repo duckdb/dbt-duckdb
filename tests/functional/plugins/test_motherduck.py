@@ -1,5 +1,6 @@
 import pytest
 from unittest import mock
+from unittest.mock import Mock
 from dbt.tests.util import (
     run_dbt,
 )
@@ -43,7 +44,7 @@ group by all
 class TestMDPlugin:
     @pytest.fixture(scope="class")
     def profiles_config_update(self, dbt_profile_target):
-        md_config = {}
+        md_config = {"token": dbt_profile_target.get("token")}
         plugins = [{"module": "motherduck", "config": md_config}]
         return {
             "test": {
@@ -114,6 +115,23 @@ def test_motherduck_user_agent(dbt_profile_target):
             kwargs = {
                 'read_only': False,
                 'config': {'custom_user_agent': f'dbt/{__version__}'}
+            }
+            mock_connect.assert_called_with(test_path, **kwargs)
+        else:
+            mock_connect.assert_called_with(test_path, read_only=False, config = {})
+
+def test_motherduck_token(dbt_profile_target):
+    test_path = dbt_profile_target["path"]
+    mock_plugin = Mock(module="motherduck")
+    mock_plugin.config = {"token": "quack"}
+    creds = DuckDBCredentials(path=test_path, plugins=[mock_plugin])
+
+    with mock.patch("dbt.adapters.duckdb.environments.duckdb.connect") as mock_connect:
+        Environment.initialize_db(creds)
+        if creds.is_motherduck:
+            kwargs = {
+                'read_only': False,
+                'config': {'custom_user_agent': f'dbt/{__version__}', 'motherduck_token': 'quack'}
             }
             mock_connect.assert_called_with(test_path, **kwargs)
         else:

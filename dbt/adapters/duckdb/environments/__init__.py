@@ -122,6 +122,9 @@ class Environment(abc.ABC):
 
             config["custom_user_agent"] = user_agent
 
+            if creds.motherduck_token:
+                config["motherduck_token"] = creds.motherduck_token
+
         if creds.retries:
             success, attempt, exc = False, 0, None
             while not success and attempt < creds.retries.connect_attempts:
