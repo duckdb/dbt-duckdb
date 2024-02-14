@@ -92,6 +92,8 @@ class BasePlugin:
     def update_connection_config(self, creds: DuckDBCredentials, config: Dict[str, Any]):
         """
         This updates the DuckDB connection config if needed.
+        This method should be overridden by subclasses to add any additional
+        config options needed on the connection, such as a connection token or user agent
 
         :param creds: DuckDB credentials
         :param config: Config dictionary to be passed to duckdb.connect
