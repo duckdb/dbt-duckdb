@@ -6,6 +6,8 @@ from dbt.tests.util import (
 )
 from dbt.adapters.duckdb.environments import Environment
 from dbt.adapters.duckdb.credentials import DuckDBCredentials
+from dbt.adapters.duckdb.credentials import PluginConfig
+from dbt.adapters.duckdb.plugins.motherduck import Plugin
 from dbt.version import __version__
 
 random_logs_sql = """
@@ -106,33 +108,36 @@ class TestMDPlugin:
         res = project.run_sql("SELECT schema_name FROM information_schema.schemata WHERE catalog_name = 'test'", fetch="all")
         assert "dbt_temp_test" in [_r for (_r,) in res]
 
-def test_motherduck_user_agent(dbt_profile_target):
-    test_path = dbt_profile_target["path"]
-    creds = DuckDBCredentials(path=test_path)
-    with mock.patch("dbt.adapters.duckdb.environments.duckdb.connect") as mock_connect:
-        Environment.initialize_db(creds)
-        if creds.is_motherduck:
-            kwargs = {
-                'read_only': False,
-                'config': {'custom_user_agent': f'dbt/{__version__}'}
-            }
-            mock_connect.assert_called_with(test_path, **kwargs)
-        else:
-            mock_connect.assert_called_with(test_path, read_only=False, config = {})
 
-def test_motherduck_token(dbt_profile_target):
-    test_path = dbt_profile_target["path"]
-    mock_plugin = Mock(module="motherduck")
-    mock_plugin.config = {"token": "quack"}
-    creds = DuckDBCredentials(path=test_path, plugins=[mock_plugin])
+@pytest.fixture
+def mock_md_plugin():
+    return Plugin.create("motherduck")
 
+
+@pytest.fixture
+def mock_creds(dbt_profile_target):
+    plugin_config = PluginConfig(module="motherduck", config={"token": "quack"})
+    if "md:" in dbt_profile_target["path"]:
+        return DuckDBCredentials(path=dbt_profile_target["path"], plugins=[plugin_config])
+    return DuckDBCredentials(path=dbt_profile_target["path"])
+
+
+@pytest.fixture
+def mock_plugins(mock_creds, mock_md_plugin):
+    plugins = {}
+    if mock_creds.is_motherduck:
+        plugins["motherduck"] = mock_md_plugin
+    return plugins
+
+
+def test_motherduck_user_agent(dbt_profile_target, mock_plugins, mock_creds):
     with mock.patch("dbt.adapters.duckdb.environments.duckdb.connect") as mock_connect:
-        Environment.initialize_db(creds)
-        if creds.is_motherduck:
+        Environment.initialize_db(mock_creds, plugins=mock_plugins)
+        if mock_creds.is_motherduck:
             kwargs = {
                 'read_only': False,
                 'config': {'custom_user_agent': f'dbt/{__version__}', 'motherduck_token': 'quack'}
             }
-            mock_connect.assert_called_with(test_path, **kwargs)
+            mock_connect.assert_called_with(dbt_profile_target["path"], **kwargs)
         else:
-            mock_connect.assert_called_with(test_path, read_only=False, config = {})
+            mock_connect.assert_called_with(dbt_profile_target["path"], read_only=False, config = {})

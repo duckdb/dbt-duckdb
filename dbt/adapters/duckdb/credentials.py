@@ -165,7 +165,7 @@ class DuckDBCredentials(Credentials):
         """
         plugins = self.plugins or []
         for plugin in plugins:
-            if plugin.module == "motherduck" and plugin.config:
+            if plugin.config:
                 token = plugin.config.get("token") or ""
                 return str(token)
         return ""
