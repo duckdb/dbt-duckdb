@@ -67,7 +67,7 @@ def dbt_profile_target(profile_type, bv_server_process, tmp_path_factory):
         profile["path"] = str(tmp_path_factory.getbasetemp() / "tmp.db")
     elif profile_type == "md":
         # Test against MotherDuck
-        if MOTHERDUCK_TOKEN not in os.environ or MOTHERDUCK_TOKEN.lower() not in os.environ:
+        if MOTHERDUCK_TOKEN not in os.environ and MOTHERDUCK_TOKEN.lower() not in os.environ:
             if TEST_MOTHERDUCK_TOKEN not in os.environ:
                 raise ValueError(
                     f"Please set the {MOTHERDUCK_TOKEN} or {TEST_MOTHERDUCK_TOKEN} \
