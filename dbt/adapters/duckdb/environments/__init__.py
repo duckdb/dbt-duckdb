@@ -122,7 +122,7 @@ class Environment(abc.ABC):
 
             config["custom_user_agent"] = user_agent
 
-            if creds.motherduck_token:
+            if creds.motherduck_token != "":
                 config["motherduck_token"] = creds.motherduck_token
 
         if creds.retries:
