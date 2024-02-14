@@ -155,21 +155,6 @@ class DuckDBCredentials(Credentials):
     def _is_motherduck(scheme: str) -> bool:
         return scheme in {"md", "motherduck"}
 
-    @property
-    def token_from_config(self) -> str:
-        """Load the token from the MotherDuck plugin config
-        If not specified, this returns an empty string
-
-        Returns:
-            str: MotherDuck token
-        """
-        plugins = self.plugins or []
-        for plugin in plugins:
-            if plugin.config:
-                token = plugin.config.get("token") or ""
-                return str(token)
-        return ""
-
     @classmethod
     def __pre_deserialize__(cls, data: Dict[Any, Any]) -> Dict[Any, Any]:
         data = super().__pre_deserialize__(data)

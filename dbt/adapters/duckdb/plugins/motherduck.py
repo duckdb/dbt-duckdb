@@ -15,6 +15,20 @@ class Plugin(BasePlugin):
     def configure_connection(self, conn: DuckDBPyConnection):
         conn.load_extension("motherduck")
 
+    @staticmethod
+    def token_from_config(creds: DuckDBCredentials) -> str:
+        """Load the token from the MotherDuck plugin config
+        If not specified, this returns an empty string
+
+        :param str: MotherDuck token
+        """
+        plugins = creds.plugins or []
+        for plugin in plugins:
+            if plugin.config:
+                token = plugin.config.get("token") or ""
+                return str(token)
+        return ""
+
     def update_connection_config(self, creds: DuckDBCredentials, config: Dict[str, Any]):
         user_agent = f"dbt/{__version__}"
         if "custom_user_agent" in config:
@@ -24,5 +38,6 @@ class Plugin(BasePlugin):
 
         # If a user specified the token via the plugin config,
         # pass it to the config kwarg in duckdb.connect
-        if creds.token_from_config != "":
-            config["motherduck_token"] = creds.token_from_config
+        token = self.token_from_config(creds)
+        if token != "":
+            config["motherduck_token"] = token
