@@ -15,6 +15,9 @@ resource.setrlimit(resource.RLIMIT_NOFILE, (hard_limit, hard_limit))
 # Note: fixtures with session scope need to be local
 pytest_plugins = ["dbt.tests.fixtures.project"]
 
+MOTHERDUCK_TOKEN = "MOTHERDUCK_TOKEN"
+TEST_MOTHERDUCK_TOKEN = "TEST_MOTHERDUCK_TOKEN"
+
 
 def pytest_addoption(parser):
     parser.addoption("--profile", action="store", default="memory", type=str)
@@ -64,13 +67,13 @@ def dbt_profile_target(profile_type, bv_server_process, tmp_path_factory):
         profile["path"] = str(tmp_path_factory.getbasetemp() / "tmp.db")
     elif profile_type == "md":
         # Test against MotherDuck
-        if "MOTHERDUCK_TOKEN" not in os.environ:
-            if "TEST_MOTHERDUCK_TOKEN" not in os.environ:
+        if MOTHERDUCK_TOKEN not in os.environ or MOTHERDUCK_TOKEN.lower() not in os.environ:
+            if TEST_MOTHERDUCK_TOKEN not in os.environ:
                 raise ValueError(
-                    "Please set the MOTHERDUCK_TOKEN or TEST_MOTHERDUCK_TOKEN \
+                    f"Please set the {MOTHERDUCK_TOKEN} or {TEST_MOTHERDUCK_TOKEN} \
                         environment variable to run tests against MotherDuck"
                 )
-            profile["token"] = os.environ.get("TEST_MOTHERDUCK_TOKEN")
+            profile["token"] = os.environ.get(TEST_MOTHERDUCK_TOKEN)
         profile["disable_transactions"] = True
         profile["path"] = "md:test"
     elif profile_type == "memory":
