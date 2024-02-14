@@ -89,7 +89,7 @@ class BasePlugin:
         """
         pass
 
-    def update_connection_config(self, creds: DuckDBCredentials, config: dict[str, Any]):
+    def update_connection_config(self, creds: DuckDBCredentials, config: Dict[str, Any]):
         """
         This updates the DuckDB connection config if needed.
 
