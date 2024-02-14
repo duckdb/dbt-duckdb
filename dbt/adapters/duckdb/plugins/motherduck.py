@@ -15,7 +15,7 @@ class Plugin(BasePlugin):
     def configure_connection(self, conn: DuckDBPyConnection):
         conn.load_extension("motherduck")
 
-    def update_connection_config(self, creds: DuckDBCredentials, config: dict[str, Any]):
+    def update_connection_config(self, creds: DuckDBCredentials, config: Dict[str, Any]):
         user_agent = f"dbt/{__version__}"
         if "custom_user_agent" in config:
             user_agent = f"{user_agent} {config['custom_user_agent']}"
