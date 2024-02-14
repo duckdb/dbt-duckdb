@@ -156,7 +156,13 @@ class DuckDBCredentials(Credentials):
         return scheme in {"md", "motherduck"}
 
     @property
-    def motherduck_token(self) -> str:
+    def token_from_config(self) -> str:
+        """Load the token from the MotherDuck plugin config
+        If not specified, this returns an empty string
+
+        Returns:
+            str: MotherDuck token
+        """
         plugins = self.plugins or []
         for plugin in plugins:
             if plugin.module == "motherduck" and plugin.config:

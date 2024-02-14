@@ -122,8 +122,10 @@ class Environment(abc.ABC):
 
             config["custom_user_agent"] = user_agent
 
-            if creds.motherduck_token != "":
-                config["motherduck_token"] = creds.motherduck_token
+            # If a user specified the token via the plugin config,
+            # pass it to the config kwarg in duckdb.connect
+            if creds.token_from_config != "":
+                config["motherduck_token"] = creds.token_from_config
 
         if creds.retries:
             success, attempt, exc = False, 0, None
