@@ -52,10 +52,6 @@ def bv_server_process(profile_type):
 def dbt_profile_target(profile_type, bv_server_process, tmp_path_factory):
     profile = {"type": "duckdb", "threads": 4}
 
-    if duckdb.__version__ > "0.7.1":
-        # for backwards compatibility
-        profile["settings"] = {"integer_division": True}
-
     if profile_type == "buenavista":
         profile["database"] = "memory"
         profile["remote"] = {
