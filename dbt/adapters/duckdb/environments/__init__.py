@@ -16,7 +16,6 @@ from ..utils import SourceConfig
 from ..utils import TargetConfig
 from dbt.contracts.connection import AdapterResponse
 from dbt.exceptions import DbtRuntimeError
-from dbt.version import __version__
 
 
 def _ensure_event_loop():
@@ -115,12 +114,9 @@ class Environment(abc.ABC):
         cls, creds: DuckDBCredentials, plugins: Optional[Dict[str, BasePlugin]] = None
     ):
         config = creds.config_options or {}
-        if creds.is_motherduck:
-            user_agent = f"dbt/{__version__}"
-            if "custom_user_agent" in config:
-                user_agent = f"{user_agent} {config['custom_user_agent']}"
-
-            config["custom_user_agent"] = user_agent
+        plugins = plugins or {}
+        for plugin in plugins.values():
+            plugin.update_connection_config(creds, config)
 
         if creds.retries:
             success, attempt, exc = False, 0, None

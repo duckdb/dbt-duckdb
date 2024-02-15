@@ -6,6 +6,7 @@ from typing import Optional
 
 from duckdb import DuckDBPyConnection
 
+from ..credentials import DuckDBCredentials
 from ..utils import SourceConfig
 from ..utils import TargetConfig
 from dbt.dataclass_schema import dbtClassMixin
@@ -85,6 +86,17 @@ class BasePlugin:
         additional initialization steps.
 
         :param plugin_config: A dictionary representing the plugin configuration.
+        """
+        pass
+
+    def update_connection_config(self, creds: DuckDBCredentials, config: Dict[str, Any]):
+        """
+        This updates the DuckDB connection config if needed.
+        This method should be overridden by subclasses to add any additional
+        config options needed on the connection, such as a connection token or user agent
+
+        :param creds: DuckDB credentials
+        :param config: Config dictionary to be passed to duckdb.connect
         """
         pass
 
