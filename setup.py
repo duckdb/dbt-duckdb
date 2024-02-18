@@ -40,9 +40,7 @@ setup(
         "dbt-core~=1.7.0",
         "duckdb>=0.7.0",
     ],
-    extras_require={
-        "glue": ["boto3", "mypy-boto3-glue"],
-    },
+    extras_require={"glue": ["boto3", "mypy-boto3-glue"], "md": ["duckdb>=0.7.0,<=0.9.2"]},
     classifiers=[
         "Development Status :: 5 - Production/Stable",
         "License :: OSI Approved :: Apache Software License",

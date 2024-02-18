@@ -114,6 +114,9 @@ class Environment(abc.ABC):
         cls, creds: DuckDBCredentials, plugins: Optional[Dict[str, BasePlugin]] = None
     ):
         config = creds.config_options or {}
+        plugins = plugins or {}
+        for plugin in plugins.values():
+            plugin.update_connection_config(creds, config)
 
         if creds.retries:
             success, attempt, exc = False, 0, None
