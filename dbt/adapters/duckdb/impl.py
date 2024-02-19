@@ -5,11 +5,18 @@ from typing import Optional
 from typing import Sequence
 
 import agate
+from dbt_common.contracts.constraints import ColumnLevelConstraint
+from dbt_common.contracts.constraints import ConstraintType
+from dbt_common.exceptions import DbtInternalError
+from dbt_common.exceptions import DbtRuntimeError
 
 from dbt.adapters.base import BaseRelation
 from dbt.adapters.base.column import Column as BaseColumn
 from dbt.adapters.base.impl import ConstraintSupport
 from dbt.adapters.base.meta import available
+from dbt.adapters.contracts.connection import AdapterResponse
+from dbt.adapters.contracts.relation import Path
+from dbt.adapters.contracts.relation import RelationType
 from dbt.adapters.duckdb.column import DuckDBColumn
 from dbt.adapters.duckdb.connections import DuckDBConnectionManager
 from dbt.adapters.duckdb.relation import DuckDBRelation
@@ -17,13 +24,6 @@ from dbt.adapters.duckdb.utils import TargetConfig
 from dbt.adapters.duckdb.utils import TargetLocation
 from dbt.adapters.sql import SQLAdapter
 from dbt.context.providers import RuntimeConfigObject
-from dbt.contracts.connection import AdapterResponse
-from dbt.contracts.graph.nodes import ColumnLevelConstraint
-from dbt.contracts.graph.nodes import ConstraintType
-from dbt.contracts.relation import Path
-from dbt.contracts.relation import RelationType
-from dbt.exceptions import DbtInternalError
-from dbt.exceptions import DbtRuntimeError
 
 TEMP_SCHEMA_NAME = "temp_schema_name"
 DEFAULT_TEMP_SCHEMA_NAME = "dbt_temp"

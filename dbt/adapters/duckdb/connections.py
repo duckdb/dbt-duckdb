@@ -1,6 +1,7 @@
 import atexit
 import threading
 from contextlib import contextmanager
+from multiprocessing.context import SpawnContext
 from typing import Optional
 from typing import Tuple
 
@@ -8,12 +9,14 @@ import agate
 
 import dbt.exceptions
 from . import environments
+from dbt.adapters.contracts.connection import AdapterRequiredConfig
+from dbt.adapters.contracts.connection import AdapterResponse
+from dbt.adapters.contracts.connection import Connection
+from dbt.adapters.contracts.connection import ConnectionState
+from dbt.adapters.events.logging import AdapterLogger
 from dbt.adapters.sql import SQLConnectionManager
-from dbt.contracts.connection import AdapterRequiredConfig
-from dbt.contracts.connection import AdapterResponse
-from dbt.contracts.connection import Connection
-from dbt.contracts.connection import ConnectionState
-from dbt.logger import GLOBAL_LOGGER as logger
+
+logger = AdapterLogger("DuckDB")
 
 
 class DuckDBConnectionManager(SQLConnectionManager):
@@ -21,9 +24,9 @@ class DuckDBConnectionManager(SQLConnectionManager):
     _LOCK = threading.RLock()
     _ENV = None
 
-    def __init__(self, profile: AdapterRequiredConfig):
-        super().__init__(profile)
-        self.disable_transactions = profile.credentials.disable_transactions  # type: ignore
+    def __init__(self, config: AdapterRequiredConfig, mp_context: SpawnContext) -> None:
+        super().__init__(config, mp_context)
+        self.disable_transactions = config.credentials.disable_transactions  # type: ignore
 
     @classmethod
     def env(cls) -> environments.Environment:
@@ -50,7 +53,7 @@ class DuckDBConnectionManager(SQLConnectionManager):
                 logger.debug("Got an error when attempting to connect to DuckDB: '{}'".format(e))
                 connection.handle = None
                 connection.state = ConnectionState.FAIL
-                raise dbt.exceptions.FailedToConnectError(str(e))
+                raise dbt.adapters.exceptions.FailedToConnectError(str(e))
 
             return connection
 

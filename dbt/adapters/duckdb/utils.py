@@ -7,8 +7,9 @@ from typing import Sequence
 
 from dbt.adapters.base.column import Column
 from dbt.adapters.base.relation import BaseRelation
-from dbt.context.providers import RuntimeConfigObject
-from dbt.contracts.graph.nodes import SourceDefinition
+# TODO
+# from dbt.context.providers import RuntimeConfigObject
+# from dbt_common.contracts.graph.nodes import SourceDefinition
 
 
 @dataclass
@@ -47,7 +48,7 @@ class SourceConfig:
         return base
 
     @classmethod
-    def create_from_source(cls, source: SourceDefinition) -> "SourceConfig":
+    def create_from_source(cls, source: Any) -> "SourceConfig":
         meta = source.source_meta.copy()
         meta.update(source.meta)
         # Use the config properties as well if they are present
@@ -75,7 +76,7 @@ class TargetLocation:
 class TargetConfig:
     relation: BaseRelation
     column_list: Sequence[Column]
-    config: RuntimeConfigObject
+    config: Any  # TODO
     location: Optional[TargetLocation] = None
 
     def as_dict(self) -> Dict[str, Any]:

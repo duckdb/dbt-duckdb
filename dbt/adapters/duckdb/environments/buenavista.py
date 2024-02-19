@@ -5,7 +5,7 @@ import psycopg2
 from . import Environment
 from .. import credentials
 from .. import utils
-from dbt.contracts.connection import AdapterResponse
+from dbt.adapters.contracts.connection import AdapterResponse
 
 
 class BVEnvironment(Environment):

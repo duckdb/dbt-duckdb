@@ -1,10 +1,11 @@
 import threading
 
+from dbt_common.exceptions import DbtRuntimeError
+
 from . import Environment
 from .. import credentials
 from .. import utils
-from dbt.contracts.connection import AdapterResponse
-from dbt.exceptions import DbtRuntimeError
+from dbt.adapters.contracts.connection import AdapterResponse
 
 
 class DuckDBCursorWrapper:

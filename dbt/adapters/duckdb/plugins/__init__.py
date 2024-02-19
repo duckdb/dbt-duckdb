@@ -4,12 +4,12 @@ from typing import Any
 from typing import Dict
 from typing import Optional
 
+from dbt_common.dataclass_schema import dbtClassMixin
 from duckdb import DuckDBPyConnection
 
 from ..credentials import DuckDBCredentials
 from ..utils import SourceConfig
 from ..utils import TargetConfig
-from dbt.dataclass_schema import dbtClassMixin
 
 
 class PluginConfig(dbtClassMixin):
