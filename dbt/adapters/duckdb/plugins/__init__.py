@@ -1,15 +1,13 @@
 import importlib
 import os
-from typing import Any
-from typing import Dict
-from typing import Optional
+from typing import Any, Dict, Optional
 
 from duckdb import DuckDBPyConnection, DuckDBPyRelation
 
-from ..credentials import DuckDBCredentials
-from ..utils import SourceConfig
-from ..utils import TargetConfig
 from dbt.dataclass_schema import dbtClassMixin
+
+from ..credentials import DuckDBCredentials
+from ..utils import SourceConfig, TargetConfig
 
 
 class PluginConfig(dbtClassMixin):
@@ -120,14 +118,16 @@ class BasePlugin:
         :raises NotImplementedError: If this method is not implemented by a subclass.
         """
         raise NotImplementedError(f"load method not implemented for {self.name}")
-
-    def store(self, df: DuckDBPyRelation, target_config: TargetConfig):
+    
+    # coursor is needed just for the native, we have to do it better 
+    # to had it over in some initalization?
+    def store(self, df: DuckDBPyRelation, target_config: TargetConfig, cursor):
         raise NotImplementedError(f"store method not implemented for {self.name}")
 
-    def create_source_config(target_config: TargetConfig) -> SourceConfig:
+    def create_source_config(self, target_config: TargetConfig) -> SourceConfig:
         raise NotImplementedError(f"store method not implemented for {self.name}")
     
-    def can_be_upstream_referenced():
+    def can_be_upstream_referenced(self):
         return False
 
     def configure_cursor(self, cursor):

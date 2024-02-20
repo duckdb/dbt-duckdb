@@ -4,18 +4,16 @@ import os
 import sys
 import tempfile
 import time
-from typing import Dict
-from typing import List
-from typing import Optional
+from typing import Dict, List, Optional
 
 import duckdb
 
-from ..credentials import DuckDBCredentials
-from ..plugins import BasePlugin
-from ..utils import SourceConfig
-from ..utils import TargetConfig
 from dbt.contracts.connection import AdapterResponse
 from dbt.exceptions import DbtRuntimeError
+
+from ..credentials import DuckDBCredentials
+from ..plugins import BasePlugin
+from ..utils import SourceConfig, TargetConfig
 
 
 def _ensure_event_loop():

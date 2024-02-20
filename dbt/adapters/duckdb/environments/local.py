@@ -1,14 +1,12 @@
 import threading
 
-from . import Environment
-from .. import credentials
-from .. import utils
 from dbt.contracts.connection import AdapterResponse
 from dbt.exceptions import DbtRuntimeError
 
-import duckdb
+from .. import credentials, utils
+from . import Environment
 
-duckdb.sql()
+
 class DuckDBCursorWrapper:
     def __init__(self, cursor):
         self._cursor = cursor
@@ -150,7 +148,7 @@ class LocalEnvironment(Environment):
         
         df = cursor.sql(target_config.config.model.compiled_code)
         #hand over Duckdb format that each plugin can choose which type of integration to use
-        plugin.store(df, target_config)
+        plugin.store(df, target_config, cursor)
 
         cursor.close()
         handle.close()
@@ -159,7 +157,7 @@ class LocalEnvironment(Environment):
         if plugin.can_be_upstream_referenced():
             #create df and view which can be referenced in the run following run
             source_config = plugin.create_source_config(target_config)
-            plugin.load(plugin_name, source_config)
+            self.load_source(plugin_name, source_config)
 
     def close(self):
         if self.conn:

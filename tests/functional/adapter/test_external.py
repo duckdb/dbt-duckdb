@@ -1,5 +1,7 @@
 import os
+
 import pytest
+
 from dbt.tests.adapter.basic.files import (
     base_table_sql,
     model_base,
@@ -51,7 +53,7 @@ class BaseExternalMaterializations:
             "table_parquet_location.sql": parquet_table_location_sql,
             "table_csv_location_delim.sql": csv_location_delim_sql,
             "table_json.sql": json_sql,
-            "schema.yml": schema_base_yml,
+            "schema.yml": schema_base_yml,    
         }
 
     @pytest.fixture(scope="class")
