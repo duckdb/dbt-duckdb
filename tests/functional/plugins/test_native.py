@@ -13,7 +13,7 @@ from dbt.tests.util import (
 )
 
 default_parquet = """
-  {{ config(materialized="external_new") }}
+  {{ config(materialized="external") }}
   SELECT 1 as a 
 """
 upstream_default_parquet = """
@@ -23,7 +23,7 @@ upstream_default_parquet = """
 
 partition_model_parquet = """
   {{ config(
-        materialized="external_new",
+        materialized="external",
         options =  {
             "partition_by": "a"
         }
@@ -37,7 +37,7 @@ upstream_partition_model_parquet = """
 """
 
 default_csv= """
-  {{ config(materialized="external_new", format="csv", delimiter="|" ) }}
+  {{ config(materialized="external", format="csv", delimiter="|" ) }}
     SELECT * FROM {{ref("base")}}
   """ 
 
@@ -47,7 +47,7 @@ upstream_default_csv = """
 """
 
 default_json= """
-  {{ config(materialized="external_new", format="json", location="{{ adapter.external_root() }}/test.json" ) }}
+  {{ config(materialized="external", format="json", location="{{ adapter.external_root() }}/test.json" ) }}
     SELECT * FROM {{ref("base")}}
   """ 
 
