@@ -225,7 +225,7 @@ def _add_partition_columns(
 def _parse_partition_columns(
     partition_columns: List[Dict[str, str]], table_def: TableInputTypeDef
 ):
-    partition_input = None
+    partition_input, partition_values = None, None
     if partition_columns:
         partition_values = [column["Value"] for column in partition_columns]
         partition_location = table_def["StorageDescriptor"]["Location"]
