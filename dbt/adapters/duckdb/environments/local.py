@@ -141,6 +141,8 @@ class LocalEnvironment(Environment):
             )
         plugin = self._plugins[plugin_name]
         
+        #e.g add file format to the location
+        target_config = plugin.adapt_target_config(target_config)
 
         #export data with the store model 
         handle = self.handle()

@@ -20,14 +20,13 @@ sources:
           external_location: "{test_data_path}/excel_file.xlsx"
 """
 
+#Question why is file here defined? this is not a source this is config?
 plugins = [
     {
         "module": "excel",
         "config": {
             "output": {
-                "engine": "openpyxl",
-                "file": "/tmp/excel_file_out.xlsx",
-                "lazy_close": False
+                "engine": "openpyxl"
             }
         }
     },
@@ -69,7 +68,7 @@ class TestExcelPlugin:
         res = project.run_sql("SELECT COUNT(1) FROM excel_file", fetch="one")
         assert res[0] == 9
 
-        df = pandas.read_excel('/tmp/excel_file_out.xlsx')
+        df = pandas.read_excel('./excel_read_write.xlsx')
         assert df.shape[0] == 9
         assert df['First Name'].iloc[0] == 'Dulce'
 
@@ -82,3 +81,4 @@ class TestExcelPlugin:
         )
 
 
+#TODO write more tests

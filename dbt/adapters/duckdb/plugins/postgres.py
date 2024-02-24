@@ -1,11 +1,12 @@
-from typing import Any
-from typing import Dict
+from typing import Any, Dict
 
 from duckdb import DuckDBPyConnection
 
 from . import BasePlugin
 
 
+## This is maybe what we can deprecate? Native way in the config 
+#is better or there is some need?
 class Plugin(BasePlugin):
     def initialize(self, config: Dict[str, Any]):
         self._dsn = config.get("dsn")

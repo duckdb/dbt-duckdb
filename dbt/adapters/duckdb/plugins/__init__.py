@@ -121,7 +121,7 @@ class BasePlugin:
     
     # coursor is needed just for the native, we have to do it better 
     # to had it over in some initalization?
-    def store(self, df: DuckDBPyRelation, target_config: TargetConfig, cursor):
+    def store(self, df: DuckDBPyRelation, target_config: TargetConfig, cursor = None):
         raise NotImplementedError(f"store method not implemented for {self.name}")
 
     def create_source_config(self, target_config: TargetConfig) -> SourceConfig:
@@ -142,3 +142,6 @@ class BasePlugin:
 
     def default_materialization(self):
         return "table"
+    
+    def adapt_target_config(self, target_config: TargetConfig) -> TargetConfig:
+        return target_config

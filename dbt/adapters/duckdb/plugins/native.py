@@ -40,15 +40,26 @@ class Plugin(BasePlugin):
         )
         return source_config
         
-    
     def store(self, df: DuckDBPyRelation, target_config: TargetConfig, cursor):
         location = target_config.location.path
+        
         options = external_write_options(location, target_config.config.get("options", {}))
         #pwd = os.getcwd() # to find out where it saves -> cd '/tmp/pytest-of-vscode/pytest-18/project0'
         #print(pwd)
         cursor.sql(f"COPY (SELECT * FROM df) to '{location}' ({options})")
 
+    def adapt_target_config(self, target_config: TargetConfig) -> TargetConfig:
+        #setup the location with default to parquet if not partitions_by
+        if target_config.location.format == "default": 
+            target_config.location.format = "parquet"  
+
+        if "partition_by" not in target_config.config.get("options", {}):
+            target_config.location.path = target_config.location.path + "." + target_config.location.format
+        return target_config
+
+
 # 1 to 1 from adapter 
+# TODO those can be maybe better written
 def external_write_options(write_location: str, rendered_options: dict) -> str:
     if "format" not in rendered_options:
         ext = os.path.splitext(write_location)[1].lower()

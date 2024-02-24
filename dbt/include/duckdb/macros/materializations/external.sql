@@ -13,7 +13,7 @@
   {%- set location = render(config.get('location', default=external_location(this, config))) -%})
   -- just a check if the options is a dictionary to stay compielnt but it will be used over config in the plugins
   {%- set rendered_options = render_write_options(config) -%}
-  {%- set format = config.get('format', 'parquet') -%}
+  {%- set format = config.get('format', 'default') -%}
   {%- set plugin_name = config.get('plugin', 'native') -%}
 
   {% do store_relation(plugin_name, target_relation, location, format, config) %}
@@ -26,6 +26,6 @@
   
   {{ run_hooks(post_hooks, inside_transaction=False) }}
 
-  {{ return({'relations': [target_relation]}) }} -- to what i return?
+  {{ return({'relations': [target_relation]}) }} 
 
 {% endmaterialization %}
