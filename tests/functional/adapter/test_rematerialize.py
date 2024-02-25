@@ -1,7 +1,9 @@
 import os
+
 import pytest
-from dbt.tests.util import run_dbt, relation_from_name
+
 from dbt.adapters.duckdb import DuckDBConnectionManager
+from dbt.tests.util import relation_from_name, run_dbt
 
 upstream_model_sql = """
 select range from range(3)
@@ -40,6 +42,8 @@ class TestRematerializeDownstreamExternalModel:
         extroot = str(tmp_path_factory.getbasetemp() / "rematerialize")
         os.mkdir(extroot)
         dbt_profile_target["external_root"] = extroot
+        dbt_profile_target["plugins"] = [{"module": "native"}]
+
         return dbt_profile_target
     
     @pytest.fixture(scope="class")

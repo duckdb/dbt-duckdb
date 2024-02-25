@@ -1,5 +1,7 @@
 import os
+
 import pytest
+
 from dbt.tests.adapter.basic.files import (
     base_table_sql,
     model_base,
@@ -43,6 +45,9 @@ class BaseExternalMaterializations:
         extroot = str(tmp_path_factory.getbasetemp() / "write_options")
         os.mkdir(extroot)
         dbt_profile_target["external_root"] = extroot
+        ##todo add native but delete after setted to default
+        dbt_profile_target["plugins"] = [{"module": "native"}]
+        #dbt_profile_target["threads"] = 5
         return dbt_profile_target
 
     @pytest.fixture(scope="class")

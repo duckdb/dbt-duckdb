@@ -25,7 +25,7 @@ class Plugin(BasePlugin):
         if "s3_region" in plugin_config:
             os.environ["AWS_DEFAULT_REGION"] = plugin_config["s3_region"]
 
-    def load(self, source_config: SourceConfig):
+    def load(self, source_config: SourceConfig, coursor = None):
         ext_location = source_config["external_location"]
         ext_location = ext_location.format(**source_config.as_dict())
         if "s3" in ext_location:

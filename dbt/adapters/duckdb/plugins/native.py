@@ -21,10 +21,11 @@ class Plugin(BasePlugin):
     def default_materialization(self):
         return "view"
     
-    def load(self, source_config: SourceConfig):
+#this one can be better not to go over some other format and df but directly 
+    def load(self, source_config: SourceConfig, coursor = None):
         location = external_read_location(source_config.meta.get("location").get("path"),
                                           source_config.meta.get("config").get("options", {}))
-        return duckdb.sql(f"SELECT * FROM '{location}'").df()
+        return coursor.sql(f"SELECT * FROM '{location}'").arrow()
 
     def can_be_upstream_referenced(self):
         return True
@@ -40,12 +41,9 @@ class Plugin(BasePlugin):
         )
         return source_config
         
-    def store(self, df: DuckDBPyRelation, target_config: TargetConfig, cursor):
+    def store(self, df: DuckDBPyRelation, target_config: TargetConfig, cursor = None):
         location = target_config.location.path
-        
         options = external_write_options(location, target_config.config.get("options", {}))
-        #pwd = os.getcwd() # to find out where it saves -> cd '/tmp/pytest-of-vscode/pytest-18/project0'
-        #print(pwd)
         cursor.sql(f"COPY (SELECT * FROM df) to '{location}' ({options})")
 
     def adapt_target_config(self, target_config: TargetConfig) -> TargetConfig:

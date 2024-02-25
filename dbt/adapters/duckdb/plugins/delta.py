@@ -1,10 +1,9 @@
-from typing import Any
-from typing import Dict
+from typing import Any, Dict
 
 from deltalake import DeltaTable
 
-from . import BasePlugin
 from ..utils import SourceConfig
+from . import BasePlugin
 
 
 class Plugin(BasePlugin):
@@ -14,7 +13,7 @@ class Plugin(BasePlugin):
     def configure_cursor(self, cursor):
         pass
 
-    def load(self, source_config: SourceConfig):
+    def load(self, source_config: SourceConfig, coursor = None):
         if "delta_table_path" not in source_config:
             raise Exception("'delta_table_path' is a required argument for the delta table!")
 

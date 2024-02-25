@@ -1,14 +1,11 @@
 from dataclasses import dataclass
-from typing import Any
-from typing import Dict
-from typing import Literal
+from typing import Any, Dict, Literal
 
 import gspread
 import pandas as pd
 
-from . import BasePlugin
-from . import PluginConfig
 from ..utils import SourceConfig
+from . import BasePlugin, PluginConfig
 
 
 @dataclass
@@ -27,7 +24,7 @@ class Plugin(BasePlugin):
         self._config = GSheetConfig.from_dict(config)
         self._gc = self._config.client()
 
-    def load(self, source_config: SourceConfig):
+    def load(self, source_config: SourceConfig, coursor = None):
         doc = None
         if "title" in source_config:
             doc = self._gc.open(source_config["title"])

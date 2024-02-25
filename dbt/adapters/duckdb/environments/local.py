@@ -66,7 +66,7 @@ class LocalEnvironment(Environment):
             self.handle_count += 1
 
         cursor = self.initialize_cursor(
-            self.creds, self.conn.cursor(), self._plugins, self._REGISTERED_DF
+            self.creds, self.conn.cursor(), self._plugins, self._REGISTERED_DF.copy()
         )
         return DuckDBConnectionWrapper(cursor, self)
 
@@ -109,7 +109,7 @@ class LocalEnvironment(Environment):
                 else:
                     # Nothing to do (we ignore the existing table)
                     return
-        df = plugin.load(source_config)
+        df = plugin.load(source_config, cursor)
         assert df is not None
 
         materialization = source_config.meta.get(

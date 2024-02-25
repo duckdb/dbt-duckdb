@@ -107,8 +107,8 @@ class BasePlugin:
         :param conn: A DuckDBPyConnection instance to be configured.
         """
         pass
-
-    def load(self, source_config: SourceConfig):
+    #coursor is needed for the native plugin
+    def load(self, source_config: SourceConfig, coursor = None):
         """
         Load data from a source config and return it as a DataFrame-like object
         that DuckDB can read. This method should be overridden by subclasses that

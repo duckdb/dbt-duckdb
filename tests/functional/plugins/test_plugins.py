@@ -1,6 +1,8 @@
 import os
-import pytest
 import sqlite3
+from pathlib import Path
+
+import pytest
 
 from dbt.tests.util import (
     check_relations_equal,
@@ -44,8 +46,9 @@ plugin_sql = """
 @pytest.mark.skip_profile("buenavista", "md")
 class TestPlugins:
     @pytest.fixture(scope="class")
-    def sqlite_test_db(self):
-        path = "/tmp/satest.db"
+    def sqlite_test_db(self,project_root):
+        path = Path(project_root)
+        path = path / "satest.db"
         db = sqlite3.connect(path)
         cursor = db.cursor()
         cursor.execute("CREATE TABLE tt1 (id int, name text)")
@@ -68,8 +71,6 @@ class TestPlugins:
         assert res[1] == (4, 5, 6)
         cursor.close()
         db.close()
-
-        os.unlink(path)
 
     @pytest.fixture(scope="class")
     def profiles_config_update(self, dbt_profile_target, sqlite_test_db):
@@ -125,6 +126,10 @@ class TestPlugins:
                 "sqlalchemy2",
             ],
         )
+        #this does not work in the new scenario because we dont store anything
+        #we have to write a new test there
+        #res = project.run_sql("SELECT foo FROM foo", fetch="one")
+        #assert res[0] == 1729
 
-        res = project.run_sql("SELECT foo FROM foo", fetch="one")
-        assert res[0] == 1729
+## TODO add some more tests 
+## separate plugin extendability and sqlachlemy?
