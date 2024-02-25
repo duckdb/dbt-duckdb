@@ -1,21 +1,22 @@
-from typing import Any, Dict, List, Optional, Sequence
+from typing import Any
+from typing import Dict
+from typing import List
+from typing import Optional
+from typing import Sequence
 
 import boto3
 from duckdb import DuckDBPyRelation
 from mypy_boto3_glue import GlueClient
-from mypy_boto3_glue.type_defs import (
-    ColumnTypeDef,
-    GetTableResponseTypeDef,
-    PartitionInputTypeDef,
-    SerDeInfoTypeDef,
-    StorageDescriptorTypeDef,
-    TableInputTypeDef,
-)
+from mypy_boto3_glue.type_defs import ColumnTypeDef
+from mypy_boto3_glue.type_defs import GetTableResponseTypeDef
+from mypy_boto3_glue.type_defs import PartitionInputTypeDef
+from mypy_boto3_glue.type_defs import SerDeInfoTypeDef
+from mypy_boto3_glue.type_defs import StorageDescriptorTypeDef
+from mypy_boto3_glue.type_defs import TableInputTypeDef
 
-from dbt.adapters.base.column import Column
-
-from ..utils import TargetConfig
 from . import BasePlugin
+from ..utils import TargetConfig
+from dbt.adapters.base.column import Column
 
 
 class UnsupportedFormatType(Exception):
@@ -331,7 +332,7 @@ class Plugin(BasePlugin):
         self.database = config.get("glue_database", "default")
         self.delimiter = config.get("delimiter", ",")
 
-    def store(self, df: DuckDBPyRelation, target_config: TargetConfig, cursor = None):
+    def store(self, df: DuckDBPyRelation, target_config: TargetConfig, cursor=None):
         assert target_config.location is not None
         assert target_config.relation.identifier is not None
         table: str = target_config.relation.identifier

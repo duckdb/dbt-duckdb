@@ -16,16 +16,15 @@
   {%- set format = config.get('format', 'default') -%}
   {%- set plugin_name = config.get('plugin', 'native') -%}
 
-  {% do store_relation(plugin_name, target_relation, location, format, config) %}
-  
+  {% do store_relation(plugin_name, target_relation, location, format, config, False) %}
   -- in this moment target should exists as a view so we can setup grants or docu
 
   {{ run_hooks(post_hooks, inside_transaction=True) }}
   -- `COMMIT` happens here
   {{ adapter.commit() }}
-  
+
   {{ run_hooks(post_hooks, inside_transaction=False) }}
 
-  {{ return({'relations': [target_relation]}) }} 
+  {{ return({'relations': [target_relation]}) }}
 
 {% endmaterialization %}

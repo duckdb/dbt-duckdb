@@ -91,7 +91,8 @@ class TestDuckdbtNativelMaterializations:
                         "plugins": [
                             {"module": "native"}
                         ],
-                        "external_root" : f'{extroot}'
+                        "external_root" : f'{extroot}',
+                        "threads" : 8
                     }
                 },
                 "target": "dev",

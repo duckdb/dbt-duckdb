@@ -100,6 +100,7 @@ class DuckDBAdapter(SQLAdapter):
         path: str,
         format: str,
         config: RuntimeConfigObject,
+        just_register: bool,
     ) -> None:
         target_config = TargetConfig(
             relation=relation,
@@ -107,7 +108,7 @@ class DuckDBAdapter(SQLAdapter):
             config=config,
             location=TargetLocation(path=path, format=format),
         )
-        DuckDBConnectionManager.env().store_relation(plugin_name, target_config)
+        DuckDBConnectionManager.env().store_relation(plugin_name, target_config, just_register)
 
     @available
     def external_root(self) -> str:

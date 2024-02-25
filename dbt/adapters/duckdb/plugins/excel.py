@@ -1,16 +1,15 @@
 import os
 import pathlib
-from threading import Lock
-from typing import Any, Dict
+from typing import Any
+from typing import Dict
 
 import pandas as pd
 from duckdb import DuckDBPyRelation
 from pandas.io.formats import excel
 
-from dbt.logger import GLOBAL_LOGGER as logger
-
-from ..utils import SourceConfig, TargetConfig
 from . import BasePlugin
+from ..utils import SourceConfig
+from ..utils import TargetConfig
 
 
 class Plugin(BasePlugin):
@@ -25,7 +24,7 @@ class Plugin(BasePlugin):
         if "s3_region" in plugin_config:
             os.environ["AWS_DEFAULT_REGION"] = plugin_config["s3_region"]
 
-    def load(self, source_config: SourceConfig, coursor = None):
+    def load(self, source_config: SourceConfig, coursor=None):
         ext_location = source_config["external_location"]
         ext_location = ext_location.format(**source_config.as_dict())
         if "s3" in ext_location:
@@ -36,10 +35,10 @@ class Plugin(BasePlugin):
         sheet_name = source_config.get("sheet_name", 0)
         return pd.read_excel(source_location, sheet_name=sheet_name)
 
-    def store(self, df: DuckDBPyRelation, target_config: TargetConfig, cursor = None):
+    def store(self, df: DuckDBPyRelation, target_config: TargetConfig, cursor=None):
         plugin_output_config = self._config["output"]
 
-        #this writer doesnt take location but always something defined in the profile?
+        # this writer doesnt take location but always something defined in the profile?
         _excel_writer = pd.ExcelWriter(
             target_config.location.path,
             mode=plugin_output_config.get("mode", "w"),
@@ -61,11 +60,11 @@ class Plugin(BasePlugin):
             sheet_name = (target_config.relation.identifier or "Sheet1")[0:31]
             target_output_config["sheet_name"] = sheet_name
 
-        df = df.df() # duckdb model to pandas dataframe 
+        pd_df = df.df()  # duckdb model to pandas dataframe
         if target_output_config.get("skip_empty_sheet", False) and df.shape[0] == 0:
             return
         try:
-            df.to_excel(
+            pd_df.to_excel(
                 _excel_writer,
                 sheet_name=target_output_config["sheet_name"],
                 na_rep=target_output_config.get("na_rep", ""),
@@ -85,40 +84,43 @@ class Plugin(BasePlugin):
                 pd.DataFrame(
                     [{"Error": target_output_config.get("ignore_sheet_too_large_error", str(ve))}]
                 ).to_excel(
-                    _excel_writer, sheet_name=target_output_config["sheet_name"], index=False
+                    _excel_writer,
+                    sheet_name=target_output_config["sheet_name"],
+                    index=False,
                 )
             else:
                 raise ve
-            
+
         _excel_writer.close()
 
     def create_source_config(self, target_config: TargetConfig) -> SourceConfig:
         # in the reader we have just location and sheet_name, maybe we can add here more options
-        # but in the first place i would not recommend to upstream excel file 
+        # but in the first place i would not recommend to upstream excel file
         # this works for a very simple case but not all of them
         meta = {
             "external_location": target_config.location.path,
-            "sheet_name": target_config.config.get("sheet_name",0)
+            "sheet_name": target_config.config.get("sheet_name", 0),
         }
 
         source_config = SourceConfig(
-            name= target_config.relation.name,
-            identifier= target_config.relation.identifier,
+            name=target_config.relation.name,
+            identifier=target_config.relation.identifier,
             schema=target_config.relation.schema,
             database=target_config.relation.database,
-            meta= meta,
-            tags= [],
+            meta=meta,
+            tags=[],
         )
         return source_config
 
-    
     def can_be_upstream_referenced(self):
         return True
-    
-    def adapt_target_config(self, target_config: TargetConfig) -> TargetConfig:
-        if target_config.location.format == "default": 
-            target_config.location.format = "xlsx"  
 
-        target_config.location.path = target_config.location.path + "." + target_config.location.format
+    def adapt_target_config(self, target_config: TargetConfig) -> TargetConfig:
+        if target_config.location.format == "default":
+            target_config.location.format = "xlsx"
+
+        target_config.location.path = (
+            target_config.location.path + "." + target_config.location.format
+        )
 
         return target_config

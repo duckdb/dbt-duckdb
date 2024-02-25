@@ -1,6 +1,8 @@
-import pytest
 import sqlite3
 from pathlib import Path
+
+import pytest
+
 from dbt.tests.util import (
     run_dbt,
 )
@@ -12,10 +14,9 @@ model_sql = """
 
 
 class TestSQLitePlugin:
-
     @pytest.fixture(scope="class")
     def sqlite_test_db(self):
-        path = '/tmp/satest.db'
+        path = "/tmp/satest.db"
         Path(path).unlink(missing_ok=True)
         db = sqlite3.connect(path)
         cursor = db.cursor()
@@ -38,9 +39,7 @@ class TestSQLitePlugin:
                     "dev": {
                         "type": "duckdb",
                         "path": dbt_profile_target.get("path", ":memory:"),
-                        "attach": [
-                           {'path': sqlite_test_db}
-                        ]
+                        "attach": [{"path": sqlite_test_db}],
                     }
                 },
                 "target": "dev",
@@ -51,7 +50,6 @@ class TestSQLitePlugin:
     def models(self, test_data_path):
         return {
             "read_write.sql": model_sql,
-
         }
 
     def test_sqlite_plugin(self, project):
@@ -60,5 +58,3 @@ class TestSQLitePlugin:
 
         res = project.run_sql("SELECT COUNT(1) FROM satest.read_write", fetch="one")
         assert res[0] == 2
-
-

@@ -4,16 +4,18 @@ import os
 import sys
 import tempfile
 import time
-from typing import Dict, List, Optional
+from typing import Dict
+from typing import List
+from typing import Optional
 
 import duckdb
 
-from dbt.contracts.connection import AdapterResponse
-from dbt.exceptions import DbtRuntimeError
-
 from ..credentials import DuckDBCredentials
 from ..plugins import BasePlugin
-from ..utils import SourceConfig, TargetConfig
+from ..utils import SourceConfig
+from ..utils import TargetConfig
+from dbt.contracts.connection import AdapterResponse
+from dbt.exceptions import DbtRuntimeError
 
 
 def _ensure_event_loop():
@@ -101,7 +103,9 @@ class Environment(abc.ABC):
         pass
 
     @abc.abstractmethod
-    def store_relation(self, plugin_name: str, target_config: TargetConfig) -> None:
+    def store_relation(
+        self, plugin_name: str, target_config: TargetConfig, just_register: bool = False
+    ) -> None:
         pass
 
     def get_binding_char(self) -> str:

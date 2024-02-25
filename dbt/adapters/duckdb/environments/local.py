@@ -1,10 +1,10 @@
 import threading
 
+from . import Environment
+from .. import credentials
+from .. import utils
 from dbt.contracts.connection import AdapterResponse
 from dbt.exceptions import DbtRuntimeError
-
-from .. import credentials, utils
-from . import Environment
 
 
 class DuckDBCursorWrapper:
@@ -24,7 +24,7 @@ class DuckDBCursorWrapper:
         except RuntimeError as e:
             raise DbtRuntimeError(str(e))
 
-    
+
 class DuckDBConnectionWrapper:
     def __init__(self, cursor, env):
         self._cursor = DuckDBCursorWrapper(cursor)
@@ -132,7 +132,9 @@ class LocalEnvironment(Environment):
         cursor.close()
         handle.close()
 
-    def store_relation(self, plugin_name: str, target_config: utils.TargetConfig) -> None:
+    def store_relation(
+        self, plugin_name: str, target_config: utils.TargetConfig, just_register: bool = False
+    ) -> None:
         # some plugin have to be initialized on the fly? glue for example?
 
         if plugin_name not in self._plugins:
@@ -141,24 +143,25 @@ class LocalEnvironment(Environment):
                 + ",".join(self._plugins.keys())
             )
         plugin = self._plugins[plugin_name]
-        
-        #e.g add file format to the location
+
+        # e.g add file format to the location
         target_config = plugin.adapt_target_config(target_config)
+        if not just_register:
+            # export data with the store model
+            handle = self.handle()
+            cursor = handle.cursor()
 
-        #export data with the store model 
-        handle = self.handle()
-        cursor = handle.cursor()        
-        
-        df = cursor.sql(target_config.config.model.compiled_code)
-        #hand over Duckdb format that each plugin can choose which type of integration to use
-        plugin.store(df, target_config, cursor)
+            df = cursor.sql(target_config.config.model.compiled_code)
+            # hand over Duckdb format that each plugin can choose which type of integration to use
 
-        cursor.close()
-        handle.close()
+            plugin.store(df, target_config, cursor)
+
+            cursor.close()
+            handle.close()
 
         # all are by default false, has to be turned on per plugin
         if plugin.can_be_upstream_referenced():
-            #create df and view which can be referenced in the run following run
+            # create df and view which can be referenced in the run following run
             source_config = plugin.create_source_config(target_config)
             self.load_source(plugin_name, source_config)
 

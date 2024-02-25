@@ -45,12 +45,11 @@ class TestRematerializeDownstreamExternalModel:
         dbt_profile_target["plugins"] = [{"module": "native"}]
 
         return dbt_profile_target
-    
+
     @pytest.fixture(scope="class")
     def project_config_update(self):
         return {
             "name": "base",
-            "models": {"+materialized": "external"},
             "on-run-start": ["{{ register_upstream_external_models() }}"],
         }
 
@@ -74,10 +73,13 @@ class TestRematerializeDownstreamExternalModel:
                 "run",
                 "--select",
                 "downstream_model other_downstream_model downstream_of_partition_model",
+                "-d",
             ]
         )
 
         # really makes sure we have created the downstream model
         relation = relation_from_name(project.adapter, "downstream_of_partition_model")
-        result = project.run_sql(f"select count(*) as num_rows from {relation}", fetch="one")
+        result = project.run_sql(
+            f"select count(*) as num_rows from {relation}", fetch="one"
+        )
         assert result[0] == 5

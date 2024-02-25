@@ -209,9 +209,9 @@ def materialize(df, con):
   {%- endcall %}
 {% endmacro %}
 
-{% macro store_relation(plugin, relation, location, format, config) -%}
+{% macro store_relation(plugin, relation, location, format, config, just_register) -%}
   {%- set column_list = adapter.get_columns_in_relation(relation) -%}
-  {% do adapter.store_relation(plugin, relation, column_list, location, format, config) %}
+  {% do adapter.store_relation(plugin, relation, column_list, location, format, config, just_register) %}
 {% endmacro %}
 
 {% macro render_write_options(config) -%}

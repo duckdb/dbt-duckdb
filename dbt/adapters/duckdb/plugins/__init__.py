@@ -1,13 +1,16 @@
 import importlib
 import os
-from typing import Any, Dict, Optional
+from typing import Any
+from typing import Dict
+from typing import Optional
 
-from duckdb import DuckDBPyConnection, DuckDBPyRelation
-
-from dbt.dataclass_schema import dbtClassMixin
+from duckdb import DuckDBPyConnection
+from duckdb import DuckDBPyRelation
 
 from ..credentials import DuckDBCredentials
-from ..utils import SourceConfig, TargetConfig
+from ..utils import SourceConfig
+from ..utils import TargetConfig
+from dbt.dataclass_schema import dbtClassMixin
 
 
 class PluginConfig(dbtClassMixin):
@@ -107,8 +110,9 @@ class BasePlugin:
         :param conn: A DuckDBPyConnection instance to be configured.
         """
         pass
-    #coursor is needed for the native plugin
-    def load(self, source_config: SourceConfig, coursor = None):
+
+    # coursor is needed for the native plugin
+    def load(self, source_config: SourceConfig, coursor=None):
         """
         Load data from a source config and return it as a DataFrame-like object
         that DuckDB can read. This method should be overridden by subclasses that
@@ -118,15 +122,15 @@ class BasePlugin:
         :raises NotImplementedError: If this method is not implemented by a subclass.
         """
         raise NotImplementedError(f"load method not implemented for {self.name}")
-    
-    # coursor is needed just for the native, we have to do it better 
+
+    # coursor is needed just for the native, we have to do it better
     # to had it over in some initalization?
-    def store(self, df: DuckDBPyRelation, target_config: TargetConfig, cursor = None):
+    def store(self, df: DuckDBPyRelation, target_config: TargetConfig, cursor=None):
         raise NotImplementedError(f"store method not implemented for {self.name}")
 
     def create_source_config(self, target_config: TargetConfig) -> SourceConfig:
         raise NotImplementedError(f"store method not implemented for {self.name}")
-    
+
     def can_be_upstream_referenced(self):
         return False
 
@@ -142,6 +146,6 @@ class BasePlugin:
 
     def default_materialization(self):
         return "table"
-    
+
     def adapt_target_config(self, target_config: TargetConfig) -> TargetConfig:
         return target_config
