@@ -122,7 +122,8 @@ class LocalEnvironment(Environment):
 
         if materialization == "view":
             # save to df instance to register on each cursor creation
-            self._REGISTERED_DF[df_name] = df
+            with self.lock:
+                self._REGISTERED_DF[df_name] = df
 
         cursor.execute(
             f"CREATE OR REPLACE {materialization} {source_table_name} AS SELECT * FROM {df_name}"
