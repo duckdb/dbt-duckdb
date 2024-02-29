@@ -33,7 +33,7 @@ class Plugin(BasePlugin):
         user_agent = f"dbt/{__version__}"
         if "custom_user_agent" in config:
             user_agent = f"{user_agent} {config['custom_user_agent']}"
-        if "custom_user_agent" in creds.settings:
+        if "custom_user_agent" in creds.settings or {}:
             user_agent = f"{user_agent} {creds.settings.pop('custom_user_agent')}"
 
         config["custom_user_agent"] = user_agent
