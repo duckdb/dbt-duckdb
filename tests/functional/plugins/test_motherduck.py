@@ -132,11 +132,15 @@ def mock_plugins(mock_creds, mock_md_plugin):
 
 def test_motherduck_user_agent(dbt_profile_target, mock_plugins, mock_creds):
     with mock.patch("dbt.adapters.duckdb.environments.duckdb.connect") as mock_connect:
+        mock_creds.settings = {"custom_user_agent": "downstream-dep"}
         Environment.initialize_db(mock_creds, plugins=mock_plugins)
         if mock_creds.is_motherduck:
             kwargs = {
                 'read_only': False,
-                'config': {'custom_user_agent': f'dbt/{__version__}', 'motherduck_token': 'quack'}
+                'config': {
+                    'custom_user_agent': f'dbt/{__version__} downstream-dep',
+                    'motherduck_token': 'quack'
+                }
             }
             mock_connect.assert_called_with(dbt_profile_target["path"], **kwargs)
         else:
