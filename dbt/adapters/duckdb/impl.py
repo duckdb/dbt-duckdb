@@ -23,7 +23,8 @@ from dbt.adapters.duckdb.relation import DuckDBRelation
 from dbt.adapters.duckdb.utils import TargetConfig
 from dbt.adapters.duckdb.utils import TargetLocation
 from dbt.adapters.sql import SQLAdapter
-from dbt.context.providers import RuntimeConfigObject
+# TODO
+# from dbt.context.providers import RuntimeConfigObject
 
 TEMP_SCHEMA_NAME = "temp_schema_name"
 DEFAULT_TEMP_SCHEMA_NAME = "dbt_temp"
@@ -99,7 +100,7 @@ class DuckDBAdapter(SQLAdapter):
         column_list: Sequence[BaseColumn],
         path: str,
         format: str,
-        config: RuntimeConfigObject,
+        config: Any,
     ) -> None:
         target_config = TargetConfig(
             relation=relation,
