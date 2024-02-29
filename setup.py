@@ -37,8 +37,8 @@ setup(
     packages=find_namespace_packages(include=["dbt", "dbt.*"]),
     include_package_data=True,
     install_requires=[
-        "dbt-common>=0.1.0,<0.2.0",
-        "dbt-adapters>=0.1.0a1,<0.2.0",
+        "dbt-common>=1.0.0b1,<2.0",
+        "dbt-adapters>=1.0.0b1,<2.0",
         "duckdb>=0.7.0",
     ],
     extras_require={"glue": ["boto3", "mypy-boto3-glue"], "md": ["duckdb>=0.7.0,<=0.9.2"]},
