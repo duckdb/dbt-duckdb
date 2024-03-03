@@ -48,6 +48,7 @@ class TestRematerializeDownstreamExternalModel:
     def project_config_update(self):
         return {
             "name": "base",
+            "models": {"+materialized": "external"},
             "on-run-start": ["{{ register_upstream_external_models() }}"],
         }
 
@@ -71,7 +72,6 @@ class TestRematerializeDownstreamExternalModel:
                 "run",
                 "--select",
                 "downstream_model other_downstream_model downstream_of_partition_model",
-                "-d",
             ]
         )
 

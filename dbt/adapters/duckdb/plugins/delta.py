@@ -1,12 +1,14 @@
-import os
-from typing import Any, Dict
+from typing import Any
+from typing import Dict
 
 import pyarrow.compute as pc
-from deltalake import DeltaTable, write_deltalake
+from deltalake import DeltaTable
+from deltalake import write_deltalake
 from duckdb import DuckDBPyRelation
 
-from ..utils import SourceConfig, TargetConfig
 from . import BasePlugin
+from ..utils import SourceConfig
+from ..utils import TargetConfig
 
 
 class Plugin(BasePlugin):
@@ -18,9 +20,7 @@ class Plugin(BasePlugin):
 
     def load(self, source_config: SourceConfig, coursor=None):
         if "delta_table_path" not in source_config:
-            raise Exception(
-                "'delta_table_path' is a required argument for the delta table!"
-            )
+            raise Exception("'delta_table_path' is a required argument for the delta table!")
 
         table_path = source_config["delta_table_path"]
         storage_options = source_config.get("storage_options", None)
@@ -95,9 +95,7 @@ class Plugin(BasePlugin):
                     raise Exception(
                         f"'{each_key}' column has not one unique value, values are: {str(unique_key_array)}"
                     )
-            create_insert_partition(
-                table_path, arrow_df, partition_dict, storage_options
-            )
+            create_insert_partition(table_path, arrow_df, partition_dict, storage_options)
         elif mode == "merge":
             # very slow -> https://github.com/delta-io/delta-rs/issues/1846
             unique_key = target_config.config.get("unique_key", None)
@@ -151,8 +149,6 @@ def table_exists(table_path, storage_options):
 
 ## TODO
 # add partition writing
-# add optimization, vacumm options to automatically run before each run ?
-# can deltars optimize if the data is bigger then memory?
 
 
 def create_insert_partition(table_path, data, partitions, storage_options):
@@ -166,16 +162,10 @@ def create_insert_partition(table_path, data, partitions, storage_options):
         print(
             f"Overwriting delta table under: {table_path} \nwith partition expr: {partition_expr}"
         )
-        write_deltalake(
-            table_path, data, partition_filters=partition_expr, mode="overwrite"
-        )
+        write_deltalake(table_path, data, partition_filters=partition_expr, mode="overwrite")
     else:
-        partitions = [
-            partition_name for (partition_name, partition_value) in partitions
-        ]
-        print(
-            f"Creating delta table under: {table_path} \nwith partitions: {partitions}"
-        )
+        partitions = [partition_name for (partition_name, partition_value) in partitions]
+        print(f"Creating delta table under: {table_path} \nwith partitions: {partitions}")
         write_deltalake(table_path, data, partition_by=partitions)
 
 

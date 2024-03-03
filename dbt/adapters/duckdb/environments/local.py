@@ -1,10 +1,10 @@
 import threading
 
+from . import Environment
+from .. import credentials
+from .. import utils
 from dbt.contracts.connection import AdapterResponse
 from dbt.exceptions import DbtRuntimeError
-
-from .. import credentials, utils
-from . import Environment
 
 
 class DuckDBCursorWrapper:
@@ -48,9 +48,7 @@ class LocalEnvironment(Environment):
         self.handle_count = 0
         self.lock = threading.RLock()
         self._keep_open = (
-            credentials.keep_open
-            or credentials.path == ":memory:"
-            or credentials.is_motherduck
+            credentials.keep_open or credentials.path == ":memory:" or credentials.is_motherduck
         )
         self._REGISTERED_DF: dict = {}
 
@@ -72,9 +70,7 @@ class LocalEnvironment(Environment):
         )
         return DuckDBConnectionWrapper(cursor, self)
 
-    def submit_python_job(
-        self, handle, parsed_model: dict, compiled_code: str
-    ) -> AdapterResponse:
+    def submit_python_job(self, handle, parsed_model: dict, compiled_code: str) -> AdapterResponse:
         con = handle.cursor()
 
         def ldf(table_name):
@@ -109,9 +105,7 @@ class LocalEnvironment(Environment):
                 params.append(source_config.database)
             if cursor.execute(q, params).fetchone()[0]:
                 if save_mode == "error_if_exists":
-                    raise Exception(
-                        f"Source {source_config.table_name()} already exists!"
-                    )
+                    raise Exception(f"Source {source_config.table_name()} already exists!")
                 else:
                     # Nothing to do (we ignore the existing table)
                     return

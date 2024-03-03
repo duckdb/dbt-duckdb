@@ -4,16 +4,19 @@ import os
 import sys
 import tempfile
 import time
-from typing import Dict, List, Optional
+from typing import Dict
+from typing import List
+from typing import Optional
 
 import duckdb
 
+from ..credentials import DuckDBCredentials
+from ..credentials import PluginConfig
+from ..plugins import BasePlugin
+from ..utils import SourceConfig
+from ..utils import TargetConfig
 from dbt.contracts.connection import AdapterResponse
 from dbt.exceptions import DbtRuntimeError
-
-from ..credentials import DuckDBCredentials, PluginConfig
-from ..plugins import BasePlugin
-from ..utils import SourceConfig, TargetConfig
 
 
 def _ensure_event_loop():
@@ -93,9 +96,7 @@ class Environment(abc.ABC):
         pass
 
     @abc.abstractmethod
-    def submit_python_job(
-        self, handle, parsed_model: dict, compiled_code: str
-    ) -> AdapterResponse:
+    def submit_python_job(self, handle, parsed_model: dict, compiled_code: str) -> AdapterResponse:
         pass
 
     @abc.abstractmethod
@@ -211,9 +212,7 @@ class Environment(abc.ABC):
         for plugin_def in creds.plugins or [] + [PluginConfig("native")]:
             config = base_config.copy()
             config.update(plugin_def.config or {})
-            plugin = BasePlugin.create(
-                plugin_def.module, config=config, alias=plugin_def.alias
-            )
+            plugin = BasePlugin.create(plugin_def.module, config=config, alias=plugin_def.alias)
             ret[plugin.name] = plugin
         return ret
 

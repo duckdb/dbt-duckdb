@@ -21,26 +21,31 @@
       {%- set plugin_name = upstream.config.get('plugin', 'native') -%}
       {% do store_relation(plugin_name, upstream_rel, location, format, upstream.config, True) %}
   {% endfor %}
-  {% for upstream_node in graph['nodes'][node]['depends_on']['nodes']
-    if upstream_node not in upstream_nodes and upstream_node not in selected_resources
-    and graph['nodes'].get(upstream_node)
-    and graph['nodes'].get(upstream_node).resource_type in ('model', 'seed')
+{% endfor %}
+{% do adapter.commit() %}
+{% endif %}
+{%- endmacro -%}
+
+
+
+{%- macro register_self_reference_external_models() -%}
+{% if execute %}
+{% for node in selected_resources if
+    graph['nodes'][node].resource_type in ('model', 'seed')
+    and graph['nodes'][node].config.materialized=='external'
+    and 'this' in graph['nodes'][node]['raw_code']
   %}
-    {% set upstream = graph['nodes'].get(upstream_node) %}
-    {%- set upstream_rel = api.Relation.create(
-      database=upstream['database'],
-      schema=upstream['schema'],
-      identifier=upstream['alias']
+    {% set current_node = graph['nodes'][node] %}
+    {%- set node_rel = api.Relation.create(
+      database=current_node['database'],
+      schema=current_node['schema'],
+      identifier=current_node['alias']
     ) -%}
-    {% call statement('main', language='sql') -%}
-      create schema if not exists {{ upstream_rel.schema }}
-    {%- endcall %}
-    {% call statement('main', language='sql') -%}
-      create or replace {{upstream.config.materialized }} {{ upstream_rel }} as (
-        select * from ({{ upstream.raw_code }})
-      );
-    {%- endcall %}
-  {% endfor %}
+    {%- set rendered_options = render_write_options(config) -%}
+    {%- set location = current_node.config.get('location', external_location(node_rel, current_node.config)) -%}
+    {%- set format = current_node.config.get('format', 'default') -%}
+    {%- set plugin_name = current_node.config.get('plugin', 'native') -%}
+    {% do store_relation(plugin_name, node_rel, location, format, current_node.config, True) %}
 {% endfor %}
 {% do adapter.commit() %}
 {% endif %}
