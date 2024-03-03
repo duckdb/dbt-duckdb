@@ -4,18 +4,16 @@ import os
 import sys
 import tempfile
 import time
-from typing import Dict
-from typing import List
-from typing import Optional
+from typing import Dict, List, Optional
 
 import duckdb
 
-from ..credentials import DuckDBCredentials
-from ..plugins import BasePlugin
-from ..utils import SourceConfig
-from ..utils import TargetConfig
 from dbt.contracts.connection import AdapterResponse
 from dbt.exceptions import DbtRuntimeError
+
+from ..credentials import DuckDBCredentials, PluginConfig
+from ..plugins import BasePlugin
+from ..utils import SourceConfig, TargetConfig
 
 
 def _ensure_event_loop():
@@ -95,7 +93,9 @@ class Environment(abc.ABC):
         pass
 
     @abc.abstractmethod
-    def submit_python_job(self, handle, parsed_model: dict, compiled_code: str) -> AdapterResponse:
+    def submit_python_job(
+        self, handle, parsed_model: dict, compiled_code: str
+    ) -> AdapterResponse:
         pass
 
     @abc.abstractmethod
@@ -208,16 +208,23 @@ class Environment(abc.ABC):
     def initialize_plugins(cls, creds: DuckDBCredentials) -> Dict[str, BasePlugin]:
         ret = {}
         base_config = creds.settings or {}
-        for plugin_def in creds.plugins or []:
+        for plugin_def in creds.plugins or [] + [PluginConfig("native")]:
             config = base_config.copy()
             config.update(plugin_def.config or {})
-            plugin = BasePlugin.create(plugin_def.module, config=config, alias=plugin_def.alias)
+            plugin = BasePlugin.create(
+                plugin_def.module, config=config, alias=plugin_def.alias
+            )
             ret[plugin.name] = plugin
         return ret
 
     @classmethod
     def run_python_job(
-        cls, con, load_df_function, identifier: str, compiled_code: str, creds: DuckDBCredentials
+        cls,
+        con,
+        load_df_function,
+        identifier: str,
+        compiled_code: str,
+        creds: DuckDBCredentials,
     ):
         mod_file = tempfile.NamedTemporaryFile(suffix=".py", delete=False)
         mod_file.write(compiled_code.lstrip().encode("utf-8"))

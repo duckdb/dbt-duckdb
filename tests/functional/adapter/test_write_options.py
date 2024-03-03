@@ -39,15 +39,12 @@ config_write_partition_by_id_name_sql = config_write_partition_by_id_name + mode
 
 
 class BaseExternalMaterializations:
-
     @pytest.fixture(scope="class")
     def dbt_profile_target(self, dbt_profile_target, tmp_path_factory):
         extroot = str(tmp_path_factory.getbasetemp() / "write_options")
         os.mkdir(extroot)
         dbt_profile_target["external_root"] = extroot
-        ##todo add native but delete after setted to default
-        dbt_profile_target["plugins"] = [{"module": "native"}]
-        #dbt_profile_target["threads"] = 5
+        # dbt_profile_target["threads"] = 5
         return dbt_profile_target
 
     @pytest.fixture(scope="class")
@@ -74,7 +71,6 @@ class BaseExternalMaterializations:
         }
 
     def test_base(self, project):
-
         # seed command
         results = run_dbt(["seed"])
         # seed result length
@@ -110,7 +106,9 @@ class BaseExternalMaterializations:
 
         # base table rowcount
         relation = relation_from_name(project.adapter, "base")
-        result = project.run_sql(f"select count(*) as num_rows from {relation}", fetch="one")
+        result = project.run_sql(
+            f"select count(*) as num_rows from {relation}", fetch="one"
+        )
         assert result[0] == 10
 
         # relations_equal

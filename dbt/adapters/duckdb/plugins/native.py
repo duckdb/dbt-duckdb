@@ -1,12 +1,10 @@
 import os
-from typing import Any
-from typing import Dict
+from typing import Any, Dict
 
 from duckdb import DuckDBPyRelation
 
+from ..utils import SourceConfig, TargetConfig
 from . import BasePlugin
-from ..utils import SourceConfig
-from ..utils import TargetConfig
 
 # here will be parquet,csv,json implementation,
 # this plugin should be default one if none is specified
@@ -30,7 +28,7 @@ class Plugin(BasePlugin):
             source_config.meta.get("location", "").get("path"),
             source_config.meta.get("config", {}).get("options", {}),
         )
-        return coursor.sql(f"SELECT * FROM '{location}'").arrow()
+        return f"(SELECT * FROM '{location}')"
 
     def can_be_upstream_referenced(self):
         return True
@@ -48,7 +46,9 @@ class Plugin(BasePlugin):
 
     def store(self, df: DuckDBPyRelation, target_config: TargetConfig, cursor=None):
         location = target_config.location.path
-        options = external_write_options(location, target_config.config.get("options", {}))
+        options = external_write_options(
+            location, target_config.config.get("options", {})
+        )
         cursor.sql(f"COPY (SELECT * FROM df) to '{location}' ({options})")
 
     def adapt_target_config(self, target_config: TargetConfig) -> TargetConfig:
@@ -104,5 +104,7 @@ def external_read_location(write_location: str, rendered_options: dict) -> str:
         globs = [write_location, "*"]
         partition_by = str(rendered_options.get("partition_by"))
         globs.extend(["*"] * len(partition_by.split(",")))
-        return ".".join(["/".join(globs), str(rendered_options.get("format", "parquet"))])
+        return ".".join(
+            ["/".join(globs), str(rendered_options.get("format", "parquet"))]
+        )
     return write_location

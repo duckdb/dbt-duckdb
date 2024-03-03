@@ -42,8 +42,6 @@ class TestRematerializeDownstreamExternalModel:
         extroot = str(tmp_path_factory.getbasetemp() / "rematerialize")
         os.mkdir(extroot)
         dbt_profile_target["external_root"] = extroot
-        dbt_profile_target["plugins"] = [{"module": "native"}]
-
         return dbt_profile_target
 
     @pytest.fixture(scope="class")

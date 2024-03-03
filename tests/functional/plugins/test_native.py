@@ -36,20 +36,20 @@ upstream_partition_model_parquet = """
   SELECT * from {{ref("partition_model_parquet")}}
 """
 
-default_csv= """
+default_csv = """
   {{ config(materialized="external", format="csv", delimiter="|" ) }}
     SELECT * FROM {{ref("base")}}
-  """ 
+  """
 
 upstream_default_csv = """
   {{ config(materialized="table") }}
   SELECT * from {{ref("default_csv")}}
 """
 
-default_json= """
+default_json = """
   {{ config(materialized="external", format="json", location="{{ adapter.external_root() }}/test.json" ) }}
     SELECT * FROM {{ref("base")}}
-  """ 
+  """
 
 upstream_default_json = """
   {{ config(materialized="table") }}
@@ -62,14 +62,14 @@ class TestDuckdbtNativelMaterializations:
     @pytest.fixture(scope="class")
     def models(self):
         return {
-            "default_parquet.sql" : default_parquet,
-            "upstream_default_parquet.sql" : upstream_default_parquet,
+            "default_parquet.sql": default_parquet,
+            "upstream_default_parquet.sql": upstream_default_parquet,
             "partition_model_parquet.sql": partition_model_parquet,
             "upstream_partition_model_parquet.sql": upstream_partition_model_parquet,
             "default_csv.sql": default_csv,
             "upstream_default_csv.sql": upstream_default_csv,
             "default_json.sql": default_json,
-            "upstream_default_json.sql": upstream_default_json
+            "upstream_default_json.sql": upstream_default_json,
         }
 
     @pytest.fixture(scope="class")
@@ -79,7 +79,7 @@ class TestDuckdbtNativelMaterializations:
         }
 
     @pytest.fixture(scope="class")
-    def profiles_config_update(self, dbt_profile_target,tmp_path_factory):
+    def profiles_config_update(self, dbt_profile_target, tmp_path_factory):
         extroot = str(tmp_path_factory.getbasetemp() / "external")
         os.mkdir(extroot)
         return {
@@ -88,11 +88,8 @@ class TestDuckdbtNativelMaterializations:
                     "dev": {
                         "type": "duckdb",
                         "path": "duckdb.dev",
-                        "plugins": [
-                            {"module": "native"}
-                        ],
-                        "external_root" : f'{extroot}',
-                        "threads" : 8
+                        "external_root": f"{extroot}",
+                        "threads": 8,
                     }
                 },
                 "target": "dev",
@@ -105,6 +102,3 @@ class TestDuckdbtNativelMaterializations:
         results = run_dbt()
         print(project.project_root)
         print("break point")
-
-
-
