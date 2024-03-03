@@ -29,11 +29,10 @@
 
 
 {%- macro register_self_reference_external_models() -%}
-{% if execute %}
+{% if execute and var("first_run") != 'true' %}
 {% for node in selected_resources if
     graph['nodes'][node].resource_type in ('model', 'seed')
     and graph['nodes'][node].config.materialized=='external'
-    and 'this' in graph['nodes'][node]['raw_code']
   %}
     {% set current_node = graph['nodes'][node] %}
     {%- set node_rel = api.Relation.create(
