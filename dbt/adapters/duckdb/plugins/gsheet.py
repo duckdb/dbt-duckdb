@@ -27,7 +27,7 @@ class Plugin(BasePlugin):
         self._config = GSheetConfig.from_dict(config)
         self._gc = self._config.client()
 
-    def load(self, source_config: SourceConfig, coursor=None):
+    def load(self, source_config: SourceConfig, cursor=None):
         doc = None
         if "title" in source_config:
             doc = self._gc.open(source_config["title"])

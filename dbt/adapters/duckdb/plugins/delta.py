@@ -18,7 +18,7 @@ class Plugin(BasePlugin):
     def configure_cursor(self, cursor):
         pass
 
-    def load(self, source_config: SourceConfig, coursor=None):
+    def load(self, source_config: SourceConfig, cursor=None):
         if "delta_table_path" not in source_config:
             raise Exception("'delta_table_path' is a required argument for the delta table!")
 

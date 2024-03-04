@@ -111,8 +111,8 @@ class BasePlugin:
         """
         pass
 
-    # coursor is needed for the native plugin
-    def load(self, source_config: SourceConfig, coursor=None):
+    # cursor is needed for the native plugin
+    def load(self, source_config: SourceConfig, cursor=None):
         """
         Load data from a source config and return it as a DataFrame-like object
         that DuckDB can read. This method should be overridden by subclasses that
@@ -123,13 +123,13 @@ class BasePlugin:
         """
         raise NotImplementedError(f"load method not implemented for {self.name}")
 
-    # coursor is needed just for the native, we have to do it better
+    # cursor is needed just for the native, we have to do it better
     # to had it over in some initalization?
     def store(self, df: DuckDBPyRelation, target_config: TargetConfig, cursor=None):
         raise NotImplementedError(f"store method not implemented for {self.name}")
 
     def create_source_config(self, target_config: TargetConfig) -> SourceConfig:
-        raise NotImplementedError(f"store method not implemented for {self.name}")
+        raise NotImplementedError(f"create_source_config method not implemented for {self.name}")
 
     def can_be_upstream_referenced(self):
         return False

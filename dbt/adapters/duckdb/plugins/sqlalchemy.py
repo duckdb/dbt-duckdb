@@ -19,7 +19,7 @@ class Plugin(BasePlugin):
     def initialize(self, plugin_config: Dict[str, Any]):
         self.engine = create_engine(plugin_config.pop("connection_url"), **plugin_config)
 
-    def load(self, source_config: SourceConfig, coursor=None):
+    def load(self, source_config: SourceConfig, cursor=None):
         if "query" in source_config:
             query = source_config["query"]
             query = query.format(**source_config.as_dict())

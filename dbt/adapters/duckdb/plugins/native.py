@@ -25,7 +25,7 @@ class Plugin(BasePlugin):
 
     # this one can be better not to go over some other format and df but directly
     # https://stackoverflow.com/questions/78055585/how-to-reference-duckdbpyrelation-from-another-connection
-    def load(self, source_config: SourceConfig, coursor=None):
+    def load(self, source_config: SourceConfig, cursor=None):
         location = external_read_location(
             source_config.meta.get("location", "").get("path"),
             source_config.meta.get("config", {}).get("options", {}),

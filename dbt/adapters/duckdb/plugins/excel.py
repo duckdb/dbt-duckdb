@@ -24,7 +24,7 @@ class Plugin(BasePlugin):
         if "s3_region" in plugin_config:
             os.environ["AWS_DEFAULT_REGION"] = plugin_config["s3_region"]
 
-    def load(self, source_config: SourceConfig, coursor=None):
+    def load(self, source_config: SourceConfig, cursor=None):
         ext_location = source_config["external_location"]
         ext_location = ext_location.format(**source_config.as_dict())
         if "s3" in ext_location:
@@ -95,7 +95,7 @@ class Plugin(BasePlugin):
 
     def create_source_config(self, target_config: TargetConfig) -> SourceConfig:
         # in the reader we have just location and sheet_name, maybe we can add here more options
-        # but in the first place i would not recommend to upstream excel file
+        # but in the first place i would not recommend to downstream excel file
         # this works for a very simple case but not all of them
         meta = {
             "external_location": target_config.location.path,
