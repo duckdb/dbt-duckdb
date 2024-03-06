@@ -146,6 +146,15 @@ class DuckDBCredentials(Credentials):
     # by networking issues)
     retries: Optional[Retries] = None
 
+    def __post_init__(self):
+        # Add MotherDuck plugin if the path is a MotherDuck database
+        # and plugin was not specified in profile.yml
+        if self.is_motherduck:
+            if self.plugins is None:
+                self.plugins = []
+            if "motherduck" not in [plugin["module"] for plugin in self.plugins]:
+                self.plugins.append(PluginConfig(module="motherduck"))
+
     @property
     def is_motherduck(self):
         parsed = urlparse(self.path)

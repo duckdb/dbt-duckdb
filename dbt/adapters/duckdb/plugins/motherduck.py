@@ -6,6 +6,7 @@ from duckdb import DuckDBPyConnection
 from . import BasePlugin
 from dbt.adapters.duckdb.credentials import DuckDBCredentials
 from dbt.version import __version__
+from dbt.adapters.duckdb.__version__ import version as __plugin_version__
 
 
 class Plugin(BasePlugin):
@@ -30,7 +31,7 @@ class Plugin(BasePlugin):
         return ""
 
     def update_connection_config(self, creds: DuckDBCredentials, config: Dict[str, Any]):
-        user_agent = f"dbt/{__version__}"
+        user_agent = f"dbt/{__version__} dbt-duckdb/{__plugin_version__}"
         if "custom_user_agent" in config:
             user_agent = f"{user_agent} {config['custom_user_agent']}"
         settings: Dict[str, Any] = creds.settings or {}
