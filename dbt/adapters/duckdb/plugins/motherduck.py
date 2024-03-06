@@ -4,9 +4,9 @@ from typing import Dict
 from duckdb import DuckDBPyConnection
 
 from . import BasePlugin
+from dbt.adapters.duckdb.__version__ import version as __plugin_version__
 from dbt.adapters.duckdb.credentials import DuckDBCredentials
 from dbt.version import __version__
-from dbt.adapters.duckdb.__version__ import version as __plugin_version__
 
 
 class Plugin(BasePlugin):
