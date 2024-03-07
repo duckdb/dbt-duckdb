@@ -152,7 +152,7 @@ class DuckDBCredentials(Credentials):
         if self.is_motherduck:
             if self.plugins is None:
                 self.plugins = []
-            if "motherduck" not in [plugin["module"] for plugin in self.plugins]:
+            if "motherduck" not in [plugin.module for plugin in self.plugins]:
                 self.plugins.append(PluginConfig(module="motherduck"))
 
     @property
