@@ -8,6 +8,7 @@ from dbt.adapters.duckdb.environments import Environment
 from dbt.adapters.duckdb.credentials import DuckDBCredentials
 from dbt.adapters.duckdb.credentials import PluginConfig
 from dbt.adapters.duckdb.plugins.motherduck import Plugin
+from dbt.adapters.duckdb.__version__ import version as plugin_version
 from dbt.version import __version__
 
 random_logs_sql = """
@@ -138,7 +139,7 @@ def test_motherduck_user_agent(dbt_profile_target, mock_plugins, mock_creds):
             kwargs = {
                 'read_only': False,
                 'config': {
-                    'custom_user_agent': f'dbt/{__version__} downstream-dep',
+                    'custom_user_agent': f'dbt/{__version__} dbt-duckdb/{plugin_version} downstream-dep',
                     'motherduck_token': 'quack'
                 }
             }
