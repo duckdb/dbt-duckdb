@@ -49,10 +49,9 @@ class SourceConfig:
 
     @classmethod
     def create_from_source(cls, source: RelationConfig) -> "SourceConfig":
-        meta = source.source_meta.copy()
-        meta.update(source.meta)
+        meta = source.meta.copy()
         # Use the config properties as well if they are present
-        meta.update(source.config._extra)
+        meta.update(source.config.extra)
         return SourceConfig(
             name=source.name,
             identifier=source.identifier,
