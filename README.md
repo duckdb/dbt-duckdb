@@ -206,19 +206,19 @@ them from the database first.
 #### Reading from external files
 
 You may reference external files in your dbt models either directly or as dbt `source`s by configuring the `external_location`
-meta option on the source:
+config option on the source:
 
 ```
 sources:
   - name: external_source
-    meta:
+    config:
       external_location: "s3://my-bucket/my-sources/{name}.parquet"
     tables:
       - name: source1
       - name: source2
 ```
 
-Here, the `meta` options on `external_source` defines `external_location` as an [f-string](https://peps.python.org/pep-0498/) that
+Here, the `config` options on `external_source` defines `external_location` as an [f-string](https://peps.python.org/pep-0498/) that
 allows us to express a pattern that indicates the location of any of the tables defined for that source. So a dbt model like:
 
 ```
@@ -233,18 +233,18 @@ SELECT *
 FROM 's3://my-bucket/my-sources/source1.parquet'
 ```
 
-If one of the source tables deviates from the pattern or needs some other special handling, then the `external_location` can also be set on the `meta`
+If one of the source tables deviates from the pattern or needs some other special handling, then the `external_location` can also be set on the `config`
 options for the table itself, for example:
 
 ```
 sources:
   - name: external_source
-    meta:
+    config:
       external_location: "s3://my-bucket/my-sources/{name}.parquet"
     tables:
       - name: source1
       - name: source2
-        meta:
+        config:
           external_location: "read_parquet(['s3://my-bucket/my-sources/source2a.parquet', 's3://my-bucket/my-sources/source2b.parquet'])"
 ```
 
@@ -270,7 +270,7 @@ sources:
   - name: flights_source
     tables:
       - name: flights
-        meta:
+        config:
           external_location: "read_csv('flights.csv', types={'FlightDate': 'DATE'}, names=['FlightDate', 'UniqueCarrier'])"
           formatter: oldstyle
 ```
