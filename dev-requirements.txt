@@ -19,6 +19,7 @@ mypy==1.8.0
 openpyxl
 pip-tools
 pre-commit
+protobuf==4.25.3
 psycopg2-binary
 pyiceberg
 pytest
