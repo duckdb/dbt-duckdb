@@ -51,7 +51,8 @@ class SourceConfig:
     def create_from_source(cls, source: RelationConfig) -> "SourceConfig":
         meta = source.meta.copy()
         # Use the config properties as well if they are present
-        meta.update(source.config.extra)
+        config_properties = source.config.extra if source.config else {}
+        meta.update(config_properties)
         return SourceConfig(
             name=source.name,
             identifier=source.identifier,

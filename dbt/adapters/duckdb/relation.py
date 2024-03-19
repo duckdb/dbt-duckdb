@@ -7,12 +7,9 @@ from typing import Type
 from .connections import DuckDBConnectionManager
 from .utils import SourceConfig
 from dbt.adapters.base.relation import BaseRelation
-from dbt.adapters.base.relation import Self
+from dbt.adapters.contracts.relation import HasQuoting
+from dbt.adapters.contracts.relation import RelationConfig
 
-from dbt.adapters.contracts.relation import (
-    HasQuoting,
-    RelationConfig,
-)
 
 @dataclass(frozen=True, eq=False, repr=False)
 class DuckDBRelation(BaseRelation):
@@ -20,18 +17,20 @@ class DuckDBRelation(BaseRelation):
 
     @classmethod
     def create_from(
-        cls: Type[Self],
+        cls: Type["DuckDBRelation"],
         quoting: HasQuoting,
         relation_config: RelationConfig,
         **kwargs: Any,
-    ) -> Self:
-        if relation_config.resource_type == 'source':
+    ) -> "DuckDBRelation":
+        if relation_config.resource_type == "source":
             return cls.create_from_source(quoting, relation_config, **kwargs)
         else:
             return super().create_from(quoting, relation_config, **kwargs)
 
     @classmethod
-    def create_from_source(cls: Type[Self], quoting: HasQuoting, source: RelationConfig, **kwargs: Any) -> Self:
+    def create_from_source(
+        cls: Type["DuckDBRelation"], quoting: HasQuoting, source: RelationConfig, **kwargs: Any
+    ) -> "DuckDBRelation":
         """
         This method creates a new DuckDBRelation instance from a source definition.
         It first checks if a 'plugin' is defined in the meta argument for the source or its parent configuration.
