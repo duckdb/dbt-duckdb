@@ -9,13 +9,13 @@ from typing import List
 from typing import Optional
 
 import duckdb
+from dbt_common.exceptions import DbtRuntimeError
 
 from ..credentials import DuckDBCredentials
 from ..plugins import BasePlugin
 from ..utils import SourceConfig
 from ..utils import TargetConfig
-from dbt.contracts.connection import AdapterResponse
-from dbt.exceptions import DbtRuntimeError
+from dbt.adapters.contracts.connection import AdapterResponse
 
 
 def _ensure_event_loop():

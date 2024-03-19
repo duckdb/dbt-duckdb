@@ -39,8 +39,9 @@ class TestDuckDBAdapter(unittest.TestCase):
 
     @property
     def adapter(self):
+        self.mock_mp_context = mock.MagicMock()
         if self._adapter is None:
-            self._adapter = DuckDBAdapter(self.config)
+            self._adapter = DuckDBAdapter(self.config, self.mock_mp_context)
         return self._adapter
 
     @mock.patch("dbt.adapters.duckdb.environments.duckdb")
