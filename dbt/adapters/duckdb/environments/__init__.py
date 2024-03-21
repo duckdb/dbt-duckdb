@@ -109,6 +109,9 @@ class Environment(abc.ABC):
     def get_binding_char(self) -> str:
         return "?"
 
+    def supports_comments(self) -> bool:
+        return duckdb.__version__ >= "0.10.1"
+
     @classmethod
     def initialize_db(
         cls, creds: DuckDBCredentials, plugins: Optional[Dict[str, BasePlugin]] = None
