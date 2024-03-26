@@ -3,8 +3,8 @@ from typing import Any
 from typing import List
 from typing import Optional
 from typing import Sequence
+from typing import TYPE_CHECKING
 
-import agate
 
 from dbt.adapters.base import BaseRelation
 from dbt.adapters.base.column import Column as BaseColumn
@@ -27,6 +27,9 @@ from dbt.exceptions import DbtRuntimeError
 
 TEMP_SCHEMA_NAME = "temp_schema_name"
 DEFAULT_TEMP_SCHEMA_NAME = "dbt_temp"
+
+if TYPE_CHECKING:
+    import agate
 
 
 class DuckDBAdapter(SQLAdapter):
@@ -61,7 +64,8 @@ class DuckDBAdapter(SQLAdapter):
         return self.config.credentials.is_motherduck
 
     @available
-    def convert_datetimes_to_strs(self, table: agate.Table) -> agate.Table:
+    def convert_datetimes_to_strs(self, table: "agate.Table") -> "agate.Table":
+        import agate
         for column in table.columns:
             if isinstance(column.data_type, agate.DateTime):
                 table = table.compute(
