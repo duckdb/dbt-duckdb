@@ -5,7 +5,6 @@ from typing import Optional
 from typing import Sequence
 from typing import TYPE_CHECKING
 
-
 from dbt.adapters.base import BaseRelation
 from dbt.adapters.base.column import Column as BaseColumn
 from dbt.adapters.base.impl import ConstraintSupport
@@ -66,6 +65,7 @@ class DuckDBAdapter(SQLAdapter):
     @available
     def convert_datetimes_to_strs(self, table: "agate.Table") -> "agate.Table":
         import agate
+
         for column in table.columns:
             if isinstance(column.data_type, agate.DateTime):
                 table = table.compute(
