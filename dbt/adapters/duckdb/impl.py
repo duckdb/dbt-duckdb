@@ -122,6 +122,13 @@ class DuckDBAdapter(SQLAdapter):
         return DuckDBConnectionManager.env().get_binding_char()
 
     @available
+    def catalog_comment(self, prefix):
+        if DuckDBConnectionManager.env().supports_comments():
+            return f"{prefix}.comment"
+        else:
+            return "''"
+
+    @available
     def external_write_options(self, write_location: str, rendered_options: dict) -> str:
         if "format" not in rendered_options:
             ext = os.path.splitext(write_location)[1].lower()
