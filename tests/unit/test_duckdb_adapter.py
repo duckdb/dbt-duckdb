@@ -45,6 +45,7 @@ class TestDuckDBAdapter(unittest.TestCase):
 
     @mock.patch("dbt.adapters.duckdb.environments.duckdb")
     def test_acquire_connection(self, connector):
+        connector.__version__ = "0.1.0"  # dummy placeholder for semver checks
         DuckDBConnectionManager.close_all_connections()
         connection = self.adapter.acquire_connection("dummy")
 
