@@ -61,7 +61,9 @@ class BVEnvironment(Environment):
         cursor.close()
         handle.close()
 
-    def store_relation(self, plugin_name: str, target_config: utils.TargetConfig) -> None:
+    def store_relation(
+        self, plugin_name: str, target_config: utils.TargetConfig, just_register: bool = False
+    ) -> None:
         handle = self.handle()
         payload = {
             "method": "dbt_store_relation",

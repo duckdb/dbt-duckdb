@@ -66,7 +66,7 @@ class LocalEnvironment(Environment):
             self.handle_count += 1
 
         cursor = self.initialize_cursor(
-            self.creds, self.conn.cursor(), self._plugins, self._REGISTERED_DF
+            self.creds, self.conn.cursor(), self._plugins, self._REGISTERED_DF.copy()
         )
         return DuckDBConnectionWrapper(cursor, self)
 
@@ -109,7 +109,7 @@ class LocalEnvironment(Environment):
                 else:
                     # Nothing to do (we ignore the existing table)
                     return
-        df = plugin.load(source_config)
+        df = plugin.load(source_config, cursor)
         assert df is not None
 
         materialization = source_config.meta.get(
@@ -118,11 +118,18 @@ class LocalEnvironment(Environment):
         source_table_name = source_config.table_name()
         df_name = source_table_name.replace(".", "_") + "_df"
 
-        cursor.register(df_name, df)
+        # hack for native plugin till we can't register a native df
+        # if native plugin -> set df_name = df which is string
+        # this native view/table doesnt have to be registered for each connection
+        if plugin_name == "native":
+            df_name = df
+        else:
+            cursor.register(df_name, df)
 
-        if materialization == "view":
-            # save to df instance to register on each cursor creation
-            self._REGISTERED_DF[df_name] = df
+            if materialization == "view":
+                # save to df instance to register on each cursor creation
+                with self.lock:
+                    self._REGISTERED_DF[df_name] = df
 
         cursor.execute(
             f"CREATE OR REPLACE {materialization} {source_table_name} AS SELECT * FROM {df_name}"
@@ -131,22 +138,41 @@ class LocalEnvironment(Environment):
         cursor.close()
         handle.close()
 
-    def store_relation(self, plugin_name: str, target_config: utils.TargetConfig) -> None:
-        if plugin_name not in self._plugins:
-            if plugin_name.startswith("glue|"):
-                from ..plugins import glue
+    def store_relation(
+        self,
+        plugin_name: str,
+        target_config: utils.TargetConfig,
+        just_register: bool = False,
+    ) -> None:
+        # some plugin have to be initialized on the fly? glue for example?
 
-                _, glue_db = plugin_name.split("|")
-                config = (self.creds.settings or {}).copy()
-                config["glue_database"] = glue_db
-                self._plugins[plugin_name] = glue.Plugin(plugin_name, config)
-            else:
-                raise Exception(
-                    f"Plugin {plugin_name} not found; known plugins are: "
-                    + ",".join(self._plugins.keys())
-                )
+        if plugin_name not in self._plugins:
+            raise Exception(
+                f"Plugin {plugin_name} not found; known plugins are: "
+                + ",".join(self._plugins.keys())
+            )
         plugin = self._plugins[plugin_name]
-        plugin.store(target_config)
+
+        # e.g add file format to the location
+        target_config = plugin.adapt_target_config(target_config)
+        if not just_register:
+            # export data with the store model
+            handle = self.handle()
+            cursor = handle.cursor()
+
+            df = cursor.sql(target_config.config.model.compiled_code)
+            # hand over Duckdb format that each plugin can choose which type of integration to use
+
+            plugin.store(df, target_config, cursor)
+
+            cursor.close()
+            handle.close()
+
+        # all are by default false, has to be turned on per plugin
+        if plugin.can_be_upstream_referenced():
+            # create df and view which can be referenced in the run following run
+            source_config = plugin.create_source_config(target_config)
+            self.load_source(plugin_name, source_config)
 
     def close(self):
         if self.conn:

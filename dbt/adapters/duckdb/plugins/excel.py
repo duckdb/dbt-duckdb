@@ -1,27 +1,20 @@
 import os
 import pathlib
-from threading import Lock
 from typing import Any
 from typing import Dict
 
 import pandas as pd
+from duckdb import DuckDBPyRelation
 from pandas.io.formats import excel
 
 from . import BasePlugin
-from . import pd_utils
 from ..utils import SourceConfig
 from ..utils import TargetConfig
-from dbt.logger import GLOBAL_LOGGER as logger
 
 
 class Plugin(BasePlugin):
     def initialize(self, plugin_config: Dict[str, Any]):
         self._config = plugin_config
-
-        if "output" in plugin_config:
-            self._excel_writer_create_lock = Lock()
-            assert isinstance(plugin_config["output"], dict)
-            assert "file" in plugin_config["output"]
 
         # Pass s3 settings to plugin environment
         if "s3_access_key_id" in plugin_config:
@@ -31,7 +24,7 @@ class Plugin(BasePlugin):
         if "s3_region" in plugin_config:
             os.environ["AWS_DEFAULT_REGION"] = plugin_config["s3_region"]
 
-    def load(self, source_config: SourceConfig):
+    def load(self, source_config: SourceConfig, cursor=None):
         ext_location = source_config["external_location"]
         ext_location = ext_location.format(**source_config.as_dict())
         if "s3" in ext_location:
@@ -42,26 +35,20 @@ class Plugin(BasePlugin):
         sheet_name = source_config.get("sheet_name", 0)
         return pd.read_excel(source_location, sheet_name=sheet_name)
 
-    def store(self, target_config: TargetConfig):
+    def store(self, df: DuckDBPyRelation, target_config: TargetConfig, cursor=None):
         plugin_output_config = self._config["output"]
 
-        # Create the writer on the first instance of the call to store.
-        # Instead if we instantiated the writer in the constructor
-        # with mode = 'w', this would result in an existing file getting
-        # overwritten. This can happen if dbt test is executed for example.
-        if not hasattr(self, "_excel_writer"):
-            with self._excel_writer_create_lock:
-                if not hasattr(self, "_excel_writer"):
-                    self._excel_writer = pd.ExcelWriter(
-                        plugin_output_config["file"],
-                        mode=plugin_output_config.get("mode", "w"),
-                        engine=plugin_output_config.get("engine", "xlsxwriter"),
-                        engine_kwargs=plugin_output_config.get("engine_kwargs", {}),
-                        date_format=plugin_output_config.get("date_format"),
-                        datetime_format=plugin_output_config.get("datetime_format"),
-                    )
-                    if not plugin_output_config.get("header_styling", True):
-                        excel.ExcelFormatter.header_style = None
+        # this writer doesnt take location but always something defined in the profile?
+        _excel_writer = pd.ExcelWriter(
+            target_config.location.path,
+            mode=plugin_output_config.get("mode", "w"),
+            engine=plugin_output_config.get("engine", "xlsxwriter"),
+            engine_kwargs=plugin_output_config.get("engine_kwargs", {}),
+            date_format=plugin_output_config.get("date_format"),
+            datetime_format=plugin_output_config.get("datetime_format"),
+        )
+        if not plugin_output_config.get("header_styling", True):
+            excel.ExcelFormatter.header_style = None
 
         target_output_config = {
             **plugin_output_config,
@@ -73,12 +60,12 @@ class Plugin(BasePlugin):
             sheet_name = (target_config.relation.identifier or "Sheet1")[0:31]
             target_output_config["sheet_name"] = sheet_name
 
-        df = pd_utils.target_to_df(target_config)
+        pd_df = df.df()  # duckdb model to pandas dataframe
         if target_output_config.get("skip_empty_sheet", False) and df.shape[0] == 0:
             return
         try:
-            df.to_excel(
-                self._excel_writer,
+            pd_df.to_excel(
+                _excel_writer,
                 sheet_name=target_output_config["sheet_name"],
                 na_rep=target_output_config.get("na_rep", ""),
                 float_format=target_output_config.get("float_format", None),
@@ -87,9 +74,6 @@ class Plugin(BasePlugin):
                 merge_cells=target_output_config.get("merge_cells", True),
                 inf_rep=target_output_config.get("inf_rep", "inf"),
             )
-            if not target_output_config.get("lazy_close", True):
-                self._excel_writer.close()
-                del self._excel_writer
         except ValueError as ve:
             # Catches errors resembling the below & logs an appropriate message
             # ValueError('This sheet is too large! Your sheet size is: 1100000, 1 Max sheet size is: 1048576, 16384')
@@ -100,12 +84,43 @@ class Plugin(BasePlugin):
                 pd.DataFrame(
                     [{"Error": target_output_config.get("ignore_sheet_too_large_error", str(ve))}]
                 ).to_excel(
-                    self._excel_writer, sheet_name=target_output_config["sheet_name"], index=False
+                    _excel_writer,
+                    sheet_name=target_output_config["sheet_name"],
+                    index=False,
                 )
             else:
                 raise ve
 
-    def __del__(self):
-        if hasattr(self, "_excel_writer"):
-            logger.info(f"Closing {self._config['output']['file']}")
-            self._excel_writer.close()
+        _excel_writer.close()
+
+    def create_source_config(self, target_config: TargetConfig) -> SourceConfig:
+        # in the reader we have just location and sheet_name, maybe we can add here more options
+        # but in the first place i would not recommend to downstream excel file
+        # this works for a very simple case but not all of them
+        meta = {
+            "external_location": target_config.location.path,
+            "sheet_name": target_config.config.get("sheet_name", 0),
+        }
+
+        source_config = SourceConfig(
+            name=target_config.relation.name,
+            identifier=target_config.relation.identifier,
+            schema=target_config.relation.schema,
+            database=target_config.relation.database,
+            meta=meta,
+            tags=[],
+        )
+        return source_config
+
+    def can_be_upstream_referenced(self):
+        return True
+
+    def adapt_target_config(self, target_config: TargetConfig) -> TargetConfig:
+        if target_config.location.format == "default":
+            target_config.location.format = "xlsx"
+
+        target_config.location.path = (
+            target_config.location.path + "." + target_config.location.format
+        )
+
+        return target_config

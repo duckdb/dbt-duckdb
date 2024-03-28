@@ -1,7 +1,9 @@
 import os
+
 import pytest
-from dbt.tests.util import run_dbt, relation_from_name
+
 from dbt.adapters.duckdb import DuckDBConnectionManager
+from dbt.tests.util import relation_from_name, run_dbt
 
 upstream_model_sql = """
 select range from range(3)
@@ -41,7 +43,7 @@ class TestRematerializeDownstreamExternalModel:
         os.mkdir(extroot)
         dbt_profile_target["external_root"] = extroot
         return dbt_profile_target
-    
+
     @pytest.fixture(scope="class")
     def project_config_update(self):
         return {
@@ -75,5 +77,7 @@ class TestRematerializeDownstreamExternalModel:
 
         # really makes sure we have created the downstream model
         relation = relation_from_name(project.adapter, "downstream_of_partition_model")
-        result = project.run_sql(f"select count(*) as num_rows from {relation}", fetch="one")
+        result = project.run_sql(
+            f"select count(*) as num_rows from {relation}", fetch="one"
+        )
         assert result[0] == 5
