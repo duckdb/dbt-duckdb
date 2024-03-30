@@ -1,28 +1,45 @@
 
 {% macro duckdb__get_catalog(information_schema, schemas) -%}
   {%- call statement('catalog', fetch_result=True) -%}
+    with relations AS (
+      select
+        t.table_name
+        , t.database_name
+        , t.schema_name
+        , 'BASE TABLE' as table_type
+        , {{ adapter.catalog_comment('t') }} as table_comment
+      from duckdb_tables() t
+      WHERE t.database_name = '{{ database }}'
+      UNION ALL
+      SELECT v.view_name as table_name
+      , v.database_name
+      , v.schema_name
+      , 'VIEW' as table_type
+      , {{ adapter.catalog_comment('v') }} as table_comment
+      from duckdb_views() v
+      WHERE v.database_name = '{{ database }}'
+    )
     select
         '{{ database }}' as table_database,
-        t.table_schema,
-        t.table_name,
-        t.table_type,
-        '' as table_comment,
+        r.schema_name as table_schema,
+        r.table_name,
+        r.table_type,
+        r.table_comment,
         c.column_name,
-        c.ordinal_position as column_index,
-        c.data_type column_type,
-        '' as column_comment,
+        c.column_index as column_index,
+        c.data_type as column_type,
+        {{ adapter.catalog_comment('c') }} as column_comment,
         '' as table_owner
-    FROM information_schema.tables t JOIN information_schema.columns c ON t.table_schema = c.table_schema AND t.table_name = c.table_name
+    FROM relations r JOIN duckdb_columns() c ON r.schema_name = c.schema_name AND r.table_name = c.table_name
     WHERE (
         {%- for schema in schemas -%}
-          upper(t.table_schema) = upper('{{ schema }}'){%- if not loop.last %} or {% endif -%}
+          upper(r.schema_name) = upper('{{ schema }}'){%- if not loop.last %} or {% endif -%}
         {%- endfor -%}
     )
-    AND t.table_type IN ('BASE TABLE', 'VIEW')
     ORDER BY
-        t.table_schema,
-        t.table_name,
-        c.ordinal_position
+        r.schema_name,
+        r.table_name,
+        c.column_index
   {%- endcall -%}
   {{ return(load_result('catalog').table) }}
 {%- endmacro %}
