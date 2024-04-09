@@ -3,8 +3,8 @@ from typing import Any
 from typing import List
 from typing import Optional
 from typing import Sequence
+from typing import TYPE_CHECKING
 
-import agate
 from dbt_common.contracts.constraints import ColumnLevelConstraint
 from dbt_common.contracts.constraints import ConstraintType
 from dbt_common.exceptions import DbtInternalError
@@ -23,11 +23,13 @@ from dbt.adapters.duckdb.relation import DuckDBRelation
 from dbt.adapters.duckdb.utils import TargetConfig
 from dbt.adapters.duckdb.utils import TargetLocation
 from dbt.adapters.sql import SQLAdapter
-# TODO
-# from dbt.context.providers import RuntimeConfigObject
+
 
 TEMP_SCHEMA_NAME = "temp_schema_name"
 DEFAULT_TEMP_SCHEMA_NAME = "dbt_temp"
+
+if TYPE_CHECKING:
+    import agate
 
 
 class DuckDBAdapter(SQLAdapter):
@@ -62,7 +64,9 @@ class DuckDBAdapter(SQLAdapter):
         return self.config.credentials.is_motherduck
 
     @available
-    def convert_datetimes_to_strs(self, table: agate.Table) -> agate.Table:
+    def convert_datetimes_to_strs(self, table: "agate.Table") -> "agate.Table":
+        import agate
+
         for column in table.columns:
             if isinstance(column.data_type, agate.DateTime):
                 table = table.compute(
@@ -117,6 +121,13 @@ class DuckDBAdapter(SQLAdapter):
     @available
     def get_binding_char(self):
         return DuckDBConnectionManager.env().get_binding_char()
+
+    @available
+    def catalog_comment(self, prefix):
+        if DuckDBConnectionManager.env().supports_comments():
+            return f"{prefix}.comment"
+        else:
+            return "''"
 
     @available
     def external_write_options(self, write_location: str, rendered_options: dict) -> str:

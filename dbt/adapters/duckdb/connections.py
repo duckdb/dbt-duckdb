@@ -4,8 +4,7 @@ from contextlib import contextmanager
 from multiprocessing.context import SpawnContext
 from typing import Optional
 from typing import Tuple
-
-import agate
+from typing import TYPE_CHECKING
 
 import dbt.exceptions
 from . import environments
@@ -17,6 +16,9 @@ from dbt.adapters.events.logging import AdapterLogger
 from dbt.adapters.sql import SQLConnectionManager
 
 logger = AdapterLogger("DuckDB")
+
+if TYPE_CHECKING:
+    import agate
 
 
 class DuckDBConnectionManager(SQLConnectionManager):
@@ -104,7 +106,7 @@ class DuckDBConnectionManager(SQLConnectionManager):
         auto_begin: bool = False,
         fetch: bool = False,
         limit: Optional[int] = None,
-    ) -> Tuple[AdapterResponse, agate.Table]:
+    ) -> Tuple[AdapterResponse, "agate.Table"]:
         if self.disable_transactions:
             auto_begin = False
         return super().execute(sql, auto_begin, fetch, limit)
