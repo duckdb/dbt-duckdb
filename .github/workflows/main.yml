@@ -17,7 +17,7 @@ name: Tests and Code Checks
 on:
   push:
     branches:
-      - "main"
+      - "master"
       - "develop"
       - "*.latest"
       - "releases/*"
@@ -200,8 +200,22 @@ jobs:
           name: filebased_results_${{ matrix.python-version }}-${{ steps.date.outputs.date }}.csv
           path: filebased_results.csv
 
+  check-md-token:
+    name: Check if MotherDuck token exists
+    runs-on: ubuntu-latest
+    outputs:
+      exists: ${{ steps.md-token.outputs.exists }}
+    steps:
+        - id: md-token
+          env:
+              MOTHERDUCK_TOKEN: ${{ secrets.MOTHERDUCK_TOKEN }}
+          if: ${{ env.MOTHERDUCK_TOKEN != '' }}
+          run: echo "::set-output name=exists::true"
+
   motherduck:
     name: MotherDuck functional test / python ${{ matrix.python-version }}
+    needs: [check-md-token]
+    if: needs.check-md-token.outputs.exists == 'true'
 
     runs-on: ubuntu-latest
 

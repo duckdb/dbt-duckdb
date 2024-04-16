@@ -242,11 +242,23 @@ class DuckDBAdapter(SQLAdapter):
         else:
             return super().render_column_constraint(constraint)
 
+    def _clean_up_temp_relation_for_incremental(self, config):
+        if self.is_motherduck():
+            if "incremental" == config.model.get_materialization():
+                temp_relation = self.Relation(
+                    path=self.get_temp_relation_path(config.model), type=RelationType.Table
+                )
+                self.drop_relation(temp_relation)
+
     def pre_model_hook(self, config: Any) -> None:
-        """A hook for getting the temp schema name from the model config"""
+        """A hook for getting the temp schema name from the model config.
+        Cleans up the remote temporary table on MotherDuck before running
+        an incremental model.
+        """
         self._temp_schema_name = config.model.config.meta.get(
             TEMP_SCHEMA_NAME, self._temp_schema_name
         )
+        self._clean_up_temp_relation_for_incremental(config)
         super().pre_model_hook(config)
 
     @available
@@ -263,12 +275,7 @@ class DuckDBAdapter(SQLAdapter):
         """A hook for cleaning up the remote temporary table on MotherDuck if the
         incremental model materialization fails to do so.
         """
-        if self.is_motherduck():
-            if "incremental" == config.model.get_materialization():
-                temp_relation = self.Relation(
-                    path=self.get_temp_relation_path(config.model), type=RelationType.Table
-                )
-                self.drop_relation(temp_relation)
+        self._clean_up_temp_relation_for_incremental(config)
         super().post_model_hook(config, context)
 
 
