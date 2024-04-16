@@ -66,7 +66,7 @@ class TestTableConstraintsRuntimeDdlEnforcement(
     pass
 
 
-@pytest.mark.skip_profile("md")
+@pytest.mark.skip_profile("md", "buenavista")
 class TestTableConstraintsRollback(DuckDBColumnEqualSetup, BaseConstraintsRollback):
     @pytest.fixture(scope="class")
     def expected_error_messages(self):
@@ -82,7 +82,7 @@ class TestIncrementalConstraintsRuntimeDdlEnforcement(
         return ["NOT NULL constraint failed"]
 
 
-@pytest.mark.skip_profile("md")
+@pytest.mark.skip_profile("md", "buenavista")
 class TestIncrementalConstraintsRollback(
     DuckDBColumnEqualSetup, BaseIncrementalConstraintsRollback
 ):
