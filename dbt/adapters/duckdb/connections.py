@@ -65,8 +65,11 @@ class DuckDBConnectionManager(SQLConnectionManager):
         connection = super(SQLConnectionManager, cls).close(connection)
         return connection
 
-    def cancel(self, connection):
-        pass
+    def cancel(self, connection: Connection):
+        logger.debug("cancelling query on connection {}. Details: {}".format(connection.name, connection))
+        self._ENV.cancel(connection)
+        logger.debug("query cancelled on connection {}".format(connection.name))
+
 
     @contextmanager
     def exception_handler(self, sql: str, connection_name="master"):
