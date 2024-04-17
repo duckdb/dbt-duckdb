@@ -51,6 +51,10 @@ class DuckDBAdapter(SQLAdapter):
     def date_function(cls) -> str:
         return "now()"
 
+    @classmethod
+    def is_cancelable(cls) -> bool:
+        return cls.ConnectionManager.env().is_cancelable()
+    
     def debug_query(self):
         self.execute("select 1 as id")
 

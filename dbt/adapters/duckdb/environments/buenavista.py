@@ -31,6 +31,9 @@ class BVEnvironment(Environment):
         cursor.close()
         return conn
     
+    def is_cancelable(cls):
+        return False
+    
     @classmethod
     def cancel(cls, connection: Connection):
         pass

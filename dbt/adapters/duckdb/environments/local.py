@@ -58,6 +58,9 @@ class LocalEnvironment(Environment):
             if self.handle_count == 0 and not self._keep_open:
                 self.close()
 
+    def is_cancelable(cls):
+        return True
+    
     def cancel(cls, connection: Connection):
         connection.handle.cursor().interrupt()
 

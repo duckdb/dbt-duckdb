@@ -120,6 +120,11 @@ class Environment(abc.ABC):
     
     @classmethod
     @abc.abstractmethod
+    def is_cancelable(cls) -> bool:
+        pass
+
+    @classmethod
+    @abc.abstractmethod
     def cancel(cls, connection: Connection):
         pass
 
