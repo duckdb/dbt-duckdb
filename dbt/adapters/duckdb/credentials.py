@@ -234,7 +234,10 @@ class DuckDBCredentials(Credentials):
         settings = self.settings or {}
         if self.use_credential_provider:
             if self.use_credential_provider == "aws":
-                settings.update(_load_aws_credentials(ttl=_get_ttl_hash()))
+                settings.update(
+                    _load_aws_credentials(ttl=_get_ttl_hash()),
+                    profile=settings.get("s3_profile"),
+                )
             else:
                 raise ValueError(
                     "Unsupported value for use_credential_provider: "
@@ -248,7 +251,7 @@ def _get_ttl_hash(seconds=300):
 
 
 @lru_cache()
-def _load_aws_credentials(ttl=None) -> Dict[str, Any]:
+def _load_aws_credentials(ttl=None, profile="default") -> Dict[str, Any]:
     """
     Load AWS credentials from the environment.
 
@@ -260,7 +263,7 @@ def _load_aws_credentials(ttl=None) -> Dict[str, Any]:
     del ttl  # make mypy happy
     import boto3.session
 
-    session = boto3.session.Session()
+    session = boto3.session.Session(profile_name=profile)
 
     # use STS to verify that the credentials are valid; we will
     # raise a helpful error here if they are not
