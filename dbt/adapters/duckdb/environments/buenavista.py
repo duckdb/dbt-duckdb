@@ -5,7 +5,8 @@ import psycopg2
 from . import Environment
 from .. import credentials
 from .. import utils
-from dbt.contracts.connection import AdapterResponse, Connection
+from dbt.contracts.connection import AdapterResponse
+from dbt.contracts.connection import Connection
 
 
 class BVEnvironment(Environment):
@@ -30,10 +31,10 @@ class BVEnvironment(Environment):
         cursor = self.initialize_cursor(self.creds, conn.cursor())
         cursor.close()
         return conn
-    
+
     def is_cancelable(cls):
         return False
-    
+
     @classmethod
     def cancel(cls, connection: Connection):
         pass

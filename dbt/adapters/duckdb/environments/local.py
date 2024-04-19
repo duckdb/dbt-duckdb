@@ -3,7 +3,8 @@ import threading
 from . import Environment
 from .. import credentials
 from .. import utils
-from dbt.contracts.connection import AdapterResponse, Connection
+from dbt.contracts.connection import AdapterResponse
+from dbt.contracts.connection import Connection
 from dbt.exceptions import DbtRuntimeError
 
 
@@ -60,7 +61,8 @@ class LocalEnvironment(Environment):
 
     def is_cancelable(cls):
         return True
-    
+
+    @classmethod
     def cancel(cls, connection: Connection):
         connection.handle.cursor().interrupt()
 

@@ -14,7 +14,8 @@ from ..credentials import DuckDBCredentials
 from ..plugins import BasePlugin
 from ..utils import SourceConfig
 from ..utils import TargetConfig
-from dbt.contracts.connection import AdapterResponse, Connection
+from dbt.contracts.connection import AdapterResponse
+from dbt.contracts.connection import Connection
 from dbt.exceptions import DbtRuntimeError
 
 
@@ -114,10 +115,10 @@ class Environment(abc.ABC):
 
     def get_binding_char(self) -> str:
         return "?"
-    
+
     def supports_comments(self) -> bool:
         return self._supports_comments
-    
+
     @classmethod
     @abc.abstractmethod
     def is_cancelable(cls) -> bool:
