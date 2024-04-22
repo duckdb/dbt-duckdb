@@ -1,4 +1,5 @@
 import os
+import tempfile
 
 import duckdb
 import pytest
@@ -36,13 +37,13 @@ models_target_model_sql = """
 class TestAttachedDatabase:
     @pytest.fixture(scope="class")
     def attach_test_db(self):
-        path = "/tmp/attach_test.duckdb"
-        db = duckdb.connect(path)
-        db.execute("CREATE SCHEMA analytics")
-        db.execute("CREATE TABLE analytics.attached_table AS SELECT 1 as id")
-        db.close()
-        yield path
-        os.unlink(path)
+        with tempfile.TemporaryDirectory() as temp_dir:
+            path = os.path.join(temp_dir, "attach_test.duckdb")
+            db = duckdb.connect(path)
+            db.execute("CREATE SCHEMA analytics")
+            db.execute("CREATE TABLE analytics.attached_table AS SELECT 1 as id")
+            db.close()
+            yield path
 
     @pytest.fixture(scope="class")
     def profiles_config_update(self, dbt_profile_target, attach_test_db):
