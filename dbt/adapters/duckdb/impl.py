@@ -53,7 +53,7 @@ class DuckDBAdapter(SQLAdapter):
 
     @classmethod
     def is_cancelable(cls) -> bool:
-        return False
+        return cls.ConnectionManager.env().is_cancelable()
 
     def debug_query(self):
         self.execute("select 1 as id")

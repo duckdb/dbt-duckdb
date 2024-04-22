@@ -4,6 +4,7 @@ from . import Environment
 from .. import credentials
 from .. import utils
 from dbt.contracts.connection import AdapterResponse
+from dbt.contracts.connection import Connection
 from dbt.exceptions import DbtRuntimeError
 
 
@@ -57,6 +58,13 @@ class LocalEnvironment(Environment):
             self.handle_count -= 1
             if self.handle_count == 0 and not self._keep_open:
                 self.close()
+
+    def is_cancelable(cls):
+        return True
+
+    @classmethod
+    def cancel(cls, connection: Connection):
+        connection.handle.cursor().interrupt()
 
     def handle(self):
         # Extensions/settings need to be configured per cursor
