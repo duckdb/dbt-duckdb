@@ -77,7 +77,7 @@ class TestAttachedDatabase:
 
         # check that the model is created in the attached db
         db = duckdb.connect(attach_test_db)
-        ret = db.execute("SELECT * FROM target_model").fetchall()
+        ret = db.execute("SELECT * FROM attach_test.main.target_model").fetchall()
         assert ret[0][0] == 1
 
         # check that everything works on a re-run of dbt
