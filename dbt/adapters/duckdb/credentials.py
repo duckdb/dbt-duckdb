@@ -235,9 +235,7 @@ class DuckDBCredentials(Credentials):
         if self.use_credential_provider:
             if self.use_credential_provider == "aws":
                 settings.update(
-                    _load_aws_credentials(
-                        ttl=_get_ttl_hash(), profile=settings.get("s3_profile")
-                    ),
+                    _load_aws_credentials(ttl=_get_ttl_hash(), profile=settings.get("s3_profile")),
                 )
             else:
                 raise ValueError(
