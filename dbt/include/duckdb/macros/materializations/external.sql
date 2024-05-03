@@ -1,10 +1,11 @@
 {% materialization external, adapter="duckdb", supported_languages=['sql', 'python'] %}
 
-  {%- set location = render(config.get('location', default=external_location(this, config))) -%})
+  {%- set location = render(config.get('location', default=external_location(this, config))) -%}
+  {%- set location_tmp = location ~ "_tmp.parquet" -%}
   {%- set rendered_options = render_write_options(config) -%}
   {%- set format = config.get('format', 'parquet') -%}
-  {%- set write_options = adapter.external_write_options(location, rendered_options) -%}
-  {%- set read_location = adapter.external_read_location(location, rendered_options) -%}
+  {%- set write_options = adapter.external_write_options(location_tmp, rendered_options) -%}
+  {%- set read_location = adapter.external_read_location(location_tmp, rendered_options) -%}
 
   -- set language - python or sql
   {%- set language = model['language'] -%}
@@ -46,7 +47,7 @@
   {%- endcall %}
 
   -- write an temp relation into file
-  {{ write_to_file(temp_relation, location, write_options) }}
+  {{write_to_file(temp_relation, location_tmp, write_options)}}
   -- create a view on top of the location
   {% call statement('main', language='sql') -%}
     create or replace view {{ intermediate_relation }} as (
