@@ -201,7 +201,7 @@ jobs:
           path: filebased_results.csv
 
   check-md-token:
-    name: Check if MotherDuck token exists
+    name: Check if MotherDuck v0.10.x token exists
     runs-on: ubuntu-latest
     outputs:
       exists: ${{ steps.md-token.outputs.exists }}
