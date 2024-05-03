@@ -1,4 +1,5 @@
 import os
+import tempfile
 
 import duckdb
 import pytest
@@ -32,17 +33,17 @@ models_target_model_sql = """
 """
 
 
-@pytest.mark.skip_profile("buenavista", "md")
+@pytest.mark.skip_profile("memory", "buenavista", "md")
 class TestAttachedDatabase:
     @pytest.fixture(scope="class")
     def attach_test_db(self):
-        path = "/tmp/attach_test.duckdb"
-        db = duckdb.connect(path)
-        db.execute("CREATE SCHEMA analytics")
-        db.execute("CREATE TABLE analytics.attached_table AS SELECT 1 as id")
-        db.close()
-        yield path
-        os.unlink(path)
+        with tempfile.TemporaryDirectory() as temp_dir:
+            path = os.path.join(temp_dir, "attach_test.duckdb")
+            db = duckdb.connect(path)
+            db.execute("CREATE SCHEMA analytics")
+            db.execute("CREATE TABLE analytics.attached_table AS SELECT 1 as id")
+            db.close()
+            yield path
 
     @pytest.fixture(scope="class")
     def profiles_config_update(self, dbt_profile_target, attach_test_db):
@@ -78,6 +79,7 @@ class TestAttachedDatabase:
         db = duckdb.connect(attach_test_db)
         ret = db.execute("SELECT * FROM target_model").fetchall()
         assert ret[0][0] == 1
+        db.close()
 
         # check that everything works on a re-run of dbt
         rerun_results = run_dbt()

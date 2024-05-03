@@ -11,11 +11,11 @@ pyarrow
 buenavista
 bumpversion
 flaky
-freezegun==1.4.0
+freezegun==1.5.0
 fsspec
 gspread
 ipdb
-mypy==1.9.0
+mypy==1.10.0
 openpyxl
 pip-tools
 pre-commit

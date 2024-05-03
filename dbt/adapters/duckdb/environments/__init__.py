@@ -16,6 +16,7 @@ from ..plugins import BasePlugin
 from ..utils import SourceConfig
 from ..utils import TargetConfig
 from dbt.adapters.contracts.connection import AdapterResponse
+from dbt.adapters.contracts.connection import Connection
 
 
 def _ensure_event_loop():
@@ -117,6 +118,16 @@ class Environment(abc.ABC):
 
     def supports_comments(self) -> bool:
         return self._supports_comments
+
+    @classmethod
+    @abc.abstractmethod
+    def is_cancelable(cls) -> bool:
+        pass
+
+    @classmethod
+    @abc.abstractmethod
+    def cancel(cls, connection: Connection):
+        pass
 
     @classmethod
     def initialize_db(

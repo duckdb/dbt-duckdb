@@ -6,6 +6,7 @@ from . import Environment
 from .. import credentials
 from .. import utils
 from dbt.adapters.contracts.connection import AdapterResponse
+from dbt.adapters.contracts.connection import Connection
 
 
 class BVEnvironment(Environment):
@@ -30,6 +31,13 @@ class BVEnvironment(Environment):
         cursor = self.initialize_cursor(self.creds, conn.cursor())
         cursor.close()
         return conn
+
+    def is_cancelable(cls):
+        return False
+
+    @classmethod
+    def cancel(cls, connection: Connection):
+        pass
 
     def get_binding_char(self) -> str:
         return "%s"
