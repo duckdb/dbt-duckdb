@@ -11,6 +11,7 @@ from typing import Optional
 import duckdb
 
 from ..credentials import DuckDBCredentials
+from ..credentials import PluginConfig
 from ..plugins import BasePlugin
 from ..utils import SourceConfig
 from ..utils import TargetConfig
@@ -110,7 +111,9 @@ class Environment(abc.ABC):
         pass
 
     @abc.abstractmethod
-    def store_relation(self, plugin_name: str, target_config: TargetConfig) -> None:
+    def store_relation(
+        self, plugin_name: str, target_config: TargetConfig, just_register: bool = False
+    ) -> None:
         pass
 
     def get_binding_char(self) -> str:
@@ -226,7 +229,7 @@ class Environment(abc.ABC):
     def initialize_plugins(cls, creds: DuckDBCredentials) -> Dict[str, BasePlugin]:
         ret = {}
         base_config = creds.settings or {}
-        for plugin_def in creds.plugins or []:
+        for plugin_def in creds.plugins or [] + [PluginConfig("native")]:
             config = base_config.copy()
             config.update(plugin_def.config or {})
             plugin = BasePlugin.create(plugin_def.module, config=config, alias=plugin_def.alias)
@@ -235,7 +238,12 @@ class Environment(abc.ABC):
 
     @classmethod
     def run_python_job(
-        cls, con, load_df_function, identifier: str, compiled_code: str, creds: DuckDBCredentials
+        cls,
+        con,
+        load_df_function,
+        identifier: str,
+        compiled_code: str,
+        creds: DuckDBCredentials,
     ):
         mod_file = tempfile.NamedTemporaryFile(suffix=".py", delete=False)
         mod_file.write(compiled_code.lstrip().encode("utf-8"))
