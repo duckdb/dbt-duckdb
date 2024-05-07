@@ -201,14 +201,14 @@ jobs:
           path: filebased_results.csv
 
   check-md-token:
-    name: Check if MotherDuck token exists
+    name: Check if MotherDuck v0.10.x token exists
     runs-on: ubuntu-latest
     outputs:
       exists: ${{ steps.md-token.outputs.exists }}
     steps:
         - id: md-token
           env:
-              MOTHERDUCK_TOKEN: ${{ secrets.MOTHERDUCK_TOKEN }}
+              MOTHERDUCK_TOKEN: ${{ secrets.MOTHERDUCK_TOKEN_10 }}
           if: ${{ env.MOTHERDUCK_TOKEN != '' }}
           run: echo "::set-output name=exists::true"
 
@@ -226,7 +226,7 @@ jobs:
 
     env:
       TOXENV: "md"
-      MOTHERDUCK_TOKEN: ${{ secrets.MOTHERDUCK_TOKEN }}
+      MOTHERDUCK_TOKEN: ${{ secrets.MOTHERDUCK_TOKEN_10 }}
       PYTEST_ADDOPTS: "-v --color=yes --csv motherduck_results.csv"
 
     steps:
@@ -362,7 +362,7 @@ jobs:
 
     env:
       TOXENV: "plugins"
-      MOTHERDUCK_TOKEN: ${{ secrets.MOTHERDUCK_TOKEN }}
+      MOTHERDUCK_TOKEN: ${{ secrets.MOTHERDUCK_TOKEN_10 }}
       PYTEST_ADDOPTS: "-v --color=yes --csv plugins_results.csv"
 
     steps:
