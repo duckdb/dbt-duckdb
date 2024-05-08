@@ -206,7 +206,10 @@ them from the database first.
 #### Reading from external files
 
 You may reference external files in your dbt models either directly or as dbt `source`s by configuring the `external_location`
-meta option on the source:
+in either the `meta` or the `config` option on the source definition. The difference is that settings under the `meta` option
+will be propagated to the documentation for the source generated via `dbt docs generate`, but the settings under the `config`
+option will not be. Any source settings that should be excluded from the docs should be specified via `config`, while any
+options that you would like to be included in the generated documentation should live under `meta`.
 
 ```
 sources:
@@ -244,7 +247,7 @@ sources:
     tables:
       - name: source1
       - name: source2
-        meta:
+        config:
           external_location: "read_parquet(['s3://my-bucket/my-sources/source2a.parquet', 's3://my-bucket/my-sources/source2b.parquet'])"
 ```
 
@@ -270,7 +273,7 @@ sources:
   - name: flights_source
     tables:
       - name: flights
-        meta:
+        config:
           external_location: "read_csv('flights.csv', types={'FlightDate': 'DATE'}, names=['FlightDate', 'UniqueCarrier'])"
           formatter: oldstyle
 ```
