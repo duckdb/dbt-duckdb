@@ -10,9 +10,10 @@ from typing import Optional
 from typing import Tuple
 from urllib.parse import urlparse
 
-import dbt.exceptions
-from dbt.adapters.base import Credentials
-from dbt.dataclass_schema import dbtClassMixin
+from dbt_common.dataclass_schema import dbtClassMixin
+from dbt_common.exceptions import DbtRuntimeError
+
+from dbt.adapters.contracts.connection import Credentials
 
 
 @dataclass
@@ -187,12 +188,12 @@ class DuckDBCredentials(Credentials):
             data["database"] = path_db
         elif path_db and data["database"] != path_db:
             if not data.get("remote"):
-                raise dbt.exceptions.DbtRuntimeError(
+                raise DbtRuntimeError(
                     "Inconsistency detected between 'path' and 'database' fields in profile; "
                     f"the 'database' property must be set to '{path_db}' to match the 'path'"
                 )
         elif not path_db:
-            raise dbt.exceptions.DbtRuntimeError(
+            raise DbtRuntimeError(
                 "Unable to determine target database name from 'path' field in profile"
             )
         return data
