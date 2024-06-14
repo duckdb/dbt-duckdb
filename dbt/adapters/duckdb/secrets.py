@@ -34,7 +34,7 @@ class Secret(dbtClassMixin):
         raise ValueError(f"Secret type {secret_type} is currently not supported.")
 
     @classmethod
-    def create(cls, secret_type: str, persistent: bool, provider: Optional[str], **kwargs):
+    def create(cls, secret_type: str, persistent: Optional[bool] = None, provider: Optional[str] = None, **kwargs):
         _secret_type = None
         _provider = None
 

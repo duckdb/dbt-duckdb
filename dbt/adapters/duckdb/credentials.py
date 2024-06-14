@@ -8,6 +8,7 @@ from typing import Dict
 from typing import List
 from typing import Optional
 from typing import Tuple
+from typing import Union
 from urllib.parse import urlparse
 
 from dbt_common.dataclass_schema import dbtClassMixin
@@ -99,7 +100,7 @@ class DuckDBCredentials(Credentials):
 
     # secrets for connecting to cloud services AWS S3, Azure, Cloudfare R2,
     # Google Cloud and Huggingface.
-    secrets: Optional[List[Secret]] = None
+    secrets: Optional[List[Union[Secret, Dict[str, Any]]]] = None
 
     # the root path to use for any external materializations that are specified
     # in this dbt project; defaults to "." (the current working directory)
@@ -160,6 +161,14 @@ class DuckDBCredentials(Credentials):
                 self.plugins = []
             if "motherduck" not in [plugin.module for plugin in self.plugins]:
                 self.plugins.append(PluginConfig(module="motherduck"))
+
+        if self.secrets:
+            self.secrets = [
+                Secret.create(
+                    secret_type=secret.pop("type"),
+                    **secret
+                ) for secret in self.secrets
+            ]
 
     @property
     def is_motherduck(self):
@@ -253,7 +262,7 @@ class DuckDBCredentials(Credentials):
     def add_secret(
             self,
             secret_type: str,
-            persistent: bool = False,
+            persistent: Optional[bool] = None,
             provider: Optional[SecretProvider] = None,
             **kwargs
         ):
@@ -261,7 +270,7 @@ class DuckDBCredentials(Credentials):
 
         :param secret_type: Secret type, must be S3, Azure, R2, GCS or Huggingface
         :type secret_type: str
-        :param persistent: Create a persistent (stored) secret, defaults to False
+        :param persistent: Create a persistent (stored) secret, defaults to None
         :type persistent: bool, optional
         :param provider: Provider the use, must be config or credential_chain, defaults to None
         :type provider: Optional[SecretProvider], optional
