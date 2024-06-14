@@ -7,6 +7,9 @@ from typing import Tuple
 from dbt_common.dataclass_schema import dbtClassMixin
 
 
+DEFAULT_SECRET_PREFIX = "_dbt_secret_"
+
+
 class SecretType(Enum):
     S3 = 0
     AZURE = 1
@@ -24,6 +27,7 @@ class SecretProvider(Enum):
 class Secret(dbtClassMixin):
     type: SecretType
     persistent: bool = False
+    name: Optional[str] = None
     provider: Optional[SecretProvider] = None
 
     @classmethod
@@ -69,18 +73,20 @@ class Secret(dbtClassMixin):
         params.update({
             field.name: getattr(self, field.name) for field in fields(self)
             if hasattr(self, field.name) and getattr(self, field.name) is not None
-            and field.name not in ["type", "persistent", "provider"]
+            and field.name not in ["type", "persistent", "name", "provider"]
         })
 
         return params
 
 
     def to_sql(self) -> Tuple[str, tuple]:
-        persistent = " PERSISTENT " if self.persistent is True else " "
+        or_replace = " OR REPLACE" if self.name else ""
+        persistent = " PERSISTENT" if self.persistent is True else ""
+        name = f" {self.name}" if self.name else ""
         params = self.get_sql_params()
         tab = "    "
         params_sql = f",\n{tab}".join([f"{key} ?" for key in params])
-        sql = f"""CREATE{persistent}SECRET (\n{tab}{params_sql}\n)"""
+        sql = f"""CREATE{or_replace}{persistent} SECRET{name} (\n{tab}{params_sql}\n)"""
         return sql, tuple(params.values())
 
 

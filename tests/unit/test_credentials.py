@@ -42,6 +42,32 @@ def test_add_secret():
     assert values == ("S3", "abc", "xyz", "us-west-2")
 
 
+def test_add_secret_with_name():
+    creds = DuckDBCredentials()
+    creds.add_secret(
+        secret_type="s3",
+        name="my_secret",
+        key_id="abc",
+        secret="xyz",
+        region="us-west-2"
+    )
+    assert len(creds.secrets) == 1
+    assert creds.secrets[0].type.name == "S3"
+    assert creds.secrets[0].key_id == "abc"
+    assert creds.secrets[0].secret == "xyz"
+    assert creds.secrets[0].region == "us-west-2"
+
+    sql, values = creds.secrets[0].to_sql()
+    assert sql == \
+"""CREATE OR REPLACE SECRET my_secret (
+    type ?,
+    key_id ?,
+    secret ?,
+    region ?
+)"""
+    assert values == ("S3", "abc", "xyz", "us-west-2")
+
+
 def test_add_unsupported_secret():
     creds = DuckDBCredentials()
     with pytest.raises(ValueError):

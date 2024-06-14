@@ -14,7 +14,7 @@ from urllib.parse import urlparse
 from dbt_common.dataclass_schema import dbtClassMixin
 from dbt_common.exceptions import DbtRuntimeError
 
-from dbt.adapters.duckdb.secrets import Secret, SecretProvider
+from dbt.adapters.duckdb.secrets import Secret, SecretProvider, DEFAULT_SECRET_PREFIX
 from dbt.adapters.contracts.connection import Credentials
 
 
@@ -166,8 +166,9 @@ class DuckDBCredentials(Credentials):
             self.secrets = [
                 Secret.create(
                     secret_type=secret.pop("type"),
+                    name=secret.pop("name", f"{DEFAULT_SECRET_PREFIX}{num + 1}"),
                     **secret
-                ) for secret in self.secrets
+                ) for num, secret in enumerate(self.secrets)
             ]
 
     @property

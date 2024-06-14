@@ -116,7 +116,7 @@ class TestDuckDBAdapterWithSecrets(unittest.TestCase):
         connection = self.adapter.acquire_connection("dummy")
         assert connection.handle
         connection.handle._cursor._cursor.execute.assert_called_with(
-"""CREATE SECRET (
+"""CREATE OR REPLACE SECRET _dbt_secret_1 (
     type ?,
     key_id ?,
     secret ?,
