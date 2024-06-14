@@ -17,13 +17,17 @@ def test_load_basic_settings():
     assert creds.settings == settings
 
 
-def test_add_secret():
-    creds = DuckDBCredentials()
-    creds.add_secret(
-        secret_type="s3",
-        key_id="abc",
-        secret="xyz",
-        region="us-west-2"
+def test_add_secret_with_empty_name():
+    creds = DuckDBCredentials(
+        secrets=[
+            dict(
+                type="s3",
+                name="",
+                key_id="abc",
+                secret="xyz",
+                region="us-west-2"
+            )
+        ]
     )
     assert len(creds.secrets) == 1
     assert creds.secrets[0].type.name == "S3"
@@ -43,13 +47,16 @@ def test_add_secret():
 
 
 def test_add_secret_with_name():
-    creds = DuckDBCredentials()
-    creds.add_secret(
-        secret_type="s3",
-        name="my_secret",
-        key_id="abc",
-        secret="xyz",
-        region="us-west-2"
+    creds = DuckDBCredentials(
+        secrets=[
+            dict(
+                type="s3",
+                name="my_secret",
+                key_id="abc",
+                secret="xyz",
+                region="us-west-2"
+            )
+        ]
     )
     assert len(creds.secrets) == 1
     assert creds.secrets[0].type.name == "S3"
@@ -69,20 +76,26 @@ def test_add_secret_with_name():
 
 
 def test_add_unsupported_secret():
-    creds = DuckDBCredentials()
     with pytest.raises(ValueError):
-        creds.add_secret(
-            secret_type="scrooge_mcduck",
-            cash="money"
+        _ = DuckDBCredentials(
+            secrets=[
+                dict(
+                    type="scrooge_mcduck",
+                    cash="money"
+                )
+            ]
         )
 
 
 def test_add_unsupported_secret_param():
-    creds = DuckDBCredentials()
     with pytest.raises(ValueError):
-        creds.add_secret(
-            secret_type="s3",
-            password="secret"
+        _ = DuckDBCredentials(
+            secrets=[
+                dict(
+                    type="scrooge_mcduck",
+                    password="secret"
+                )
+            ]
         )
 
 

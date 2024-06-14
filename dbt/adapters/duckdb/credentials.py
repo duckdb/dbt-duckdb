@@ -260,31 +260,6 @@ class DuckDBCredentials(Credentials):
                 )
         return settings
 
-    def add_secret(
-            self,
-            secret_type: str,
-            persistent: Optional[bool] = None,
-            provider: Optional[SecretProvider] = None,
-            **kwargs
-        ):
-        """Add a secret
-
-        :param secret_type: Secret type, must be S3, Azure, R2, GCS or Huggingface
-        :type secret_type: str
-        :param persistent: Create a persistent (stored) secret, defaults to None
-        :type persistent: bool, optional
-        :param provider: Provider the use, must be config or credential_chain, defaults to None
-        :type provider: Optional[SecretProvider], optional
-        """
-        secret = Secret.create(
-            secret_type,
-            persistent=persistent,
-            provider=provider,
-            **kwargs
-        )
-        self.secrets = self.secrets or []
-        self.secrets.append(secret)
-
 
 def _get_ttl_hash(seconds=300):
     return round(time.time() / seconds)
