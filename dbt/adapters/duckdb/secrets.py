@@ -1,6 +1,6 @@
-from enum import Enum
 from dataclasses import dataclass
 from dataclasses import fields
+from enum import Enum
 from typing import Optional
 from typing import Tuple
 
@@ -34,11 +34,17 @@ class Secret(dbtClassMixin):
     def cls_from_type(cls, secret_type: SecretType):
         if SecretType.S3 == secret_type:
             return AWSSecret
-        
+
         raise ValueError(f"Secret type {secret_type} is currently not supported.")
 
     @classmethod
-    def create(cls, secret_type: str, persistent: Optional[bool] = None, provider: Optional[str] = None, **kwargs):
+    def create(
+        cls,
+        secret_type: str,
+        persistent: Optional[bool] = None,
+        provider: Optional[str] = None,
+        **kwargs,
+    ):
         _secret_type = None
         _provider = None
 
@@ -58,26 +64,29 @@ class Secret(dbtClassMixin):
             return secret_cls(persistent=persistent, provider=_provider, **kwargs)
         except TypeError as e:
             secret_params = ", ".join([_f.name for _f in fields(secret_cls)])
-            raise ValueError(f"Could not create secret: {str(e)}. " \
-                             f"Supported input arguments for secret of type {_secret_type.name}: "
-                             f"{secret_params}")
+            raise ValueError(
+                f"Could not create secret: {str(e)}. "
+                f"Supported input arguments for secret of type {_secret_type.name}: "
+                f"{secret_params}"
+            )
 
     def get_sql_params(self):
-        params = {
-            "type": self.type.name
-        }
+        params = {"type": self.type.name}
 
         if self.provider is not None:
             params["provider"] = self.provider.name
 
-        params.update({
-            field.name: getattr(self, field.name) for field in fields(self)
-            if hasattr(self, field.name) and getattr(self, field.name) is not None
-            and field.name not in ["type", "persistent", "name", "provider"]
-        })
+        params.update(
+            {
+                field.name: getattr(self, field.name)
+                for field in fields(self)
+                if hasattr(self, field.name)
+                and getattr(self, field.name) is not None
+                and field.name not in ["type", "persistent", "name", "provider"]
+            }
+        )
 
         return params
-
 
     def to_sql(self) -> Tuple[str, tuple]:
         or_replace = " OR REPLACE" if self.name else ""
