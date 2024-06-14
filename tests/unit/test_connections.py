@@ -1,3 +1,4 @@
+import pytest
 from unittest import mock
 
 from botocore.credentials import Credentials
@@ -14,6 +15,49 @@ def test_load_basic_settings():
     }
     settings = creds.load_settings()
     assert creds.settings == settings
+
+
+def test_add_secret():
+    creds = DuckDBCredentials()
+    creds.add_secret(
+        secret_type="s3",
+        key_id="abc",
+        secret="xyz",
+        region="us-west-2"
+    )
+    assert len(creds.secrets) == 1
+    assert creds.secrets[0].type.name == "S3"
+    assert creds.secrets[0].key_id == "abc"
+    assert creds.secrets[0].secret == "xyz"
+    assert creds.secrets[0].region == "us-west-2"
+
+    sql, values = creds.secrets[0].to_sql()
+    assert sql == \
+"""CREATE SECRET (
+    type ?,
+    key_id ?,
+    secret ?,
+    region ?
+)"""
+    assert values == ("S3", "abc", "xyz", "us-west-2")
+
+
+def test_add_unsupported_secret():
+    creds = DuckDBCredentials()
+    with pytest.raises(ValueError):
+        creds.add_secret(
+            secret_type="scrooge_mcduck",
+            cash="money"
+        )
+
+
+def test_add_unsupported_secret_param():
+    creds = DuckDBCredentials()
+    with pytest.raises(ValueError):
+        creds.add_secret(
+            secret_type="s3",
+            password="secret"
+        )
 
 
 @mock.patch("boto3.session.Session")
