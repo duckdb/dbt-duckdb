@@ -17,6 +17,7 @@ from ..utils import SourceConfig
 from ..utils import TargetConfig
 from dbt.adapters.contracts.connection import AdapterResponse
 from dbt.adapters.contracts.connection import Connection
+from dbt.adapters.duckdb.secrets import Secret
 
 
 def _ensure_event_loop():
@@ -208,8 +209,9 @@ class Environment(abc.ABC):
 
         if creds.secrets:
             for secret in creds.secrets:
-                sql, params = secret.to_sql()
-                cursor.execute(sql, params)
+                if isinstance(secret, Secret):
+                    sql, params = secret.to_sql()
+                    cursor.execute(sql, params)
 
         # update cursor if something is lost in the copy
         # of the parent connection

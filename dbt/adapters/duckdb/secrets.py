@@ -31,7 +31,7 @@ class Secret(dbtClassMixin):
     provider: Optional[SecretProvider] = None
 
     @classmethod
-    def cls_from_type(cls, secret_type: SecretType):
+    def cls_from_type(cls, secret_type: Optional[SecretType]):
         if SecretType.S3 == secret_type:
             return AWSSecret
 
@@ -64,11 +64,12 @@ class Secret(dbtClassMixin):
             return secret_cls(persistent=persistent, provider=_provider, **kwargs)
         except TypeError as e:
             secret_params = ", ".join([_f.name for _f in fields(secret_cls)])
-            raise ValueError(
-                f"Could not create secret: {str(e)}. "
-                f"Supported input arguments for secret of type {_secret_type.name}: "
-                f"{secret_params}"
-            )
+            if isinstance(_secret_type, SecretType):
+                raise ValueError(
+                    f"Could not create secret: {str(e)}. "
+                    f"Supported input arguments for secret of type {_secret_type.name}: "
+                    f"{secret_params}"
+                )
 
     def get_sql_params(self):
         params = {"type": self.type.name}
