@@ -114,4 +114,11 @@ class TestDuckDBAdapterWithSecrets(unittest.TestCase):
         connector.__version__ = "0.1.0"  # dummy placeholder for semver checks
         DuckDBConnectionManager.close_all_connections()
         connection = self.adapter.acquire_connection("dummy")
-        connection.handle
+        assert connection.handle
+        connection.handle._cursor._cursor.execute.assert_called_with(
+"""CREATE SECRET (
+    type ?,
+    key_id ?,
+    secret ?,
+    region ?
+)""", ("S3", "abc", "xyz", "us-west-2"))

@@ -206,6 +206,11 @@ class Environment(abc.ABC):
             # to the correct type
             cursor.execute(f"SET {key} = '{value}'")
 
+        if creds.secrets:
+            for secret in creds.secrets:
+                sql, params = secret.to_sql()
+                cursor.execute(sql, params)
+
         # update cursor if something is lost in the copy
         # of the parent connection
         if plugins:
