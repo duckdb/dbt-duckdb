@@ -2,6 +2,7 @@ from dataclasses import dataclass
 from dataclasses import fields
 from enum import Enum
 from typing import Optional
+from typing import Union
 
 from dbt_common.dataclass_schema import dbtClassMixin
 
@@ -22,17 +23,25 @@ class SecretProvider(Enum):
     CREDENTIAL_CHAIN = 1
 
 
+class AzureSecretProvider(Enum):
+    CONFIG = 0
+    CREDENTIAL_CHAIN = 1
+    SERVICE_PRINCIPAL = 2
+
+
 @dataclass
 class Secret(dbtClassMixin):
     type: SecretType
     persistent: bool = False
     name: Optional[str] = None
-    provider: Optional[SecretProvider] = None
+    provider: Optional[Union[SecretProvider, AzureSecretProvider]] = None
 
     @classmethod
     def cls_from_type(cls, secret_type: Optional[SecretType]):
         if SecretType.S3 == secret_type:
             return AWSSecret
+        elif SecretType.AZURE == secret_type:
+            return AzureSecret
 
         raise ValueError(f"Secret type {secret_type} is currently not supported.")
 
@@ -52,13 +61,20 @@ class Secret(dbtClassMixin):
         except KeyError:
             pass
 
+        # Get the SecretProvider class for this secret type
+        secret_cls = cls.cls_from_type(_secret_type)
+        secret_provider_cls = SecretProvider
+        provider_fields = [field for field in fields(secret_cls) if "provider" == field.name]
+        if len(provider_fields) > 0:
+            if len(provider_fields[0].type.__args__) > 0:
+                secret_provider_cls = provider_fields[0].type.__args__[0]
+
         if provider is not None:
             try:
-                _provider = SecretProvider[provider.upper()]
+                _provider = secret_provider_cls[provider.upper()]
             except KeyError:
                 pass
 
-        secret_cls = cls.cls_from_type(_secret_type)
         try:
             return secret_cls(persistent=persistent, provider=_provider, **kwargs)
         except TypeError as e:
@@ -112,3 +128,19 @@ class AWSSecret(Secret):
     use_ssl: Optional[bool] = None
     url_compatibility_mode: Optional[bool] = None
     account_id: Optional[str] = None
+
+
+@dataclass
+class AzureSecret(Secret):
+    type: SecretType = SecretType.AZURE
+    provider: Optional[AzureSecretProvider] = None
+    chain: Optional[str] = None
+    connection_string: Optional[str] = None
+    tenant_id: Optional[str] = None
+    client_id: Optional[str] = None
+    client_secret: Optional[str] = None
+    account_name: Optional[str] = None
+    client_certificate_path: Optional[str] = None
+    http_proxy: Optional[str] = None
+    proxy_user_name: Optional[str] = None
+    proxy_password: Optional[str] = None

@@ -97,6 +97,39 @@ def test_add_unsupported_secret_param():
         )
 
 
+def test_add_azure_secret():
+    creds = DuckDBCredentials(
+        secrets=[
+            dict(
+                type="azure",
+                name="",
+                provider="service_principal",
+                tenant_id="abc",
+                client_id="xyz",
+                client_certificate_path="foo\\bar\\baz",
+                account_name="123"
+            )
+        ]
+    )
+    assert len(creds.secrets) == 1
+    assert creds.secrets[0].type.name == "AZURE"
+    assert creds.secrets[0].tenant_id == "abc"
+    assert creds.secrets[0].client_id == "xyz"
+    assert creds.secrets[0].client_certificate_path == "foo\\bar\\baz.pem"
+    assert creds.secrets[0].account_name == "123"
+
+    sql = creds.secrets[0].to_sql()
+    assert sql == \
+"""CREATE SECRET (
+    type AZURE,
+    provider SERVICE_PRINCIPAL,
+    account_name 123,
+    tenant_id abc,
+    client_id xyz,
+    client_certificate_path foo\\bar\\baz.pem
+)"""
+
+
 @mock.patch("boto3.session.Session")
 def test_load_aws_creds(mock_session_class):
     mock_session_object = mock.Mock()
