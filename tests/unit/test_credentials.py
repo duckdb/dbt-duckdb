@@ -130,6 +130,28 @@ def test_add_azure_secret():
 )"""
 
 
+def test_add_hf_secret():
+    creds = DuckDBCredentials(
+        secrets=[
+            dict(
+                type="huggingface",
+                name="",
+                token="abc"
+            )
+        ]
+    )
+    assert len(creds.secrets) == 1
+    assert creds.secrets[0].type.name == "HUGGINGFACE"
+    assert creds.secrets[0].token == "abc"
+
+    sql = creds.secrets[0].to_sql()
+    assert sql == \
+"""CREATE SECRET (
+    type HUGGINGFACE,
+    token abc
+)"""
+
+
 @mock.patch("boto3.session.Session")
 def test_load_aws_creds(mock_session_class):
     mock_session_object = mock.Mock()

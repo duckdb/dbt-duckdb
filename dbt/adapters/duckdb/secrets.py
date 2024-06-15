@@ -39,10 +39,12 @@ class Secret(dbtClassMixin):
 
     @classmethod
     def cls_from_type(cls, secret_type: Optional[SecretType]):
-        if SecretType.S3 == secret_type:
-            return AWSSecret
+        if secret_type in [SecretType.S3, SecretType.R2, SecretType.GCS]:
+            return S3Secret
         elif SecretType.AZURE == secret_type:
             return AzureSecret
+        elif SecretType.HUGGINGFACE == secret_type:
+            return HFSecret
 
         raise ValueError(f"Secret type {secret_type} is currently not supported.")
 
@@ -117,7 +119,7 @@ class Secret(dbtClassMixin):
 
 
 @dataclass
-class AWSSecret(Secret):
+class S3Secret(Secret):
     type: SecretType = SecretType.S3
     chain: Optional[str] = None
     key_id: Optional[str] = None
@@ -145,3 +147,9 @@ class AzureSecret(Secret):
     http_proxy: Optional[str] = None
     proxy_user_name: Optional[str] = None
     proxy_password: Optional[str] = None
+
+
+@dataclass
+class HFSecret(Secret):
+    type: SecretType = SecretType.HUGGINGFACE
+    token: Optional[str] = None
