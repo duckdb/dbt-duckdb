@@ -106,7 +106,7 @@ def test_add_azure_secret():
                 provider="service_principal",
                 tenant_id="abc",
                 client_id="xyz",
-                client_certificate_path="foo\\bar\\baz",
+                client_certificate_path="foo\\bar\\baz.pem",
                 account_name="123"
             )
         ]
@@ -123,9 +123,9 @@ def test_add_azure_secret():
 """CREATE SECRET (
     type AZURE,
     provider SERVICE_PRINCIPAL,
-    account_name 123,
     tenant_id abc,
     client_id xyz,
+    account_name 123,
     client_certificate_path foo\\bar\\baz.pem
 )"""
 
