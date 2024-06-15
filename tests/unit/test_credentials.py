@@ -79,7 +79,7 @@ def test_add_unsupported_secret():
             secrets=[
                 dict(
                     type="scrooge_mcduck",
-                    cash="money"
+                    name="money"
                 )
             ]
         )
