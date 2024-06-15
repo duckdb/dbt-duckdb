@@ -35,6 +35,7 @@ class Secret(dbtClassMixin):
     persistent: bool = False
     name: Optional[str] = None
     provider: Optional[Union[SecretProvider, AzureSecretProvider]] = None
+    scope: Optional[str] = None
 
     @classmethod
     def cls_from_type(cls, secret_type: Optional[SecretType]):
