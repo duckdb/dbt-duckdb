@@ -90,7 +90,7 @@ def test_add_unsupported_secret_param():
         _ = DuckDBCredentials(
             secrets=[
                 dict(
-                    type="scrooge_mcduck",
+                    type="s3",
                     password="secret"
                 )
             ]
