@@ -59,27 +59,27 @@ class Secret(dbtClassMixin):
         _secret_type = None
         _provider = None
 
-        try:
+        # Get the Secret class for this secret type
+        if secret_type.upper() in SecretType._member_map_:
             _secret_type = SecretType[secret_type.upper()]
-        except KeyError:
-            pass
+        secret_cls = cls.cls_from_type(_secret_type)
 
         # Get the SecretProvider class for this secret type
-        secret_cls = cls.cls_from_type(_secret_type)
         secret_provider_cls = SecretProvider
         provider_fields = [field for field in fields(secret_cls) if "provider" == field.name]
         if len(provider_fields) > 0:
             if len(provider_fields[0].type.__args__) > 0:
                 secret_provider_cls = provider_fields[0].type.__args__[0]
 
-        if provider is not None:
-            try:
-                _provider = secret_provider_cls[provider.upper()]
-            except KeyError:
-                pass
+        # Get the provider for this Secret
+        if provider is not None and provider.upper() in secret_provider_cls._member_map_:
+            _provider = secret_provider_cls[provider.upper()]
 
+        # Create and return Secret
         try:
             return secret_cls(persistent=persistent, provider=_provider, **kwargs)
+
+        # Validation failed
         except TypeError as e:
             secret_params = ", ".join([_f.name for _f in fields(secret_cls)])
             if isinstance(_secret_type, SecretType):
