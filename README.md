@@ -61,7 +61,7 @@ option that will be automatically enabled if you are connecting to a MotherDuck 
 
 You can load any supported [DuckDB extensions](https://duckdb.org/docs/extensions/overview) by listing them in
 the `extensions` field in your profile. You can also set any additional [DuckDB configuration options](https://duckdb.org/docs/sql/configuration)
-via the `settings` field, including options that are supported in any loaded extensions. For example, to be able to connect to S3 and read/write
+via the `settings` field, including options that are supported in any loaded extensions. To use the [DuckDB Secrets Manager](https://duckdb.org/docs/configuration/secrets_manager.html), you can use the `secrets` field. For example, to be able to connect to S3 and read/write
 Parquet files using an AWS access key and secret, your profile would look something like this:
 
 ```
@@ -73,10 +73,11 @@ default:
       extensions:
         - httpfs
         - parquet
-      settings:
-        s3_region: my-aws-region
-        s3_access_key_id: "{{ env_var('S3_ACCESS_KEY_ID') }}"
-        s3_secret_access_key: "{{ env_var('S3_SECRET_ACCESS_KEY') }}"
+      secrets:
+        - type: s3
+          region: my-aws-region
+          key_id: "{{ env_var('S3_ACCESS_KEY_ID') }}"
+          secret: "{{ env_var('S3_SECRET_ACCESS_KEY') }}"
   target: dev
 ```
 
