@@ -2,7 +2,6 @@ from dataclasses import dataclass
 from dataclasses import fields
 from enum import Enum
 from typing import Optional
-from typing import Tuple
 
 from dbt_common.dataclass_schema import dbtClassMixin
 
@@ -89,15 +88,15 @@ class Secret(dbtClassMixin):
 
         return params
 
-    def to_sql(self) -> Tuple[str, tuple]:
+    def to_sql(self) -> str:
         or_replace = " OR REPLACE" if self.name else ""
         persistent = " PERSISTENT" if self.persistent is True else ""
         name = f" {self.name}" if self.name else ""
         params = self.get_sql_params()
         tab = "    "
-        params_sql = f",\n{tab}".join([f"{key} ?" for key in params])
+        params_sql = f",\n{tab}".join([f"{key} {value}" for key, value in params.items()])
         sql = f"""CREATE{or_replace}{persistent} SECRET{name} (\n{tab}{params_sql}\n)"""
-        return sql, tuple(params.values())
+        return sql
 
 
 @dataclass

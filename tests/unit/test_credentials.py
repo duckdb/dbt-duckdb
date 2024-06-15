@@ -35,15 +35,14 @@ def test_add_secret_with_empty_name():
     assert creds.secrets[0].secret == "xyz"
     assert creds.secrets[0].region == "us-west-2"
 
-    sql, values = creds.secrets[0].to_sql()
+    sql = creds.secrets[0].to_sql()
     assert sql == \
 """CREATE SECRET (
-    type ?,
-    key_id ?,
-    secret ?,
-    region ?
+    type S3,
+    key_id abc,
+    secret xyz,
+    region us-west-2
 )"""
-    assert values == ("S3", "abc", "xyz", "us-west-2")
 
 
 def test_add_secret_with_name():
@@ -64,15 +63,14 @@ def test_add_secret_with_name():
     assert creds.secrets[0].secret == "xyz"
     assert creds.secrets[0].region == "us-west-2"
 
-    sql, values = creds.secrets[0].to_sql()
+    sql = creds.secrets[0].to_sql()
     assert sql == \
 """CREATE OR REPLACE SECRET my_secret (
-    type ?,
-    key_id ?,
-    secret ?,
-    region ?
+    type S3,
+    key_id abc,
+    secret xyz,
+    region us-west-2
 )"""
-    assert values == ("S3", "abc", "xyz", "us-west-2")
 
 
 def test_add_unsupported_secret():

@@ -210,8 +210,8 @@ class Environment(abc.ABC):
         if creds.secrets:
             for secret in creds.secrets:
                 if isinstance(secret, Secret):
-                    sql, params = secret.to_sql()
-                    cursor.execute(sql, params)
+                    sql = secret.to_sql()
+                    cursor.execute(sql)
 
         # update cursor if something is lost in the copy
         # of the parent connection
