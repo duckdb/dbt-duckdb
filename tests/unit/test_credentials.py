@@ -7,13 +7,11 @@ from dbt.adapters.duckdb.credentials import Attachment, DuckDBCredentials
 
 
 def test_load_basic_settings():
-    creds = DuckDBCredentials()
-    creds.settings = {
-        "s3_access_key_id": "abc",
-        "s3_secret_access_key": "xyz",
-        "s3_region": "us-west-2",
+    settings = {
+        "access_mode": "read_only",
+        "log_query_path": "/path/to/log",
     }
-    settings = creds.load_settings()
+    creds = DuckDBCredentials(settings=settings)
     assert creds.settings == settings
 
 
@@ -165,13 +163,9 @@ def test_load_aws_creds(mock_session_class):
     mock_client.get_caller_identity.return_value = {}
 
     creds = DuckDBCredentials(use_credential_provider="aws")
-    creds.settings = {"some_other_setting": 1}
-
-    settings = creds.load_settings()
-    assert settings["s3_access_key_id"] == "access_key"
-    assert settings["s3_secret_access_key"] == "secret_key"
-    assert settings["s3_session_token"] == "token"
-    assert settings["some_other_setting"] == 1
+    assert len(creds.secrets) == 1
+    assert creds.secrets[0].type.name == "S3"
+    assert creds.secrets[0].provider.name == "CREDENTIAL_CHAIN"
 
 
 def test_attachments():

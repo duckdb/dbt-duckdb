@@ -202,7 +202,7 @@ class Environment(abc.ABC):
         plugins: Optional[Dict[str, BasePlugin]] = None,
         registered_df: dict = {},
     ):
-        for key, value in creds.load_settings().items():
+        for key, value in creds.settings.items():
             # Okay to set these as strings because DuckDB will cast them
             # to the correct type
             cursor.execute(f"SET {key} = '{value}'")

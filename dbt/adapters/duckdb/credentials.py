@@ -1,8 +1,6 @@
 import os
-import time
 from dataclasses import dataclass
 from dataclasses import field
-from functools import lru_cache
 from typing import Any
 from typing import Dict
 from typing import List
@@ -155,6 +153,9 @@ class DuckDBCredentials(Credentials):
     retries: Optional[Retries] = None
 
     def __post_init__(self):
+        self.settings = self.settings or {}
+        self.secrets = self.secrets or []
+
         # Add MotherDuck plugin if the path is a MotherDuck database
         # and plugin was not specified in profile.yml
         if self.is_motherduck:
@@ -162,6 +163,21 @@ class DuckDBCredentials(Credentials):
                 self.plugins = []
             if "motherduck" not in [plugin.module for plugin in self.plugins]:
                 self.plugins.append(PluginConfig(module="motherduck"))
+
+        # For backward compatibility, to be deprecated in the future
+        if self.use_credential_provider:
+            if self.use_credential_provider == "aws":
+                self.secrets.append(
+                    {
+                        "type": "s3",
+                        "provider": "credential_chain"
+                    }
+                )
+            else:
+                raise ValueError(
+                    "Unsupported value for use_credential_provider: "
+                    + self.use_credential_provider
+                )
 
         if self.secrets:
             self.secrets = [
@@ -247,54 +263,3 @@ class DuckDBCredentials(Credentials):
             "plugins",
             "disable_transactions",
         )
-
-    def load_settings(self) -> Dict[str, str]:
-        settings = self.settings or {}
-        if self.use_credential_provider:
-            if self.use_credential_provider == "aws":
-                settings.update(
-                    _load_aws_credentials(ttl=_get_ttl_hash(), profile=settings.get("s3_profile")),
-                )
-            else:
-                raise ValueError(
-                    "Unsupported value for use_credential_provider: "
-                    + self.use_credential_provider
-                )
-        return settings
-
-
-def _get_ttl_hash(seconds=300):
-    return round(time.time() / seconds)
-
-
-@lru_cache()
-def _load_aws_credentials(ttl=None, profile="default") -> Dict[str, Any]:
-    """
-    Load AWS credentials from the environment.
-
-    This function is cached to prevent unnecessary calls to the AWS API.
-
-    :param ttl: Time to live for the cache. If None, the cache will not expire.
-    :return: A dictionary containing the AWS credentials which can be used to configure DuckDB settings.
-    """
-    del ttl  # make mypy happy
-    import boto3.session
-
-    session = boto3.session.Session(profile_name=profile)
-
-    # use STS to verify that the credentials are valid; we will
-    # raise a helpful error here if they are not
-    sts = session.client("sts")
-    sts.get_caller_identity()
-
-    # now extract/return them
-    aws_creds = session.get_credentials().get_frozen_credentials()
-
-    credentials = {
-        "s3_access_key_id": aws_creds.access_key,
-        "s3_secret_access_key": aws_creds.secret_key,
-        "s3_session_token": aws_creds.token,
-        "s3_region": session.region_name,
-    }
-    # only return if value is filled
-    return {k: v for k, v in credentials.items() if v}
