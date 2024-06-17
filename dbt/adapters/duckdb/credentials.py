@@ -167,12 +167,7 @@ class DuckDBCredentials(Credentials):
         # For backward compatibility, to be deprecated in the future
         if self.use_credential_provider:
             if self.use_credential_provider == "aws":
-                self.secrets.append(
-                    {
-                        "type": "s3",
-                        "provider": "credential_chain"
-                    }
-                )
+                self.secrets.append({"type": "s3", "provider": "credential_chain"})
             else:
                 raise ValueError(
                     "Unsupported value for use_credential_provider: "
