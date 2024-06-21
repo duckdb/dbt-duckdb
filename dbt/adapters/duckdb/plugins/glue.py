@@ -13,6 +13,8 @@ from mypy_boto3_glue.type_defs import SerDeInfoTypeDef
 from mypy_boto3_glue.type_defs import StorageDescriptorTypeDef
 from mypy_boto3_glue.type_defs import TableInputTypeDef
 
+from dbt.adapters.duckdb.secrets import S3Secret, Secret, SecretProvider, SecretType
+
 from . import BasePlugin
 from ..utils import TargetConfig
 from dbt.adapters.base.column import Column
@@ -263,8 +265,19 @@ def _get_table_def(
     return table_def
 
 
-def _get_glue_client(settings: Dict[str, Any]) -> "GlueClient":
-    if settings:
+def _get_glue_client(settings: Dict[str, Any], secrets: Optional[list[Secret]]) -> "GlueClient":
+    if secrets is not None:
+        for secret in secrets:
+            if secret.type == SecretType.S3 and SecretProvider.CONFIG == secret.provider:
+                secret: S3Secret
+                return boto3.client(
+                    "glue",
+                    aws_access_key_id=secret.key_id,
+                    aws_secret_access_key=secret.secret,
+                    aws_session_token=secret.session_token,
+                    region_name=secret.region
+                )
+    elif settings:
         return boto3.client(
             "glue",
             aws_access_key_id=settings.get("s3_access_key_id"),
@@ -327,7 +340,9 @@ def create_or_update_table(
 
 class Plugin(BasePlugin):
     def initialize(self, config: Dict[str, Any]):
-        self.client = _get_glue_client(config)
+        if self.creds is not None:
+            secrets = self.creds.secrets
+        self.client = _get_glue_client(config, secrets)
         self.database = config.get("glue_database", "default")
         self.delimiter = config.get("delimiter", ",")
 

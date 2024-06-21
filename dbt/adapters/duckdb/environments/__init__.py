@@ -237,7 +237,7 @@ class Environment(abc.ABC):
         for plugin_def in creds.plugins or []:
             config = base_config.copy()
             config.update(plugin_def.config or {})
-            plugin = BasePlugin.create(plugin_def.module, config=config, alias=plugin_def.alias)
+            plugin = BasePlugin.create(plugin_def.module, config=config, alias=plugin_def.alias, credentials=creds)
             ret[plugin.name] = plugin
         return ret
 
