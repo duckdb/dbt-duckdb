@@ -6,6 +6,7 @@ from typing import Dict
 from typing import List
 from typing import Optional
 from typing import Tuple
+from typing import Union
 from urllib.parse import urlparse
 
 from dbt_common.dataclass_schema import dbtClassMixin
@@ -98,7 +99,7 @@ class DuckDBCredentials(Credentials):
 
     # secrets for connecting to cloud services AWS S3, Azure, Cloudfare R2,
     # Google Cloud and Huggingface.
-    secrets: Optional[List[Secret]] = None
+    secrets: Optional[List[Union[Secret, Dict[str, Any]]]] = None
 
     # the root path to use for any external materializations that are specified
     # in this dbt project; defaults to "." (the current working directory)
