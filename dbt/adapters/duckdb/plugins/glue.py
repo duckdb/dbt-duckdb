@@ -1,4 +1,5 @@
 from typing import Any
+from typing import cast
 from typing import Dict
 from typing import List
 from typing import Optional
@@ -13,11 +14,13 @@ from mypy_boto3_glue.type_defs import SerDeInfoTypeDef
 from mypy_boto3_glue.type_defs import StorageDescriptorTypeDef
 from mypy_boto3_glue.type_defs import TableInputTypeDef
 
-from dbt.adapters.duckdb.secrets import S3Secret, Secret, SecretProvider, SecretType
-
 from . import BasePlugin
 from ..utils import TargetConfig
 from dbt.adapters.base.column import Column
+from dbt.adapters.duckdb.secrets import S3Secret
+from dbt.adapters.duckdb.secrets import Secret
+from dbt.adapters.duckdb.secrets import SecretProvider
+from dbt.adapters.duckdb.secrets import SecretType
 
 
 class UnsupportedFormatType(Exception):
@@ -269,16 +272,17 @@ def _get_glue_client(settings: Dict[str, Any], secrets: Optional[list[Secret]]) 
     if secrets is not None:
         for secret in secrets:
             if secret.type == SecretType.S3 and SecretProvider.CONFIG == secret.provider:
-                secret: S3Secret
-                return boto3.client(
+                secret = cast(S3Secret, secret)
+                client = boto3.client(
                     "glue",
                     aws_access_key_id=secret.key_id,
                     aws_secret_access_key=secret.secret,
                     aws_session_token=secret.session_token,
-                    region_name=secret.region
+                    region_name=secret.region,
                 )
+                break
     elif settings:
-        return boto3.client(
+        client = boto3.client(
             "glue",
             aws_access_key_id=settings.get("s3_access_key_id"),
             aws_secret_access_key=settings.get("s3_secret_access_key"),
@@ -286,7 +290,8 @@ def _get_glue_client(settings: Dict[str, Any], secrets: Optional[list[Secret]]) 
             region_name=settings.get("s3_region"),
         )
     else:
-        return boto3.client("glue")
+        client = boto3.client("glue")
+    return client
 
 
 def create_or_update_table(
