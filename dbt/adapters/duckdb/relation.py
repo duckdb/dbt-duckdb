@@ -13,6 +13,7 @@ from dbt.adapters.contracts.relation import RelationConfig
 
 @dataclass(frozen=True, eq=False, repr=False)
 class DuckDBRelation(BaseRelation):
+    require_alias: bool = False
     external: Optional[str] = None
 
     @classmethod
