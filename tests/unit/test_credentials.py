@@ -51,7 +51,8 @@ def test_add_secret_with_name():
                 name="my_secret",
                 key_id="abc",
                 secret="xyz",
-                region="us-west-2"
+                region="us-west-2",
+                scope="s3://my-bucket"
             )
         ]
     )
@@ -60,11 +61,13 @@ def test_add_secret_with_name():
     assert creds.secrets[0].key_id == "abc"
     assert creds.secrets[0].secret == "xyz"
     assert creds.secrets[0].region == "us-west-2"
+    assert creds.secrets[0].scope == "s3://my-bucket"
 
     sql = creds.secrets[0].to_sql()
     assert sql == \
 """CREATE OR REPLACE SECRET my_secret (
     type S3,
+    scope s3://my-bucket,
     key_id abc,
     secret xyz,
     region us-west-2
