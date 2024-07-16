@@ -39,15 +39,14 @@ class Secret(dbtClassMixin):
         )
 
     def to_sql(self) -> str:
-        params = self.to_dict()
-        params.update(params.pop("secret_kwargs"))
-        name = params.pop("name")
-        name = f" {name}" if name else ""
+        name = f" {self.name}" if self.name else ""
         or_replace = " OR REPLACE" if name else ""
-        persistent = " PERSISTENT" if params.pop("persistent") is True else ""
+        persistent = " PERSISTENT" if self.persistent is True else ""
         tab = "    "
+        params = self.to_dict(omit_none=True)
+        params.update(params.pop("secret_kwargs", {}))
         params_sql = f",\n{tab}".join(
-            [f"{key} {value}" for key, value in params.items() if value is not None]
+            [f"{key} {value}" for key, value in params.items() if value is not None and key not in ["name", "persistent"]]
         )
         sql = f"""CREATE{or_replace}{persistent} SECRET{name} (\n{tab}{params_sql}\n)"""
         return sql

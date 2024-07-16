@@ -208,11 +208,8 @@ class Environment(abc.ABC):
                 # to the correct type
                 cursor.execute(f"SET {key} = '{value}'")
 
-        if creds.secrets:
-            for secret in creds.secrets:
-                if isinstance(secret, Secret):
-                    sql = secret.to_sql()
-                    cursor.execute(sql)
+        for sql in creds.secrets_sql():
+            cursor.execute(sql)
 
         # update cursor if something is lost in the copy
         # of the parent connection

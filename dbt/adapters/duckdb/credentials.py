@@ -99,7 +99,7 @@ class DuckDBCredentials(Credentials):
 
     # secrets for connecting to cloud services AWS S3, Azure, Cloudfare R2,
     # Google Cloud and Huggingface.
-    secrets: Optional[List[Union[Secret, Dict[str, Any]]]] = None
+    secrets: Optional[List[Dict[str, Any]]] = None
 
     # the root path to use for any external materializations that are specified
     # in this dbt project; defaults to "." (the current working directory)
@@ -155,6 +155,7 @@ class DuckDBCredentials(Credentials):
     def __post_init__(self):
         self.settings = self.settings or {}
         self.secrets = self.secrets or []
+        self._secrets = []
 
         # Add MotherDuck plugin if the path is a MotherDuck database
         # and plugin was not specified in profile.yml
@@ -175,7 +176,7 @@ class DuckDBCredentials(Credentials):
                 )
 
         if self.secrets:
-            self.secrets = [
+            self._secrets = [
                 Secret.create(
                     secret_type=secret.pop("type"),
                     name=secret.pop("name", f"{DEFAULT_SECRET_PREFIX}{num + 1}"),
@@ -183,6 +184,9 @@ class DuckDBCredentials(Credentials):
                 )
                 for num, secret in enumerate(self.secrets)
             ]
+
+    def secrets_sql(self) -> List[str]:
+        return [secret.to_sql() for secret in self._secrets]
 
     @property
     def is_motherduck(self):

@@ -29,12 +29,12 @@ def test_add_secret_with_empty_name():
         ]
     )
     assert len(creds.secrets) == 1
-    assert creds.secrets[0].type == "s3"
-    assert creds.secrets[0].secret_kwargs.get("key_id") == "abc"
-    assert creds.secrets[0].secret_kwargs.get("secret") == "xyz"
-    assert creds.secrets[0].secret_kwargs.get("region") == "us-west-2"
+    assert creds._secrets[0].type == "s3"
+    assert creds._secrets[0].secret_kwargs.get("key_id") == "abc"
+    assert creds._secrets[0].secret_kwargs.get("secret") == "xyz"
+    assert creds._secrets[0].secret_kwargs.get("region") == "us-west-2"
 
-    sql = creds.secrets[0].to_sql()
+    sql = creds.secrets_sql()[0]
     assert sql == \
 """CREATE SECRET (
     type s3,
@@ -45,8 +45,8 @@ def test_add_secret_with_empty_name():
 
 
 def test_add_secret_with_name():
-    creds = DuckDBCredentials(
-        secrets=[
+    creds = DuckDBCredentials.from_dict(
+        dict(secrets=[
             dict(
                 type="s3",
                 name="my_secret",
@@ -55,16 +55,16 @@ def test_add_secret_with_name():
                 region="us-west-2",
                 scope="s3://my-bucket"
             )
-        ]
+        ])
     )
-    assert len(creds.secrets) == 1
-    assert creds.secrets[0].type == "s3"
-    assert creds.secrets[0].secret_kwargs.get("key_id") == "abc"
-    assert creds.secrets[0].secret_kwargs.get("secret") == "xyz"
-    assert creds.secrets[0].secret_kwargs.get("region") == "us-west-2"
-    assert creds.secrets[0].scope == "s3://my-bucket"
+    assert len(creds._secrets) == 1
+    assert creds._secrets[0].type == "s3"
+    assert creds._secrets[0].secret_kwargs.get("key_id") == "abc"
+    assert creds._secrets[0].secret_kwargs.get("secret") == "xyz"
+    assert creds._secrets[0].secret_kwargs.get("region") == "us-west-2"
+    assert creds._secrets[0].scope == "s3://my-bucket"
 
-    sql = creds.secrets[0].to_sql()
+    sql = creds.secrets_sql()[0]
     assert sql == \
 """CREATE OR REPLACE SECRET my_secret (
     type s3,
@@ -84,7 +84,7 @@ def test_add_unsupported_secret():
             )
         ]
     )
-    sql = creds.secrets[0].to_sql()
+    sql = creds.secrets_sql()[0]
     assert sql == \
 """CREATE OR REPLACE SECRET money (
     type scrooge_mcduck
@@ -103,7 +103,7 @@ def test_add_unsupported_secret_param():
             )
         ]
     )
-    sql = creds.secrets[0].to_sql()
+    sql = creds.secrets_sql()[0]
     assert sql == \
 """CREATE OR REPLACE SECRET _dbt_secret_1 (
     type s3,
@@ -130,13 +130,13 @@ def test_add_azure_secret():
         ]
     )
     assert len(creds.secrets) == 1
-    assert creds.secrets[0].type == "azure"
-    assert creds.secrets[0].secret_kwargs.get("tenant_id") == "abc"
-    assert creds.secrets[0].secret_kwargs.get("client_id") == "xyz"
-    assert creds.secrets[0].secret_kwargs.get("client_certificate_path") == "foo\\bar\\baz.pem"
-    assert creds.secrets[0].secret_kwargs.get("account_name") == "123"
+    assert creds._secrets[0].type == "azure"
+    assert creds._secrets[0].secret_kwargs.get("tenant_id") == "abc"
+    assert creds._secrets[0].secret_kwargs.get("client_id") == "xyz"
+    assert creds._secrets[0].secret_kwargs.get("client_certificate_path") == "foo\\bar\\baz.pem"
+    assert creds._secrets[0].secret_kwargs.get("account_name") == "123"
 
-    sql = creds.secrets[0].to_sql()
+    sql = creds.secrets_sql()[0]
     assert sql == \
 """CREATE SECRET (
     type azure,
@@ -159,10 +159,10 @@ def test_add_hf_secret():
         ]
     )
     assert len(creds.secrets) == 1
-    assert creds.secrets[0].type == "huggingface"
-    assert creds.secrets[0].secret_kwargs.get("token") == "abc"
+    assert creds._secrets[0].type == "huggingface"
+    assert creds._secrets[0].secret_kwargs.get("token") == "abc"
 
-    sql = creds.secrets[0].to_sql()
+    sql = creds.secrets_sql()[0]
     assert sql == \
 """CREATE SECRET (
     type huggingface,
@@ -184,8 +184,8 @@ def test_load_aws_creds(mock_session_class):
 
     creds = DuckDBCredentials(use_credential_provider="aws")
     assert len(creds.secrets) == 1
-    assert creds.secrets[0].type == "s3"
-    assert creds.secrets[0].provider == "credential_chain"
+    assert creds._secrets[0].type == "s3"
+    assert creds._secrets[0].provider == "credential_chain"
 
 
 def test_attachments():
