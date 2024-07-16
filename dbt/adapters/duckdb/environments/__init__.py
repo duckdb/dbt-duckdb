@@ -17,7 +17,6 @@ from ..utils import SourceConfig
 from ..utils import TargetConfig
 from dbt.adapters.contracts.connection import AdapterResponse
 from dbt.adapters.contracts.connection import Connection
-from dbt.adapters.duckdb.secrets import Secret
 
 
 def _ensure_event_loop():

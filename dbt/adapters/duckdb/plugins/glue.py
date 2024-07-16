@@ -3,7 +3,6 @@ from typing import Dict
 from typing import List
 from typing import Optional
 from typing import Sequence
-from typing import Union
 
 import boto3
 from mypy_boto3_glue import GlueClient
@@ -266,7 +265,7 @@ def _get_table_def(
 
 
 def _get_glue_client(
-    settings: Dict[str, Any], secrets: Optional[List[Union[Secret, Dict[str, Any]]]]
+    settings: Dict[str, Any], secrets: Optional[List[Dict[str, Any]]]
 ) -> "GlueClient":
     if secrets is not None:
         for secret in secrets:

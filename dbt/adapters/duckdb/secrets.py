@@ -46,7 +46,11 @@ class Secret(dbtClassMixin):
         params = self.to_dict(omit_none=True)
         params.update(params.pop("secret_kwargs", {}))
         params_sql = f",\n{tab}".join(
-            [f"{key} {value}" for key, value in params.items() if value is not None and key not in ["name", "persistent"]]
+            [
+                f"{key} {value}"
+                for key, value in params.items()
+                if value is not None and key not in ["name", "persistent"]
+            ]
         )
         sql = f"""CREATE{or_replace}{persistent} SECRET{name} (\n{tab}{params_sql}\n)"""
         return sql
