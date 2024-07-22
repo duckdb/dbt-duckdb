@@ -201,10 +201,14 @@ class Environment(abc.ABC):
         plugins: Optional[Dict[str, BasePlugin]] = None,
         registered_df: dict = {},
     ):
-        for key, value in creds.load_settings().items():
-            # Okay to set these as strings because DuckDB will cast them
-            # to the correct type
-            cursor.execute(f"SET {key} = '{value}'")
+        if creds.settings is not None:
+            for key, value in creds.settings.items():
+                # Okay to set these as strings because DuckDB will cast them
+                # to the correct type
+                cursor.execute(f"SET {key} = '{value}'")
+
+        for sql in creds.secrets_sql():
+            cursor.execute(sql)
 
         # update cursor if something is lost in the copy
         # of the parent connection
@@ -229,7 +233,9 @@ class Environment(abc.ABC):
         for plugin_def in creds.plugins or []:
             config = base_config.copy()
             config.update(plugin_def.config or {})
-            plugin = BasePlugin.create(plugin_def.module, config=config, alias=plugin_def.alias)
+            plugin = BasePlugin.create(
+                plugin_def.module, config=config, alias=plugin_def.alias, credentials=creds
+            )
             ret[plugin.name] = plugin
         return ret
 

@@ -16,6 +16,7 @@ from mypy_boto3_glue.type_defs import TableInputTypeDef
 from . import BasePlugin
 from ..utils import TargetConfig
 from dbt.adapters.base.column import Column
+from dbt.adapters.duckdb.secrets import Secret
 
 
 class UnsupportedFormatType(Exception):
@@ -263,9 +264,23 @@ def _get_table_def(
     return table_def
 
 
-def _get_glue_client(settings: Dict[str, Any]) -> "GlueClient":
-    if settings:
-        return boto3.client(
+def _get_glue_client(
+    settings: Dict[str, Any], secrets: Optional[List[Dict[str, Any]]]
+) -> "GlueClient":
+    if secrets is not None:
+        for secret in secrets:
+            if isinstance(secret, Secret) and "config" == str(secret.provider).lower():
+                secret_kwargs = secret.secret_kwargs or {}
+                client = boto3.client(
+                    "glue",
+                    aws_access_key_id=secret_kwargs.get("key_id"),
+                    aws_secret_access_key=secret_kwargs.get("secret"),
+                    aws_session_token=secret_kwargs.get("session_token"),
+                    region_name=secret_kwargs.get("region"),
+                )
+                break
+    elif settings:
+        client = boto3.client(
             "glue",
             aws_access_key_id=settings.get("s3_access_key_id"),
             aws_secret_access_key=settings.get("s3_secret_access_key"),
@@ -273,7 +288,8 @@ def _get_glue_client(settings: Dict[str, Any]) -> "GlueClient":
             region_name=settings.get("s3_region"),
         )
     else:
-        return boto3.client("glue")
+        client = boto3.client("glue")
+    return client
 
 
 def create_or_update_table(
@@ -327,7 +343,9 @@ def create_or_update_table(
 
 class Plugin(BasePlugin):
     def initialize(self, config: Dict[str, Any]):
-        self.client = _get_glue_client(config)
+        if self.creds is not None:
+            secrets = self.creds.secrets
+        self.client = _get_glue_client(config, secrets)
         self.database = config.get("glue_database", "default")
         self.delimiter = config.get("delimiter", ",")
 

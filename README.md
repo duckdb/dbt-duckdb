@@ -61,7 +61,7 @@ option that will be automatically enabled if you are connecting to a MotherDuck 
 
 You can load any supported [DuckDB extensions](https://duckdb.org/docs/extensions/overview) by listing them in
 the `extensions` field in your profile. You can also set any additional [DuckDB configuration options](https://duckdb.org/docs/sql/configuration)
-via the `settings` field, including options that are supported in any loaded extensions. For example, to be able to connect to S3 and read/write
+via the `settings` field, including options that are supported in any loaded extensions. To use the [DuckDB Secrets Manager](https://duckdb.org/docs/configuration/secrets_manager.html), you can use the `secrets` field. For example, to be able to connect to S3 and read/write
 Parquet files using an AWS access key and secret, your profile would look something like this:
 
 ```
@@ -73,10 +73,11 @@ default:
       extensions:
         - httpfs
         - parquet
-      settings:
-        s3_region: my-aws-region
-        s3_access_key_id: "{{ env_var('S3_ACCESS_KEY_ID') }}"
-        s3_secret_access_key: "{{ env_var('S3_SECRET_ACCESS_KEY') }}"
+      secrets:
+        - type: s3
+          region: my-aws-region
+          key_id: "{{ env_var('S3_ACCESS_KEY_ID') }}"
+          secret: "{{ env_var('S3_SECRET_ACCESS_KEY') }}"
   target: dev
 ```
 
@@ -107,7 +108,23 @@ to load (so `s3`, `gcs`, `abfs`, etc.) and then an arbitrary set of other key-va
 illustrates the usage of this feature to connect to a Localstack instance running S3 from dbt-duckdb [here](https://github.com/jwills/s3-demo).
 
 #### Fetching credentials from context
-Instead of specifying the credentials through the settings block, you can also use the use_credential_provider property. If you set this to `aws` (currently the only supported implementation) and you have `boto3` installed in your python environment, we will fetch your AWS credentials using the credential provider chain as described [here](https://boto3.amazonaws.com/v1/documentation/api/latest/guide/credentials.html). This means that you can use any supported mechanism from AWS to obtain credentials (e.g., web identity tokens).
+
+Instead of specifying the credentials through the settings block, you can also use the `CREDENTIAL_CHAIN` secret provider. This means that you can use any supported mechanism from AWS to obtain credentials (e.g., web identity tokens). You can read more about the secret providers [here](https://duckdb.org/docs/configuration/secrets_manager.html#secret-providers). To use the `CREDENTIAL_CHAIN` provider and automatically fetch credentials from AWS, specify the `provider` in the `secrets` key:
+
+```
+default:
+  outputs:
+    dev:
+      type: duckdb
+      path: /tmp/dbt.duckdb
+      extensions:
+        - httpfs
+        - parquet
+      secrets:
+        - type: s3
+          provider: credential_chain
+  target: dev
+```
 
 #### Attaching Additional Databases
 

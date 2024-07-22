@@ -309,4 +309,4 @@ class TestGlue:
             delimiter=",",
         )
         assert len(client.mock_calls) == 1
-        client.has_calls([call.get_table(DatabaseName="test", Name="test")])
+        client.assert_has_calls([call.get_table(DatabaseName="test", Name="test")])
