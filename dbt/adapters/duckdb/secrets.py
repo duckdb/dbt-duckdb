@@ -47,7 +47,7 @@ class Secret(dbtClassMixin):
         params.update(params.pop("secret_kwargs", {}))
         params_sql = f",\n{tab}".join(
             [
-                f"{key} '{value}'"
+                f"{key} '{value}'" if key not in ["type", "provider"] else f"{key} {value}"
                 for key, value in params.items()
                 if value is not None and key not in ["name", "persistent"]
             ]
