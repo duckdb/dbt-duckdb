@@ -38,9 +38,9 @@ def test_add_secret_with_empty_name():
     assert sql == \
 """CREATE SECRET (
     type s3,
-    key_id abc,
-    secret xyz,
-    region us-west-2
+    key_id 'abc',
+    secret 'xyz',
+    region 'us-west-2'
 )"""
 
 
@@ -68,10 +68,10 @@ def test_add_secret_with_name():
     assert sql == \
 """CREATE OR REPLACE SECRET my_secret (
     type s3,
-    scope s3://my-bucket,
-    key_id abc,
-    secret xyz,
-    region us-west-2
+    scope 's3://my-bucket',
+    key_id 'abc',
+    secret 'xyz',
+    region 'us-west-2'
 )"""
 
 
@@ -107,7 +107,7 @@ def test_add_unsupported_secret_param():
     assert sql == \
 """CREATE OR REPLACE SECRET _dbt_secret_1 (
     type s3,
-    password secret
+    password 'secret'
 )"""
     with pytest.raises(duckdb.BinderException) as e:
         duckdb.sql(sql)
@@ -141,10 +141,10 @@ def test_add_azure_secret():
 """CREATE SECRET (
     type azure,
     provider service_principal,
-    tenant_id abc,
-    client_id xyz,
-    client_certificate_path foo\\bar\\baz.pem,
-    account_name 123
+    tenant_id 'abc',
+    client_id 'xyz',
+    client_certificate_path 'foo\\bar\\baz.pem',
+    account_name '123'
 )"""
 
 
@@ -166,7 +166,7 @@ def test_add_hf_secret():
     assert sql == \
 """CREATE SECRET (
     type huggingface,
-    token abc
+    token 'abc'
 )"""
 
 
