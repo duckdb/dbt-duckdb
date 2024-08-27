@@ -349,7 +349,7 @@ class Plugin(BasePlugin):
         self.database = config.get("glue_database", "default")
         self.delimiter = config.get("delimiter", ",")
 
-    def store(self, target_config: TargetConfig):
+    def store(self, target_config: TargetConfig, df=None):
         assert target_config.location is not None
         assert target_config.relation.identifier is not None
         table: str = target_config.relation.identifier

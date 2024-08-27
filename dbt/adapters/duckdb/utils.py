@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from dataclasses import dataclass
 from typing import Any
 from typing import Dict
@@ -5,9 +7,17 @@ from typing import List
 from typing import Optional
 from typing import Sequence
 
+from duckdb.duckdb import DatabaseError
+from tenacity import retry
+from tenacity import retry_if_exception_type
+from tenacity import stop_after_attempt
+from tenacity import wait_incrementing
+
 from dbt.adapters.base.column import Column
 from dbt.adapters.base.relation import BaseRelation
 from dbt.adapters.contracts.relation import RelationConfig
+
+
 # TODO
 # from dbt.context.providers import RuntimeConfigObject
 
@@ -88,3 +98,26 @@ class TargetConfig:
         if self.location:
             base["location"] = self.location.as_dict()
         return base
+
+
+def find_secrets_by_type(secrets: list[dict], secret_type: str) -> dict:
+    """Find secrets of a specific type in the secrets dictionary."""
+    for secret in secrets:
+        if secret.get("type") == secret_type:
+            return secret
+    raise SecretTypeMissingError(f"Secret type {secret_type} not found in the secrets!")
+
+
+class SecretTypeMissingError(Exception):
+    """Exception raised when the secret type is missing from the secrets dictionary."""
+
+    pass
+
+
+def get_retry_decorator(max_attempts: int, wait_time: float, exception: DatabaseError):
+    return retry(
+        stop=stop_after_attempt(max_attempts),
+        wait=wait_incrementing(start=wait_time, increment=0.05),
+        retry=retry_if_exception_type(exception),
+        reraise=True,
+    )

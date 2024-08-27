@@ -8,6 +8,8 @@ from dbt.tests.util import (
 )
 from deltalake.writer import write_deltalake
 
+from tests.functional.plugins.utils import get_table_row_count
+
 delta_schema_yml = """
 version: 2
 sources:
@@ -55,38 +57,26 @@ delta3_sql_expected = """
 class TestPlugins:
     @pytest.fixture(scope="class")
     def delta_test_table1(self):
-        td = tempfile.TemporaryDirectory() 
-        path = Path(td.name)
-        table_path = path / "test_delta_table1"
+        with tempfile.TemporaryDirectory() as tmpdir:
+            table_path = Path(tmpdir) / "test_delta_table1"
 
-        df = pd.DataFrame({"x": [1, 2, 3]})
-        write_deltalake(table_path, df, mode="overwrite")
+            df = pd.DataFrame({"x": [1, 2, 3]})
+            write_deltalake(table_path, df, mode="overwrite")
 
-        yield table_path
-
-        td.cleanup()
+            yield table_path
 
     @pytest.fixture(scope="class")
     def delta_test_table2(self):
-        td = tempfile.TemporaryDirectory() 
-        path = Path(td.name)
-        table_path = path / "test_delta_table2"
+        with tempfile.TemporaryDirectory() as tmpdir:
+            table_path = Path(tmpdir) / "test_delta_table2"
 
-        df = pd.DataFrame({
-            "x": [1],
-            "y": ["a"]                   
-        })
-        write_deltalake(table_path, df, mode="overwrite")
+            df1 = pd.DataFrame({"x": [1], "y": ["a"]})
+            write_deltalake(table_path, df1, mode="overwrite")
 
-        df = pd.DataFrame({
-            "x": [1, 2],
-            "y": ["a","b"]                   
-        })
-        write_deltalake(table_path, df, mode="overwrite")
+            df2 = pd.DataFrame({"x": [1, 2], "y": ["a", "b"]})
+            write_deltalake(table_path, df2, mode="overwrite")
 
-        yield table_path
-
-        td.cleanup()
+            yield table_path
 
     @pytest.fixture(scope="class")
     def profiles_config_update(self, dbt_profile_target):
@@ -121,12 +111,12 @@ class TestPlugins:
         results = run_dbt()
         assert len(results) == 4
 
-        # check_relations_equal(
-        #     project.adapter,
-        #     [
-        #         "delta_table3",
-        #         "delta_table3_expected",
-        #     ],
-        # )
-        # res = project.run_sql("SELECT count(1) FROM 'delta_table3'", fetch="one")
-        # assert res[0] == 2
+        delta_table1_row_count = get_table_row_count(project, "main.delta_table1")
+        assert delta_table1_row_count == 3
+
+        delta_table2_row_count = get_table_row_count(project, "main.delta_table2")
+        assert delta_table2_row_count == 1
+
+        delta_table3_row_count = get_table_row_count(project, "main.delta_table3")
+        assert delta_table3_row_count == 0
+

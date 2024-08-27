@@ -42,7 +42,7 @@ class Plugin(BasePlugin):
         sheet_name = source_config.get("sheet_name", 0)
         return pd.read_excel(source_location, sheet_name=sheet_name)
 
-    def store(self, target_config: TargetConfig):
+    def store(self, target_config: TargetConfig, df=None):
         plugin_output_config = self._config["output"]
 
         # Create the writer on the first instance of the call to store.

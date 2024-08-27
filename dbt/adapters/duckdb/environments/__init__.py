@@ -167,8 +167,19 @@ class Environment(abc.ABC):
         # install any extensions on the connection
         if creds.extensions is not None:
             for extension in creds.extensions:
-                conn.install_extension(extension)
-                conn.load_extension(extension)
+                if extension.repository:
+                    conn.execute(f"SET custom_extension_repository = '{extension.repository}'")
+                else:
+                    conn.execute(
+                        "SET custom_extension_repository = 'http://extensions.duckdb.org'"
+                    )
+                conn.install_extension(extension.name)
+                conn.load_extension(extension.name)
+
+        # install any secrets on the connection
+        if creds.secrets:
+            for sql in creds.secrets_sql():
+                conn.execute(sql)
 
         # Attach any fsspec filesystems on the database
         if creds.filesystems:
@@ -206,9 +217,6 @@ class Environment(abc.ABC):
                 # Okay to set these as strings because DuckDB will cast them
                 # to the correct type
                 cursor.execute(f"SET {key} = '{value}'")
-
-        for sql in creds.secrets_sql():
-            cursor.execute(sql)
 
         # update cursor if something is lost in the copy
         # of the parent connection

@@ -90,6 +90,7 @@ class BasePlugin:
         """
         self.name = name
         self.creds = credentials
+        self.plugin_config = plugin_config
         self.initialize(plugin_config)
 
     def initialize(self, plugin_config: Dict[str, Any]):
@@ -134,7 +135,7 @@ class BasePlugin:
         """
         raise NotImplementedError(f"load method not implemented for {self.name}")
 
-    def store(self, target_config: TargetConfig):
+    def store(self, target_config: TargetConfig, df=None):
         raise NotImplementedError(f"store method not implemented for {self.name}")
 
     def configure_cursor(self, cursor):

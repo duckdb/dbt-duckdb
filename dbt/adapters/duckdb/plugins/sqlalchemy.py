@@ -30,7 +30,7 @@ class Plugin(BasePlugin):
             with self.engine.connect() as conn:
                 return pd.read_sql_table(table, con=conn)
 
-    def store(self, target_config: TargetConfig):
+    def store(self, target_config: TargetConfig, df=None):
         # first, load the data frame from the external location
         df = pd_utils.target_to_df(target_config)
         table_name = target_config.relation.identifier

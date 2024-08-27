@@ -35,7 +35,7 @@ class TestGlueMaterializations:
     @pytest.fixture(scope="class")
     def dbt_profile_target(self, dbt_profile_target):
         dbt_profile_target["external_root"] = "s3://duckdbtest/glue_test"
-        dbt_profile_target["extensions"] = ["httpfs"]
+        dbt_profile_target["extensions"] = [{"name": "httpfs"}]
         dbt_profile_target["settings"] = {
             "s3_access_key_id": os.getenv("AWS_ACCESS_KEY_ID"),
             "s3_secret_access_key": os.getenv("AWS_SECRET_ACCESS_KEY"),

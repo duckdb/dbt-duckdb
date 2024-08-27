@@ -72,6 +72,21 @@ def dbt_profile_target(profile_type, bv_server_process, tmp_path_factory):
             profile["token"] = os.environ.get(TEST_MOTHERDUCK_TOKEN)
         profile["disable_transactions"] = True
         profile["path"] = "md:test"
+    elif profile_type == "unity":
+        profile["extensions"] = [{"name": "uc_catalog",
+                                  "repository": "http://nightly-extensions.duckdb.org"}]
+        profile["attach"] = [
+            {"path": "unity",
+             "alias": "unity",
+             "type": "UC_CATALOG"},
+        ]
+        profile["secrets"] = [{
+            "type": "UC",
+            # here our mock uc server is running, prism defaults to 4010
+            "endpoint": "http://127.0.0.1:4010",
+            "token": "test",
+            "aws_region": "eu-west-1"
+        }]
     elif profile_type == "memory":
         pass  # use the default path-less profile
     else:

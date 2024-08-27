@@ -5,14 +5,12 @@ from typing import Any
 from typing import Dict
 from typing import List
 from typing import Optional
-from typing import Tuple
 from urllib.parse import urlparse
 
 from dbt_common.dataclass_schema import dbtClassMixin
 from dbt_common.exceptions import DbtRuntimeError
 
 from dbt.adapters.contracts.connection import Credentials
-from dbt.adapters.duckdb.secrets import DEFAULT_SECRET_PREFIX
 from dbt.adapters.duckdb.secrets import Secret
 
 
@@ -78,6 +76,12 @@ class Retries(dbtClassMixin):
 
 
 @dataclass
+class Extension(dbtClassMixin):
+    name: str
+    repository: Optional[str] = None
+
+
+@dataclass
 class DuckDBCredentials(Credentials):
     database: str = "main"
     schema: str = "main"
@@ -88,7 +92,7 @@ class DuckDBCredentials(Credentials):
     config_options: Optional[Dict[str, Any]] = None
 
     # any DuckDB extensions we want to install and load (httpfs, parquet, etc.)
-    extensions: Optional[Tuple[str, ...]] = None
+    extensions: Optional[List[Extension]] = None
 
     # any additional pragmas we want to configure on our DuckDB connections;
     # a list of the built-in pragmas can be found here:
@@ -177,11 +181,12 @@ class DuckDBCredentials(Credentials):
         if self.secrets:
             self._secrets = [
                 Secret.create(
-                    secret_type=secret.pop("type"),
-                    name=secret.pop("name", f"{DEFAULT_SECRET_PREFIX}{num + 1}"),
+                    secret_type=secret_type,
+                    name=secret.pop("name", f"__default_{secret_type}"),
                     **secret,
                 )
-                for num, secret in enumerate(self.secrets)
+                for secret in self.secrets
+                if (secret_type := secret.get("type"))
             ]
 
     def secrets_sql(self) -> List[str]:

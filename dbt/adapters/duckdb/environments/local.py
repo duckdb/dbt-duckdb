@@ -1,10 +1,13 @@
 import threading
 
+import pyarrow
 from dbt_common.exceptions import DbtRuntimeError
+from duckdb import CatalogException
 
 from . import Environment
 from .. import credentials
 from .. import utils
+from ..utils import get_retry_decorator
 from dbt.adapters.contracts.connection import AdapterResponse
 from dbt.adapters.contracts.connection import Connection
 
@@ -29,6 +32,7 @@ class DuckDBCursorWrapper:
 
 class DuckDBConnectionWrapper:
     def __init__(self, cursor, env):
+        self._conn = env.conn
         self._cursor = DuckDBCursorWrapper(cursor)
         self._env = env
 
@@ -98,7 +102,8 @@ class LocalEnvironment(Environment):
         handle = self.handle()
         cursor = handle.cursor()
 
-        if source_config.schema:
+        # Schema creation is currently not supported by the uc_catalog duckdb extension
+        if source_config.schema and plugin_name != "unity":
             cursor.execute(f"CREATE SCHEMA IF NOT EXISTS {source_config.schema}")
 
         save_mode = source_config.get("save_mode", "overwrite")
@@ -133,12 +138,48 @@ class LocalEnvironment(Environment):
             # save to df instance to register on each cursor creation
             self._REGISTERED_DF[df_name] = df
 
-        cursor.execute(
-            f"CREATE OR REPLACE {materialization} {source_table_name} AS SELECT * FROM {df_name}"
-        )
+        # CREATE OR REPLACE table creation is currently not supported by the uc_catalog duckdb extension
+        if plugin_name != "unity":
+            cursor.execute(
+                f"CREATE OR REPLACE {materialization} {source_table_name} AS SELECT * FROM {df_name}"
+            )
 
         cursor.close()
         handle.close()
+
+    def get_arrow_dataframe(
+        self, compiled_code: str, retries: int, wait_time: float
+    ) -> pyarrow.lib.Table:
+        """Get the arrow dataframe from the compiled code.
+
+        :param compiled_code: Compiled code
+        :param retries: Number of retries
+        :param wait_time: Wait time between retries
+
+        :returns: Arrow dataframe
+        """
+
+        @get_retry_decorator(retries, wait_time, CatalogException)
+        def execute_query():
+            try:
+                # Get the handle and cursor
+                handle = self.handle()
+                cursor = handle.cursor()
+
+                # Execute the compiled code
+                df = cursor.sql(compiled_code).arrow()
+
+                return df
+            except CatalogException as e:
+                # Reset the connection to refresh the catalog
+                self.conn = None
+
+                # Raise the exception to retry the operation
+                raise CatalogException(
+                    f"{str(e)}: failed to execute compiled code {compiled_code}"
+                )
+
+        return execute_query()
 
     def store_relation(self, plugin_name: str, target_config: utils.TargetConfig) -> None:
         if plugin_name not in self._plugins:
@@ -155,7 +196,25 @@ class LocalEnvironment(Environment):
                     + ",".join(self._plugins.keys())
                 )
         plugin = self._plugins[plugin_name]
-        plugin.store(target_config)
+
+        handle = self.handle()
+        cursor = handle.cursor()
+
+        # Get the number of retries and the wait time for a dbt model
+        retries = int(target_config.config.get("retries", 20))
+        wait_time = float(target_config.config.get("wait_time", 0.05))
+
+        # Get the arrow dataframe
+        df = self.get_arrow_dataframe(
+            compiled_code=target_config.config.model.compiled_code,
+            retries=retries,
+            wait_time=wait_time,
+        )
+
+        plugin.store(target_config, df)
+
+        cursor.close()
+        handle.close()
 
     def close(self):
         if self.conn:

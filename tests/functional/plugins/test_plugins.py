@@ -41,14 +41,19 @@ plugin_sql = """
 """
 
 
-@pytest.mark.skip_profile("buenavista", "md")
+@pytest.mark.skip_profile("buenavista", "md", "unity")
 class TestPlugins:
     @pytest.fixture(scope="class")
     def sqlite_test_db(self):
         path = "/tmp/satest.db"
         db = sqlite3.connect(path)
         cursor = db.cursor()
-        cursor.execute("CREATE TABLE tt1 (id int, name text)")
+
+        # clean up
+        cursor.execute("DROP TABLE IF EXISTS tt1")
+        cursor.execute("DROP TABLE IF EXISTS test_table2")
+
+        cursor.execute("CREATE TABLE  tt1 (id int, name text)")
         cursor.execute("INSERT INTO tt1 VALUES (1, 'John Doe')")
         cursor.execute("INSERT INTO tt1 VALUES (2, 'Jane Smith')")
         cursor.execute("CREATE TABLE test_table2 (a int, b int, c int)")

@@ -105,7 +105,7 @@ def test_add_unsupported_secret_param():
     )
     sql = creds.secrets_sql()[0]
     assert sql == \
-"""CREATE OR REPLACE SECRET _dbt_secret_1 (
+"""CREATE OR REPLACE SECRET __default_s3 (
     type s3,
     password 'secret'
 )"""

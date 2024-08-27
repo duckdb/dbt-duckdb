@@ -12,5 +12,5 @@ class Plugin(BasePlugin):
     def configure_connection(self, conn: DuckDBPyConnection):
         conn.create_function("foo", foo)
 
-    def store(self, target_config: TargetConfig):
+    def store(self, target_config: TargetConfig, df=None):
         assert target_config.config.get("key") == "value"

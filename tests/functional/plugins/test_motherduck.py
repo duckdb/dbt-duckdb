@@ -1,15 +1,16 @@
-import pytest
 from unittest import mock
-from unittest.mock import Mock
+
+import pytest
 from dbt.tests.util import (
     run_dbt,
 )
-from dbt.adapters.duckdb.environments import Environment
+from dbt.version import __version__
+
+from dbt.adapters.duckdb.__version__ import version as plugin_version
 from dbt.adapters.duckdb.credentials import DuckDBCredentials
 from dbt.adapters.duckdb.credentials import PluginConfig
+from dbt.adapters.duckdb.environments import Environment
 from dbt.adapters.duckdb.plugins.motherduck import Plugin
-from dbt.adapters.duckdb.__version__ import version as plugin_version
-from dbt.version import __version__
 
 random_logs_sql = """
 {{ config(materialized='table', meta=dict(temp_schema_name='dbt_temp_test')) }}
@@ -43,7 +44,8 @@ from {{ ref('random_logs_test') }}
 group by all
 """
 
-@pytest.mark.skip_profile("buenavista", "file", "memory")
+
+@pytest.mark.skip_profile("buenavista", "file", "memory", "unity")
 class TestMDPlugin:
     @pytest.fixture(scope="class")
     def profiles_config_update(self, dbt_profile_target):
@@ -65,7 +67,7 @@ class TestMDPlugin:
     @pytest.fixture(scope="class")
     def database_name(self, dbt_profile_target):
         return dbt_profile_target["path"].replace("md:", "")
-    
+
     @pytest.fixture(scope="class")
     def md_sql(self, database_name):
         # Reads from a MD database in my test account in the cloud
@@ -106,48 +108,47 @@ class TestMDPlugin:
         res = project.run_sql("SELECT count(*) FROM summary_of_logs_test", fetch="one")
         assert res == (105,)
 
-        res = project.run_sql("SELECT schema_name FROM information_schema.schemata WHERE catalog_name = 'test'", fetch="all")
+        res = project.run_sql("SELECT schema_name FROM information_schema.schemata WHERE catalog_name = 'test'",
+                              fetch="all")
         assert "dbt_temp_test" in [_r for (_r,) in res]
 
     def test_incremental_temp_table_exists(self, project):
-        project.run_sql('create or replace table test.dbt_temp_test.summary_of_logs_test as (select 1 from generate_series(1,10) g(x))')
+        project.run_sql(
+            'create or replace table test.dbt_temp_test.summary_of_logs_test as (select 1 from generate_series(1,10) g(x))')
         run_dbt()
         res = project.run_sql("SELECT count(*) FROM summary_of_logs_test", fetch="one")
         assert res == (70,)
 
-@pytest.fixture
-def mock_md_plugin():
-    return Plugin.create("motherduck")
+    @pytest.fixture
+    def mock_md_plugin(self):
+        return Plugin.create("motherduck")
 
+    @pytest.fixture
+    def mock_creds(self, dbt_profile_target):
+        plugin_config = PluginConfig(module="motherduck", config={"token": "quack"})
+        if "md:" in dbt_profile_target["path"]:
+            return DuckDBCredentials(path=dbt_profile_target["path"], plugins=[plugin_config])
+        return DuckDBCredentials(path=dbt_profile_target["path"])
 
-@pytest.fixture
-def mock_creds(dbt_profile_target):
-    plugin_config = PluginConfig(module="motherduck", config={"token": "quack"})
-    if "md:" in dbt_profile_target["path"]:
-        return DuckDBCredentials(path=dbt_profile_target["path"], plugins=[plugin_config])
-    return DuckDBCredentials(path=dbt_profile_target["path"])
-
-
-@pytest.fixture
-def mock_plugins(mock_creds, mock_md_plugin):
-    plugins = {}
-    if mock_creds.is_motherduck:
-        plugins["motherduck"] = mock_md_plugin
-    return plugins
-
-
-def test_motherduck_user_agent(dbt_profile_target, mock_plugins, mock_creds):
-    with mock.patch("dbt.adapters.duckdb.environments.duckdb.connect") as mock_connect:
-        mock_creds.settings = {"custom_user_agent": "downstream-dep"}
-        Environment.initialize_db(mock_creds, plugins=mock_plugins)
+    @pytest.fixture
+    def mock_plugins(self, mock_creds, mock_md_plugin):
+        plugins = {}
         if mock_creds.is_motherduck:
-            kwargs = {
-                'read_only': False,
-                'config': {
-                    'custom_user_agent': f'dbt/{__version__} dbt-duckdb/{plugin_version} downstream-dep',
-                    'motherduck_token': 'quack'
+            plugins["motherduck"] = mock_md_plugin
+        return plugins
+
+    def test_motherduck_user_agent(self, dbt_profile_target, mock_plugins, mock_creds):
+        with mock.patch("dbt.adapters.duckdb.environments.duckdb.connect") as mock_connect:
+            mock_creds.settings = {"custom_user_agent": "downstream-dep"}
+            Environment.initialize_db(mock_creds, plugins=mock_plugins)
+            if mock_creds.is_motherduck:
+                kwargs = {
+                    'read_only': False,
+                    'config': {
+                        'custom_user_agent': f'dbt/{__version__} dbt-duckdb/{plugin_version} downstream-dep',
+                        'motherduck_token': 'quack'
+                    }
                 }
-            }
-            mock_connect.assert_called_with(dbt_profile_target["path"], **kwargs)
-        else:
-            mock_connect.assert_called_with(dbt_profile_target["path"], read_only=False, config = {})
+                mock_connect.assert_called_with(dbt_profile_target["path"], **kwargs)
+            else:
+                mock_connect.assert_called_with(dbt_profile_target["path"], read_only=False, config={})
