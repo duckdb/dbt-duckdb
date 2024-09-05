@@ -1,3 +1,4 @@
+from urllib.parse import urlparse
 import pytest
 from unittest import mock
 from unittest.mock import Mock
@@ -9,6 +10,7 @@ from dbt.adapters.duckdb.credentials import DuckDBCredentials
 from dbt.adapters.duckdb.credentials import PluginConfig
 from dbt.adapters.duckdb.plugins.motherduck import Plugin
 from dbt.adapters.duckdb.__version__ import version as plugin_version
+from dbt.artifacts.schemas.results import RunStatus
 from dbt.version import __version__
 
 random_logs_sql = """
@@ -43,6 +45,13 @@ from {{ ref('random_logs_test') }}
 group by all
 """
 
+python_pyarrow_table_model = """
+import pyarrow as pa
+
+def model(dbt, con):
+    return pa.Table.from_pydict({"a": [1,2,3]})
+"""
+
 @pytest.mark.skip_profile("buenavista", "file", "memory")
 class TestMDPlugin:
     @pytest.fixture(scope="class")
@@ -64,7 +73,7 @@ class TestMDPlugin:
 
     @pytest.fixture(scope="class")
     def database_name(self, dbt_profile_target):
-        return dbt_profile_target["path"].replace("md:", "")
+        return urlparse(dbt_profile_target["path"]).path
     
     @pytest.fixture(scope="class")
     def md_sql(self, database_name):
@@ -79,6 +88,7 @@ class TestMDPlugin:
             "md_table.sql": md_sql,
             "random_logs_test.sql": random_logs_sql,
             "summary_of_logs_test.sql": summary_of_logs_sql,
+            "python_pyarrow_table_model.py": python_pyarrow_table_model,
         }
 
     @pytest.fixture(autouse=True)
@@ -91,11 +101,14 @@ class TestMDPlugin:
         project.run_sql("DROP TABLE random_logs_test")
         project.run_sql("DROP TABLE summary_of_logs_test")
         project.run_sql("DROP TABLE plugin_table")
+        project.run_sql("DROP TABLE python_pyarrow_table_model")
 
     def test_motherduck(self, project):
         run_dbt()
         res = project.run_sql("SELECT * FROM md_table", fetch="one")
         assert res == (1, "foo")
+        res = project.run_sql("SELECT * FROM python_pyarrow_table_model", fetch="all")
+        assert res == [(1,), (2,), (3,)]
 
     def test_incremental(self, project):
         run_dbt()
@@ -114,6 +127,7 @@ class TestMDPlugin:
         run_dbt()
         res = project.run_sql("SELECT count(*) FROM summary_of_logs_test", fetch="one")
         assert res == (70,)
+
 
 @pytest.fixture
 def mock_md_plugin():
