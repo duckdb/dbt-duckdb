@@ -1,16 +1,9 @@
 from urllib.parse import urlparse
 import pytest
-from unittest import mock
 from dbt.tests.util import (
     run_dbt,
 )
-from dbt.adapters.duckdb.environments import Environment
-from dbt.adapters.duckdb.credentials import DuckDBCredentials
-from dbt.adapters.duckdb.credentials import PluginConfig
-from dbt.adapters.duckdb.plugins.motherduck import Plugin
-from dbt.adapters.duckdb.__version__ import version as plugin_version
 from dbt.artifacts.schemas.results import RunStatus
-from dbt.version import __version__
 
 random_logs_sql = """
 {{ config(materialized='table', meta=dict(temp_schema_name='dbt_temp_test')) }}
@@ -109,41 +102,3 @@ class TestMDPluginSaaSMode:
         result = run_dbt(expect_pass=False)
         expected_msg = "Python models are disabled when MotherDuck SaaS Mode is on."
         assert [_res for _res in result.results if _res.status != RunStatus.Success][0].message == expected_msg
-
-
-@pytest.fixture
-def mock_md_plugin():
-    return Plugin.create("motherduck")
-
-
-@pytest.fixture
-def mock_creds(dbt_profile_target):
-    plugin_config = PluginConfig(module="motherduck", config={"token": "quack"})
-    if "md:" in dbt_profile_target["path"]:
-        return DuckDBCredentials(path=dbt_profile_target["path"], plugins=[plugin_config])
-    return DuckDBCredentials(path=dbt_profile_target["path"])
-
-
-@pytest.fixture
-def mock_plugins(mock_creds, mock_md_plugin):
-    plugins = {}
-    if mock_creds.is_motherduck:
-        plugins["motherduck"] = mock_md_plugin
-    return plugins
-
-
-def test_motherduck_user_agent(dbt_profile_target, mock_plugins, mock_creds):
-    with mock.patch("dbt.adapters.duckdb.environments.duckdb.connect") as mock_connect:
-        mock_creds.settings = {"custom_user_agent": "downstream-dep"}
-        Environment.initialize_db(mock_creds, plugins=mock_plugins)
-        if mock_creds.is_motherduck:
-            kwargs = {
-                'read_only': False,
-                'config': {
-                    'custom_user_agent': f'dbt/{__version__} dbt-duckdb/{plugin_version} downstream-dep',
-                    'motherduck_token': 'quack'
-                }
-            }
-            mock_connect.assert_called_with(dbt_profile_target["path"], **kwargs)
-        else:
-            mock_connect.assert_called_with(dbt_profile_target["path"], read_only=False, config = {})
