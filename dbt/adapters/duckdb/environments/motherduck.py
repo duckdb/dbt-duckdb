@@ -28,5 +28,5 @@ class MotherDuckEnvironment(LocalEnvironment):
     def submit_python_job(self, handle, parsed_model: dict, compiled_code: str) -> AdapterResponse:
         # Block local file access if SaaS mode is on
         if self.motherduck_saas_mode(handle) is True:
-            raise RuntimeError("Cannot submit Python job: MotherDuck SaaS Mode restricts local file access.")
+            raise RuntimeError("Python models are disabled when MotherDuck SaaS Mode is on.")
         return super().submit_python_job(handle=handle, parsed_model=parsed_model, compiled_code=compiled_code)
