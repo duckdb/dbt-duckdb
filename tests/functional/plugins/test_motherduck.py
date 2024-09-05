@@ -182,7 +182,7 @@ class TestMDPluginSaaSMode:
 
     def test_motherduck(self, project):
         result = run_dbt(expect_pass=False)
-        expected_msg = "Cannot submit Python job: MotherDuck SaaS Mode restricts local file access."
+        expected_msg = "Python models are disabled when MotherDuck SaaS Mode is on."
         assert [_res for _res in result.results if _res.status != RunStatus.Success][0].message == expected_msg
 
 
