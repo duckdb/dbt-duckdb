@@ -189,6 +189,11 @@ class DuckDBCredentials(Credentials):
 
     @property
     def is_motherduck(self):
+        # Check if any MotherDuck paths are attached
+        for attached_db in self.attach or []:
+            parsed = urlparse(attached_db.path)
+            if self._is_motherduck(parsed.scheme):
+                return True
         parsed = urlparse(self.path)
         return self._is_motherduck(parsed.scheme)
 

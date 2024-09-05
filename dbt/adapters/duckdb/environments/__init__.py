@@ -289,6 +289,10 @@ def create(creds: DuckDBCredentials) -> Environment:
         from .buenavista import BVEnvironment
 
         return BVEnvironment(creds)
+    elif creds.is_motherduck:
+        from .motherduck import MotherDuckEnvironment
+
+        return MotherDuckEnvironment(creds)
     else:
         from .local import LocalEnvironment
 
