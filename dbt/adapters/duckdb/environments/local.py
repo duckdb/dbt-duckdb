@@ -148,7 +148,7 @@ class LocalEnvironment(Environment):
                 _, glue_db = plugin_name.split("|")
                 config = (self.creds.settings or {}).copy()
                 config["glue_database"] = glue_db
-                self._plugins[plugin_name] = glue.Plugin(plugin_name, config)
+                self._plugins[plugin_name] = glue.Plugin(plugin_name, config, credentials=self.creds)
             else:
                 raise Exception(
                     f"Plugin {plugin_name} not found; known plugins are: "

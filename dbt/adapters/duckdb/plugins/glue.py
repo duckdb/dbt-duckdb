@@ -343,8 +343,7 @@ def create_or_update_table(
 
 class Plugin(BasePlugin):
     def initialize(self, config: Dict[str, Any]):
-        if self.creds is not None:
-            secrets = self.creds.secrets
+        secrets = self.creds.secrets if self.creds is not None else {}
         self.client = _get_glue_client(config, secrets)
         self.database = config.get("glue_database", "default")
         self.delimiter = config.get("delimiter", ",")
