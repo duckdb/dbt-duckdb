@@ -9,6 +9,7 @@ from typing import Literal
 
 import pyarrow as pa
 from unitycatalog import Unitycatalog
+from unitycatalog.types import GenerateTemporaryTableCredentialResponse
 from unitycatalog.types.table_create_params import Column
 
 from . import BasePlugin
@@ -44,6 +45,36 @@ def uc_table_exists(
         return False
 
     return table_name in [table.name for table in table_list_request.tables]
+
+
+def uc_get_storage_credentials(
+    client: Unitycatalog, catalog_name: str, schema_name: str, table_name: str
+) -> dict:
+    """Get temporary table credentials for a UC table if they exist."""
+
+    # Get the table ID
+
+    if not uc_table_exists(client, table_name, schema_name, catalog_name):
+        return {}
+
+    table_response = client.tables.retrieve(full_name=f"{catalog_name}.{schema_name}.{table_name}")
+
+    if not table_response.table_id:
+        return {}
+
+    # Get the temporary table credentials
+    creds: GenerateTemporaryTableCredentialResponse = client.temporary_table_credentials.create(
+        operation="READ_WRITE", table_id=table_response.table_id
+    )
+
+    if creds.aws_temp_credentials:
+        return {
+            "AWS_ACCESS_KEY_ID": creds.aws_temp_credentials.access_key_id,
+            "AWS_SECRET_ACCESS_KEY": creds.aws_temp_credentials.secret_access_key,
+            "AWS_SESSION_TOKEN": creds.aws_temp_credentials.session_token,
+        }
+
+    return {}
 
 
 UCSupportedTypeLiteral = Literal[
@@ -214,48 +245,7 @@ class Plugin(BasePlugin):
             self.uc_client: Unitycatalog = Unitycatalog(base_url=catalog_base_url)
 
     def load(self, source_config: SourceConfig):
-        # Assert that the source_config has a name, schema, and database
-        assert source_config.identifier is not None, "Name is required for loading data!"
-        assert source_config.schema is not None, "Schema is required for loading data!"
-        assert source_config.get("location") is not None, "Location is required for loading data!"
-
-        # Get the required variables from the source configuration
-        table_path = source_config.get("location")
-        table_name = source_config.identifier
-        schema_name = source_config.schema
-
-        # Get the optional variables from the source configuration
-        storage_format = source_config.get("format", self.default_format)
-        storage_options = source_config.get("storage_options", {})
-        as_of_version = source_config.get("as_of_version", None)
-        as_of_datetime = source_config.get("as_of_datetime", None)
-
-        if storage_format == StorageFormat.DELTA:
-            from .delta import delta_load
-
-            df = delta_load(
-                table_path=table_path,
-                storage_options=storage_options,
-                as_of_version=as_of_version,
-                as_of_datetime=as_of_datetime,
-            )
-        else:
-            raise NotImplementedError(f"Loading storage format {storage_format} not supported!")
-
-        converted_schema = pyarrow_schema_to_columns(schema=df.schema)
-
-        # Create he table in the Unitycatalog if it does not exist
-        create_table_if_not_exists(
-            uc_client=self.uc_client,
-            table_name=table_name,
-            schema_name=schema_name,
-            catalog_name=self.catalog_name,
-            storage_location=table_path,
-            schema=converted_schema,
-            storage_format=storage_format,
-        )
-
-        return df
+        raise NotImplementedError("Loading data to Unitycatalog is not supported!")
 
     def store(self, target_config: TargetConfig, df: pa.lib.Table = None):
         # Assert that the target_config has a location and relation identifier
@@ -286,7 +276,7 @@ class Plugin(BasePlugin):
         # Convert the pa schema to columns
         converted_schema = pyarrow_schema_to_columns(schema=df.schema)
 
-        # Create he table in the Unitycatalog if it does not exist
+        # Create the table in the Unitycatalog if it does not exist
         create_table_if_not_exists(
             uc_client=self.uc_client,
             table_name=table_name,
@@ -295,6 +285,11 @@ class Plugin(BasePlugin):
             storage_location=table_path,
             schema=converted_schema,
             storage_format=storage_format,
+        )
+
+        # extend the storage options with the temporary table credentials
+        storage_options = storage_options | uc_get_storage_credentials(
+            self.uc_client, self.catalog_name, schema_name, table_name
         )
 
         if storage_format == StorageFormat.DELTA:
