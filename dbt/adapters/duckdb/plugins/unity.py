@@ -220,6 +220,9 @@ class Plugin(BasePlugin):
     # The Unitycatalog client
     uc_client: Unitycatalog
 
+    # The AWS region
+    aws_region: str
+
     def initialize(self, config: Dict[str, Any]):
         # Assert that the credentials and secrets are present
         assert self.creds is not None, "Credentials are required for the plugin!"
@@ -227,6 +230,9 @@ class Plugin(BasePlugin):
 
         # Find the UC secret
         uc_secret = find_secrets_by_type(self.creds.secrets, "UC")
+
+        # Get AWS region from the UC secret
+        self.aws_region = uc_secret["aws_region"]
 
         # Get the endpoint from the UC secret
         host_and_port = uc_secret["endpoint"]
@@ -286,6 +292,9 @@ class Plugin(BasePlugin):
             schema=converted_schema,
             storage_format=storage_format,
         )
+
+        # extend the storage options with the aws region
+        storage_options["AWS_REGION"] = self.aws_region
 
         # extend the storage options with the temporary table credentials
         storage_options = storage_options | uc_get_storage_credentials(
