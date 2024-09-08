@@ -149,7 +149,7 @@ class LocalEnvironment(Environment):
                 config = (self.creds.settings or {}).copy()
                 config["glue_database"] = glue_db
                 self._plugins[plugin_name] = glue.Plugin(
-                    plugin_name, config, credentials=self.creds
+                    name=plugin_name, plugin_config=config, credentials=self.creds
                 )
             else:
                 raise Exception(
