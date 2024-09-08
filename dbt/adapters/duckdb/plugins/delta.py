@@ -31,10 +31,10 @@ class Plugin(BasePlugin):
         as_of_datetime = source_config.get("as_of_datetime", None)
 
         if as_of_version:
-            dt.load_version(as_of_version)
+            dt.load_as_version(as_of_version)
 
         if as_of_datetime:
-            dt.load_with_datetime(as_of_datetime)
+            dt.load_as_version(as_of_datetime)
 
         df = dt.to_pyarrow_dataset()
 
