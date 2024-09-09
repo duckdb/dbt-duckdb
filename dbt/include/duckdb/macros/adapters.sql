@@ -101,7 +101,10 @@ def materialize(df, con):
         if pyarrow_available and isinstance(df, pyarrow.Table):
             # https://github.com/duckdb/duckdb/issues/6584
             import pyarrow.dataset
-    con.execute('create table {{ relation }} as select * from df')
+    tmp_name = '__dbt_python_model_df_' + '{{ relation.identifier }}'
+    con.register(tmp_name, df)
+    con.execute('create table {{ relation }} as select * from ' + tmp_name)
+    con.unregister(tmp_name)
 {% endmacro %}
 
 {% macro duckdb__create_view_as(relation, sql) -%}
