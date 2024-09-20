@@ -33,6 +33,8 @@ class Plugin(BasePlugin):
                         parsed = urlparse(attachment.path)
                         if parsed.scheme == "md":
                             qs = parse_qs(parsed.query)
+                            # Note that we currently only support setting the
+                            # motherduck_token via ATTACH.
                             token = qs.get("motherduck_token")
                             if token:
                                 conn.execute(f"SET motherduck_token = '{token[0]}'")
