@@ -18,8 +18,13 @@ class Plugin(BasePlugin):
         # If a MotherDuck database is attached after the database
         # instance is created, set the motherduck token
         if self.creds is not None:
-            if self.creds.is_motherduck_attach and self._token:
-                conn.execute(f"SET motherduck_token = '{self._token}'")
+            if self.creds.is_motherduck_attach:
+                if self._token:
+                    conn.execute(f"SET motherduck_token = '{self._token}'")
+                elif self.creds.settings:
+                    if "motherduck_token" in self.creds.settings:
+                        token = self.creds.settings.pop("motherduck_token")
+                        conn.execute(f"SET motherduck_token = '{token}'")
 
     @staticmethod
     def token_from_config(creds: DuckDBCredentials) -> str:
