@@ -129,3 +129,27 @@ class TestMDPluginAttachWithSettings(TestMDPluginAttach):
                 "target": "dev",
             }
         }
+
+
+@pytest.mark.skip_profile("buenavista", "file", "memory")
+class TestMDPluginAttachWithTokenInPath(TestMDPluginAttach):
+    @pytest.fixture(scope="class")
+    def profiles_config_update(self, dbt_profile_target):
+        token = dbt_profile_target.get("token")
+        return {
+            "test": {
+                "outputs": {
+                    "dev": {
+                        "type": "duckdb",
+                        "path": ":memory:",
+                        "attach": [
+                            {
+                                "path": dbt_profile_target.get("path", ":memory:") + f"?motherduck_token={token}&user=1",
+                                "type": "motherduck"
+                            }
+                        ]
+                    }
+                },
+                "target": "dev",
+            }
+        }

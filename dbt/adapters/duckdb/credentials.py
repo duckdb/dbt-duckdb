@@ -31,7 +31,10 @@ class Attachment(dbtClassMixin):
     read_only: bool = False
 
     def to_sql(self) -> str:
-        base = f"ATTACH '{self.path}'"
+        # remove query parameters (not supported in ATTACH)
+        parsed = urlparse(self.path)
+        path = self.path.replace(f"?{parsed.query}", "")
+        base = f"ATTACH '{path}'"
         if self.alias:
             base += f" AS {self.alias}"
         options = []

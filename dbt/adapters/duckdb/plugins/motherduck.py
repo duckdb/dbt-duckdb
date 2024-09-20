@@ -1,5 +1,7 @@
 from typing import Any
 from typing import Dict
+from urllib.parse import parse_qs
+from urllib.parse import urlparse
 
 from duckdb import DuckDBPyConnection
 
@@ -25,6 +27,15 @@ class Plugin(BasePlugin):
                     if "motherduck_token" in self.creds.settings:
                         token = self.creds.settings.pop("motherduck_token")
                         conn.execute(f"SET motherduck_token = '{token}'")
+                elif self.creds.attach:
+                    # Check if the md token is specified in the path
+                    for attachment in self.creds.attach:
+                        parsed = urlparse(attachment.path)
+                        if parsed.scheme == "md":
+                            qs = parse_qs(parsed.query)
+                            token = qs.get("motherduck_token")
+                            if token:
+                                conn.execute(f"SET motherduck_token = '{token[0]}'")
 
     @staticmethod
     def token_from_config(creds: DuckDBCredentials) -> str:
