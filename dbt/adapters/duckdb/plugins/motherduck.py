@@ -15,6 +15,11 @@ class Plugin(BasePlugin):
 
     def configure_connection(self, conn: DuckDBPyConnection):
         conn.load_extension("motherduck")
+        # If a MotherDuck database is attached after the database
+        # instance is created, set the motherduck token
+        if self.creds is not None:
+            if self.creds.is_motherduck_attach and self._token:
+                conn.execute(f"SET motherduck_token = '{self._token}'")
 
     @staticmethod
     def token_from_config(creds: DuckDBCredentials) -> str:
@@ -26,8 +31,9 @@ class Plugin(BasePlugin):
         plugins = creds.plugins or []
         for plugin in plugins:
             if plugin.config:
-                token = plugin.config.get("token") or ""
-                return str(token)
+                if "token" in plugin.config or "motherduck_token" in plugin.config:
+                    token = plugin.config.get("token") or plugin.config.get("motherduck_token")
+                    return str(token)
         return ""
 
     def update_connection_config(self, creds: DuckDBCredentials, config: Dict[str, Any]):
@@ -42,6 +48,7 @@ class Plugin(BasePlugin):
 
         # If a user specified the token via the plugin config,
         # pass it to the config kwarg in duckdb.connect
-        token = self.token_from_config(creds)
-        if token != "":
-            config["motherduck_token"] = token
+        if not creds.is_motherduck_attach:
+            token = self.token_from_config(creds)
+            if token != "":
+                config["motherduck_token"] = token
