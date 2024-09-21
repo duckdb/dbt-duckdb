@@ -63,7 +63,7 @@ class TestMDPlugin:
                 "outputs": {
                     "dev": {
                         "type": "duckdb",
-                        "path": dbt_profile_target.get("path", ":memory:"),
+                        "path": dbt_profile_target.get("path", ":memory:") + "?user=test_motherduck",
                         "plugins": plugins,
                     }
                 },

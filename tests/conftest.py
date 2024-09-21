@@ -71,7 +71,7 @@ def dbt_profile_target(profile_type, bv_server_process, tmp_path_factory):
                 )
             profile["token"] = os.environ.get(TEST_MOTHERDUCK_TOKEN)
         else:
-            profile["token"] = os.environ.get(MOTHERDUCK_TOKEN)
+            profile["token"] = os.environ.get(MOTHERDUCK_TOKEN, os.environ.get(MOTHERDUCK_TOKEN.lower()))
         profile["disable_transactions"] = True
         profile["path"] = "md:test"
     elif profile_type == "memory":
