@@ -191,12 +191,18 @@ class DuckDBCredentials(Credentials):
         return [secret.to_sql() for secret in self._secrets]
 
     @property
-    def is_motherduck_attach(self):
+    def motherduck_attach(self):
         # Check if any MotherDuck paths are attached
+        attach = []
         for attached_db in self.attach or []:
             parsed = urlparse(attached_db.path)
             if self._is_motherduck(parsed.scheme):
-                return True
+                attach.append(attached_db)
+        return attach
+
+    @property
+    def is_motherduck_attach(self):
+        return len(self.motherduck_attach) > 0
 
     @property
     def is_motherduck(self):
