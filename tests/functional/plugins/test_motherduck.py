@@ -63,6 +63,8 @@ class TestMDPlugin:
                 "outputs": {
                     "dev": {
                         "type": "duckdb",
+                        # make path unique from other tests that don't pass the token via config
+                        # to avoid duckdb 1.1.0 caching error (see https://github.com/duckdb/duckdb/pull/13129)
                         "path": dbt_profile_target.get("path", ":memory:") + "?user=test_motherduck",
                         "plugins": plugins,
                     }
