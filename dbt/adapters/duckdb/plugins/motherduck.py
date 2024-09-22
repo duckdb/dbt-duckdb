@@ -18,8 +18,9 @@ MOTHERDUCK_CONFIG_OPTIONS = [MOTHERDUCK_TOKEN]
 
 
 class Plugin(BasePlugin):
-    def initialize(self, config: Dict[str, Any]):
-        self._token = config.get(TOKEN) or config.get(TOKEN.lower())
+    def initialize(self, plugin_config: Dict[str, Any]):
+        self._config = plugin_config
+        self._token = self.token_from_config(plugin_config)
 
     def configure_connection(self, conn: DuckDBPyConnection):
         conn.load_extension(MOTHERDUCK_EXT)
@@ -35,7 +36,7 @@ class Plugin(BasePlugin):
                     if value:
                         conn.execute(f"SET {KEY} = '{value[0]}'")
             # If config options are specified via plugin config, set them here
-            if self._token:
+            if self._config:
                 conn.execute(f"SET {MOTHERDUCK_TOKEN} = '{self._token}'")
             elif self.creds.settings:
                 if MOTHERDUCK_TOKEN in self.creds.settings:
@@ -43,28 +44,25 @@ class Plugin(BasePlugin):
                     conn.execute(f"SET {MOTHERDUCK_TOKEN} = '{token}'")
 
     @staticmethod
-    def token_from_config(creds: DuckDBCredentials) -> str:
+    def token_from_config(config: Dict[str, Any]) -> str:
         """Load the token from the MotherDuck plugin config
         If not specified, this returns an empty string
 
         :param str: MotherDuck token
         """
-        plugins = creds.plugins or []
-        for plugin in plugins:
-            if plugin.config:
-                if (
-                    TOKEN in plugin.config
-                    or TOKEN.upper() in plugin.config
-                    or MOTHERDUCK_TOKEN in plugin.config
-                    or MOTHERDUCK_TOKEN.upper() in plugin.config
-                ):
-                    token = (
-                        plugin.config.get(TOKEN)
-                        or plugin.config.get(TOKEN.upper())
-                        or plugin.config.get(MOTHERDUCK_TOKEN)
-                        or plugin.config.get(MOTHERDUCK_TOKEN.upper())
-                    )
-                    return str(token)
+        if (
+            TOKEN in config
+            or TOKEN.upper() in config
+            or MOTHERDUCK_TOKEN in config
+            or MOTHERDUCK_TOKEN.upper() in config
+        ):
+            token = (
+                config.get(TOKEN)
+                or config.get(TOKEN.upper())
+                or config.get(MOTHERDUCK_TOKEN)
+                or config.get(MOTHERDUCK_TOKEN.upper())
+            )
+            return str(token)
         return ""
 
     def update_connection_config(self, creds: DuckDBCredentials, config: Dict[str, Any]):
@@ -80,6 +78,5 @@ class Plugin(BasePlugin):
         # If a user specified MotherDuck config options via the plugin config,
         # pass it to the config kwarg in duckdb.connect.
         if not creds.is_motherduck_attach:
-            token = self.token_from_config(creds)
-            if token != "":
-                config[MOTHERDUCK_TOKEN] = token
+            if self._token:
+                config[MOTHERDUCK_TOKEN] = self._token

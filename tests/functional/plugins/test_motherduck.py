@@ -132,23 +132,23 @@ class TestMDPlugin:
 
 
 @pytest.fixture
-def mock_md_plugin():
-    return Plugin.create("motherduck")
+def mock_plugin_config():
+    return {"token": "quack"}
 
 
 @pytest.fixture
-def mock_creds(dbt_profile_target):
-    plugin_config = PluginConfig(module="motherduck", config={"token": "quack"})
+def mock_creds(dbt_profile_target, mock_plugin_config):
+    plugin_config = PluginConfig(module="motherduck", config=mock_plugin_config)
     if "md:" in dbt_profile_target["path"]:
         return DuckDBCredentials(path=dbt_profile_target["path"], plugins=[plugin_config])
     return DuckDBCredentials(path=dbt_profile_target["path"])
 
 
 @pytest.fixture
-def mock_plugins(mock_creds, mock_md_plugin):
+def mock_plugins(mock_creds, mock_plugin_config):
     plugins = {}
     if mock_creds.is_motherduck:
-        plugins["motherduck"] = mock_md_plugin
+        plugins["motherduck"] = Plugin.create("motherduck", config=mock_plugin_config)
     return plugins
 
 
