@@ -77,6 +77,5 @@ class Plugin(BasePlugin):
 
         # If a user specified MotherDuck config options via the plugin config,
         # pass it to the config kwarg in duckdb.connect.
-        if not creds.is_motherduck_attach:
-            if self._token:
-                config[MOTHERDUCK_TOKEN] = self._token
+        if not creds.is_motherduck_attach and self._token:
+            config[MOTHERDUCK_TOKEN] = self._token
