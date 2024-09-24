@@ -31,7 +31,10 @@ class Attachment(dbtClassMixin):
     read_only: bool = False
 
     def to_sql(self) -> str:
-        base = f"ATTACH '{self.path}'"
+        # remove query parameters (not supported in ATTACH)
+        parsed = urlparse(self.path)
+        path = self.path.replace(f"?{parsed.query}", "")
+        base = f"ATTACH '{path}'"
         if self.alias:
             base += f" AS {self.alias}"
         options = []
@@ -188,14 +191,23 @@ class DuckDBCredentials(Credentials):
         return [secret.to_sql() for secret in self._secrets]
 
     @property
-    def is_motherduck(self):
+    def motherduck_attach(self):
         # Check if any MotherDuck paths are attached
+        attach = []
         for attached_db in self.attach or []:
             parsed = urlparse(attached_db.path)
             if self._is_motherduck(parsed.scheme):
-                return True
+                attach.append(attached_db)
+        return attach
+
+    @property
+    def is_motherduck_attach(self):
+        return len(self.motherduck_attach) > 0
+
+    @property
+    def is_motherduck(self):
         parsed = urlparse(self.path)
-        return self._is_motherduck(parsed.scheme)
+        return self._is_motherduck(parsed.scheme) or self.is_motherduck_attach
 
     @staticmethod
     def _is_motherduck(scheme: str) -> bool:

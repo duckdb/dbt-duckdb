@@ -180,16 +180,16 @@ class Environment(abc.ABC):
                 fs = fsspec.filesystem(fsimpl, **curr)
                 conn.register_filesystem(fs)
 
-        # attach any databases that we will be using
-        if creds.attach:
-            for attachment in creds.attach:
-                conn.execute(attachment.to_sql())
-
         # let the plugins do any configuration on the
         # connection that they need to do
         if plugins:
             for plugin in plugins.values():
                 plugin.configure_connection(conn)
+
+        # attach any databases that we will be using
+        if creds.attach:
+            for attachment in creds.attach:
+                conn.execute(attachment.to_sql())
 
         return conn
 
