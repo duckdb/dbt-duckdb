@@ -10,44 +10,37 @@ from dbt.adapters.duckdb.__version__ import version as __plugin_version__
 from dbt.adapters.duckdb.credentials import DuckDBCredentials
 from dbt.version import __version__
 
-# MD config options, in the order in which they should be set
-# Should be prefixed as motherduck_<option>
+CUSTOM_USER_AGENT = "custom_user_agent"
+MOTHERDUCK_EXT = "motherduck"
 MOTHERDUCK_CONFIG_OPTIONS = [
     "token",
     "attach_mode",
     "saas_mode",
 ]
-CUSTOM_USER_AGENT = "custom_user_agent"
-MOTHERDUCK_EXT = "motherduck"
-
-
-def _get_index(kv):
-    key = kv[0].replace("motherduck_", "")
-    if key in MOTHERDUCK_CONFIG_OPTIONS:
-        return MOTHERDUCK_CONFIG_OPTIONS.index(key)
-    return -1
-
-
-def _is_md(kv):
-    return kv[0].replace("motherduck_", "") in MOTHERDUCK_CONFIG_OPTIONS
-
-
-def _get_md_config(config):
-    return dict(sorted(filter(_is_md, config.items()), key=_get_index))
-
-
-def _with_prefix(key):
-    _key = key.replace("motherduck_", "")
-    return f"motherduck_{_key}"
-
-
-def _config_from_path(path):
-    return {key: value[0] for key, value in parse_qs(urlparse(path).query).items()}
 
 
 class Plugin(BasePlugin):
     def initialize(self, plugin_config: Dict[str, Any]):
         self._config = plugin_config
+
+    @staticmethod
+    def get_config_from_path(path):
+        return {key: value[0] for key, value in parse_qs(urlparse(path).query).items()}
+
+    @staticmethod
+    def get_md_config(config):
+        # Get MotherDuck config settings
+        md_config = {}
+        for name in MOTHERDUCK_CONFIG_OPTIONS:
+            for key in [name, f"motherduck_{name}", name.upper(), f"motherduck_{name}".upper()]:
+                if key in config:
+                    md_config[name] = config[key]
+
+        # Sort values (SaaS mode should be set last)
+        return sorted(
+            md_config,
+            key=lambda x: MOTHERDUCK_CONFIG_OPTIONS.index(x[0]),
+        )
 
     def configure_connection(self, conn: DuckDBPyConnection):
         conn.load_extension(MOTHERDUCK_EXT)
@@ -55,17 +48,21 @@ class Plugin(BasePlugin):
         # set config options *before* attaching
         if self.creds is not None and self.creds.is_motherduck_attach:
             config = {}
+
             # add config options specified in the path
             for attachment in self.creds.motherduck_attach:
-                config.update(_config_from_path(attachment.path))
+                config.update(self.get_config_from_path(attachment.path))
+
             # add config options specified via plugin config
             config.update(self._config)
+
             # add config options specified via settings
             if self.creds.settings is not None:
                 config.update(self.creds.settings)
+
             # set MD config options and remove from settings
-            for key, value in _get_md_config(config).items():
-                conn.execute(f"SET {_with_prefix(key)} = '{value}'")
+            for key, value in self.get_md_config(config).items():
+                conn.execute(f"SET motherduck_{key} = '{value}'")
                 if self.creds.settings is not None and key in self.creds.settings:
                     self.creds.settings.pop(key)
 
@@ -80,5 +77,4 @@ class Plugin(BasePlugin):
         # If a user specified MotherDuck config options via the plugin config,
         # pass it to the config kwarg in duckdb.connect.
         if not creds.is_motherduck_attach:
-            for key, value in _get_md_config(self._config).items():
-                config[_with_prefix(key)] = value
+            config.update(self.get_md_config(self._config))
