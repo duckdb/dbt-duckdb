@@ -12,6 +12,8 @@ from dbt.version import __version__
 
 CUSTOM_USER_AGENT = "custom_user_agent"
 MOTHERDUCK_EXT = "motherduck"
+# MotherDuck config options, in order in which they need to be set
+# (SaaS mode is last because it locks other config options)
 MOTHERDUCK_CONFIG_OPTIONS = [
     "motherduck_token",
     "motherduck_attach_mode",
@@ -42,10 +44,10 @@ class Plugin(BasePlugin):
                     md_config[name] = config[key]
 
         # Sort values (SaaS mode should be set last)
-        return sorted(
-            md_config,
+        return dict(sorted(
+            md_config.items(),
             key=lambda x: MOTHERDUCK_CONFIG_OPTIONS.index(x[0]),
-        )
+        ))
 
     def configure_connection(self, conn: DuckDBPyConnection):
         conn.load_extension(MOTHERDUCK_EXT)
@@ -82,4 +84,4 @@ class Plugin(BasePlugin):
         # If a user specified MotherDuck config options via the plugin config,
         # pass it to the config kwarg in duckdb.connect.
         if not creds.is_motherduck_attach:
-            config.update(self._config)
+            config.update(self.get_md_config_settings(self._config))
