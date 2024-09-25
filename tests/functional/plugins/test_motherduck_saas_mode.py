@@ -4,6 +4,7 @@ from dbt.tests.util import (
     run_dbt,
 )
 from dbt.artifacts.schemas.results import RunStatus
+from sqlalchemy import true
 
 random_logs_sql = """
 {{ config(materialized='table', meta=dict(temp_schema_name='dbt_temp_test')) }}
@@ -96,7 +97,6 @@ class TestMDPluginSaaSMode:
         project.run_sql("DROP TABLE random_logs_test")
         project.run_sql("DROP TABLE summary_of_logs_test")
         project.run_sql(f"DROP TABLE {database_name}.plugin_table")
-        project.run_sql("DROP TABLE python_pyarrow_table_model")
 
     def test_motherduck(self, project):
         result = run_dbt(expect_pass=False)
@@ -123,6 +123,58 @@ class TestMDPluginSaaSModeViaAttach(TestMDPluginSaaSMode):
                         "attach": [
                             {
                                 "path": dbt_profile_target.get("path", ":memory:"),
+                                "type": "motherduck"
+                            }
+                        ]
+                    }
+                },
+                "target": "dev",
+            }
+        }
+
+
+@pytest.mark.skip_profile("buenavista", "file", "memory")
+class TestMDPluginSaaSModeViaAttachWithSettings(TestMDPluginSaaSMode):
+    @pytest.fixture(scope="class")
+    def profiles_config_update(self, dbt_profile_target):
+        md_setting = {
+            "motherduck_token": dbt_profile_target.get("token"),
+            "motherduck_saas_mode": True
+        }
+        return {
+            "test": {
+                "outputs": {
+                    "dev": {
+                        "type": "duckdb",
+                        "path": ":memory:",
+                        "attach": [
+                            {
+                                "path": dbt_profile_target.get("path", ":memory:"),
+                                "type": "motherduck"
+                            }
+                        ],
+                        "settings": md_setting
+                    }
+                },
+                "target": "dev",
+            }
+        }
+
+
+@pytest.mark.skip_profile("buenavista", "file", "memory")
+class TestMDPluginSaaSModeViaAttachWithTokenInPath(TestMDPluginSaaSMode):
+    @pytest.fixture(scope="class")
+    def profiles_config_update(self, dbt_profile_target):
+        token = dbt_profile_target.get("token")
+        return {
+            "test": {
+                "outputs": {
+                    "dev": {
+                        "type": "duckdb",
+                        "path": ":memory:",
+                        "attach": [
+                            {
+                                "path": dbt_profile_target.get("path", ":memory:") + f"?motherduck_token={token}&saas_mode=true&user=1",
                                 "type": "motherduck"
                             }
                         ]
