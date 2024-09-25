@@ -13,9 +13,9 @@ from dbt.version import __version__
 CUSTOM_USER_AGENT = "custom_user_agent"
 MOTHERDUCK_EXT = "motherduck"
 MOTHERDUCK_CONFIG_OPTIONS = [
-    "token",
-    "attach_mode",
-    "saas_mode",
+    "motherduck_token",
+    "motherduck_attach_mode",
+    "motherduck_saas_mode",
 ]
 
 
@@ -28,11 +28,16 @@ class Plugin(BasePlugin):
         return {key: value[0] for key, value in parse_qs(urlparse(path).query).items()}
 
     @staticmethod
-    def get_md_config(config):
+    def get_md_config_settings(config):
         # Get MotherDuck config settings
         md_config = {}
         for name in MOTHERDUCK_CONFIG_OPTIONS:
-            for key in [name, f"motherduck_{name}", name.upper(), f"motherduck_{name}".upper()]:
+            for key in [
+                name,
+                name.replace("motherduck_", ""),
+                name.upper(),
+                name.replace("motherduck_", "").upper(),
+            ]:
                 if key in config:
                     md_config[name] = config[key]
 
@@ -61,8 +66,8 @@ class Plugin(BasePlugin):
                 config.update(self.creds.settings)
 
             # set MD config options and remove from settings
-            for key, value in self.get_md_config(config).items():
-                conn.execute(f"SET motherduck_{key} = '{value}'")
+            for key, value in self.get_md_config_settings(config).items():
+                conn.execute(f"SET {key} = '{value}'")
                 if self.creds.settings is not None and key in self.creds.settings:
                     self.creds.settings.pop(key)
 
@@ -77,4 +82,4 @@ class Plugin(BasePlugin):
         # If a user specified MotherDuck config options via the plugin config,
         # pass it to the config kwarg in duckdb.connect.
         if not creds.is_motherduck_attach:
-            config.update(self.get_md_config(self._config))
+            config.update(self._config)
