@@ -23,7 +23,7 @@ class MotherDuckEnvironment(LocalEnvironment):
         # Get SaaS mode from DuckDB config
         con = handle.cursor()
         (motherduck_saas_mode,) = con.sql(MOTHERDUCK_SAAS_MODE_QUERY).fetchone()
-        if motherduck_saas_mode.lower() in ["1", "true"]:
+        if str(motherduck_saas_mode).lower() in ["1", "true"]:
             self._motherduck_saas_mode = True
             return True
         return False
