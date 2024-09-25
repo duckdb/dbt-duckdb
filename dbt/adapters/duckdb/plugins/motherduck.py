@@ -44,10 +44,12 @@ class Plugin(BasePlugin):
                     md_config[name] = config[key]
 
         # Sort values (SaaS mode should be set last)
-        return dict(sorted(
-            md_config.items(),
-            key=lambda x: MOTHERDUCK_CONFIG_OPTIONS.index(x[0]),
-        ))
+        return dict(
+            sorted(
+                md_config.items(),
+                key=lambda x: MOTHERDUCK_CONFIG_OPTIONS.index(x[0]),
+            )
+        )
 
     def configure_connection(self, conn: DuckDBPyConnection):
         conn.load_extension(MOTHERDUCK_EXT)
