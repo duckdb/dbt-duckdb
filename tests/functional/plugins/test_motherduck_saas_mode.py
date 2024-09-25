@@ -4,7 +4,6 @@ from dbt.tests.util import (
     run_dbt,
 )
 from dbt.artifacts.schemas.results import RunStatus
-from sqlalchemy import true
 
 random_logs_sql = """
 {{ config(materialized='table', meta=dict(temp_schema_name='dbt_temp_test')) }}
@@ -166,6 +165,7 @@ class TestMDPluginSaaSModeViaAttachWithTokenInPath(TestMDPluginSaaSMode):
     @pytest.fixture(scope="class")
     def profiles_config_update(self, dbt_profile_target):
         token = dbt_profile_target.get("token")
+        qs = f"?motherduck_token={token}&saas_mode=true&user=1"
         return {
             "test": {
                 "outputs": {
@@ -174,7 +174,7 @@ class TestMDPluginSaaSModeViaAttachWithTokenInPath(TestMDPluginSaaSMode):
                         "path": ":memory:",
                         "attach": [
                             {
-                                "path": dbt_profile_target.get("path", ":memory:") + f"?motherduck_token={token}&saas_mode=true&user=1",
+                                "path": dbt_profile_target.get("path", ":memory:") + qs,
                                 "type": "motherduck"
                             }
                         ]
