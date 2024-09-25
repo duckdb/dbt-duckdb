@@ -219,7 +219,7 @@ def _add_partition_columns(
             column
             for column in table_def["StorageDescriptor"]["Columns"]
             if not (column["Name"] == p_column["Name"] and column["Type"] == p_column["Type"])
-        ]
+        ] # type: ignore
     return table_def
 
 
