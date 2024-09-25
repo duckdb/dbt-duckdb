@@ -27,15 +27,19 @@ def _get_index(kv):
         return MOTHERDUCK_CONFIG_OPTIONS.index(key)
     return -1
 
+
 def _is_md(kv):
     return kv[0].replace("motherduck_", "") in MOTHERDUCK_CONFIG_OPTIONS
+
 
 def _get_md_config(config):
     return dict(sorted(filter(_is_md, config.items()), key=_get_index))
 
+
 def _with_prefix(key):
     _key = key.replace("motherduck_", "")
     return f"motherduck_{_key}"
+
 
 def _config_from_path(path):
     return {key: value[0] for key, value in parse_qs(urlparse(path).query).items()}
@@ -57,11 +61,12 @@ class Plugin(BasePlugin):
             # add config options specified via plugin config
             config.update(self._config)
             # add config options specified via settings
-            config.update(self.creds.settings)
+            if self.creds.settings is not None:
+                config.update(self.creds.settings)
             # set MD config options and remove from settings
             for key, value in _get_md_config(config).items():
                 conn.execute(f"SET {_with_prefix(key)} = '{value}'")
-                if key in self.creds.settings:
+                if self.creds.settings is not None and key in self.creds.settings:
                     self.creds.settings.pop(key)
 
     def update_connection_config(self, creds: DuckDBCredentials, config: Dict[str, Any]):
