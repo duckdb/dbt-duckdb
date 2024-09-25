@@ -93,17 +93,17 @@ class TestMDPluginAttach:
         # CREATE DATABASE does not work with SaaS mode on duckdb 1.0.0
         # This will be fixed in duckdb 1.1.0
         # project.run_sql(f"CREATE DATABASE IF NOT EXISTS {database_name}")
-        project.run_sql("CREATE OR REPLACE TABLE plugin_table (i integer, j string)")
-        project.run_sql("INSERT INTO plugin_table (i, j) VALUES (1, 'foo')")
+        project.run_sql(f"CREATE OR REPLACE TABLE {database_name}.plugin_table (i integer, j string)")
+        project.run_sql(f"INSERT INTO {database_name}.plugin_table (i, j) VALUES (1, 'foo')")
         yield
         project.run_sql("DROP VIEW md_table")
         project.run_sql("DROP TABLE random_logs_test")
         project.run_sql("DROP TABLE summary_of_logs_test")
-        project.run_sql("DROP TABLE plugin_table")
+        project.run_sql(f"DROP TABLE {database_name}.plugin_table")
         project.run_sql("DROP TABLE python_pyarrow_table_model")
 
     def test_motherduck(self, project):
-        run_dbt(expect_pass=False)
+        run_dbt(expect_pass=True)
 
 
 @pytest.mark.skip_profile("buenavista", "file", "memory")
