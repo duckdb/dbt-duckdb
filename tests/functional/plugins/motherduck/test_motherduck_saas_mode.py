@@ -5,6 +5,8 @@ from dbt.tests.util import (
 )
 from dbt.artifacts.schemas.results import RunStatus
 
+from dbt.adapters.duckdb.environments.motherduck import MOTHERDUCK_SAAS_MODE_QUERY
+
 random_logs_sql = """
 {{ config(materialized='table', meta=dict(temp_schema_name='dbt_temp_test')) }}
 
@@ -98,6 +100,8 @@ class TestMDPluginSaaSMode:
         project.run_sql(f"DROP TABLE {database_name}.plugin_table")
 
     def test_motherduck(self, project):
+        (motherduck_saas_mode,) = project.run_sql(MOTHERDUCK_SAAS_MODE_QUERY, fetch="one")
+        assert motherduck_saas_mode == "1"
         result = run_dbt(expect_pass=False)
         expected_msg = "Python models are disabled when MotherDuck SaaS Mode is on."
         assert [_res for _res in result.results if _res.status != RunStatus.Success][0].message == expected_msg
