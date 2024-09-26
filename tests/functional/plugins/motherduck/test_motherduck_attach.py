@@ -90,9 +90,7 @@ class TestMDPluginAttach:
     
     @pytest.fixture(autouse=True)
     def run_dbt_scope(self, project, database_name):
-        # CREATE DATABASE does not work with SaaS mode on duckdb 1.0.0
-        # This will be fixed in duckdb 1.1.0
-        # project.run_sql(f"CREATE DATABASE IF NOT EXISTS {database_name}")
+        project.run_sql(f"CREATE DATABASE IF NOT EXISTS {database_name}")
         project.run_sql(f"CREATE OR REPLACE TABLE {database_name}.plugin_table (i integer, j string)")
         project.run_sql(f"INSERT INTO {database_name}.plugin_table (i, j) VALUES (1, 'foo')")
         yield
