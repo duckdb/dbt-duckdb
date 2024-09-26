@@ -3,6 +3,9 @@ import pytest
 from dbt.tests.util import (
     run_dbt,
 )
+from dbt.artifacts.schemas.results import RunStatus
+
+from dbt.adapters.duckdb.environments.motherduck import MOTHERDUCK_SAAS_MODE_QUERY
 
 random_logs_sql = """
 {{ config(materialized='table', meta=dict(temp_schema_name='dbt_temp_test')) }}
@@ -44,24 +47,17 @@ def model(dbt, con):
 """
 
 @pytest.mark.skip_profile("buenavista", "file", "memory")
-class TestMDPluginAttach:
+class TestMDPluginSaaSMode:
     @pytest.fixture(scope="class")
     def profiles_config_update(self, dbt_profile_target):
-        md_config = {"token": dbt_profile_target.get("token")}
-        plugins = [{"module": "motherduck", "config": md_config}]
+        md_config = {"motherduck_token": dbt_profile_target.get("token"), "motherduck_saas_mode": True}
         return {
             "test": {
                 "outputs": {
                     "dev": {
                         "type": "duckdb",
-                        "path": ":memory:",
-                        "plugins": plugins,
-                        "attach": [
-                            {
-                                "path": dbt_profile_target.get("path", ":memory:"),
-                                "type": "motherduck"
-                            }
-                        ]
+                        "path": dbt_profile_target.get("path", ":memory:") + "?user=1",
+                        "config_options": md_config,
                     }
                 },
                 "target": "dev",
@@ -91,26 +87,62 @@ class TestMDPluginAttach:
     @pytest.fixture(autouse=True)
     def run_dbt_scope(self, project, database_name):
         # CREATE DATABASE does not work with SaaS mode on duckdb 1.0.0
-        # This will be fixed in duckdb 1.1.0
+        # This will be fixed in duckdb 1.1.1
         # project.run_sql(f"CREATE DATABASE IF NOT EXISTS {database_name}")
-        project.run_sql("CREATE OR REPLACE TABLE plugin_table (i integer, j string)")
-        project.run_sql("INSERT INTO plugin_table (i, j) VALUES (1, 'foo')")
+        project.run_sql(f"CREATE OR REPLACE TABLE {database_name}.plugin_table (i integer, j string)")
+        project.run_sql(f"INSERT INTO {database_name}.plugin_table (i, j) VALUES (1, 'foo')")
         yield
         project.run_sql("DROP VIEW md_table")
         project.run_sql("DROP TABLE random_logs_test")
         project.run_sql("DROP TABLE summary_of_logs_test")
-        project.run_sql("DROP TABLE plugin_table")
-        project.run_sql("DROP TABLE python_pyarrow_table_model")
+        project.run_sql(f"DROP TABLE {database_name}.plugin_table")
 
     def test_motherduck(self, project):
-        run_dbt(expect_pass=False)
+        (motherduck_saas_mode,) = project.run_sql(MOTHERDUCK_SAAS_MODE_QUERY, fetch="one")
+        if str(motherduck_saas_mode).lower() not in ["1", "true"]:
+            raise ValueError("SaaS mode was not set")
+        result = run_dbt(expect_pass=False)
+        expected_msg = "Python models are disabled when MotherDuck SaaS Mode is on."
+        assert [_res for _res in result.results if _res.status != RunStatus.Success][0].message == expected_msg
 
 
 @pytest.mark.skip_profile("buenavista", "file", "memory")
-class TestMDPluginAttachWithSettings(TestMDPluginAttach):
+class TestMDPluginSaaSModeViaAttach(TestMDPluginSaaSMode):
     @pytest.fixture(scope="class")
     def profiles_config_update(self, dbt_profile_target):
-        md_setting = {"motherduck_token": dbt_profile_target.get("token")}
+        md_config = {
+            "token": dbt_profile_target.get("token"),
+            "saas_mode": 1
+        }
+        plugins = [{"module": "motherduck", "config": md_config}]
+        return {
+            "test": {
+                "outputs": {
+                    "dev": {
+                        "type": "duckdb",
+                        "path": ":memory:",
+                        "plugins": plugins,
+                        "attach": [
+                            {
+                                "path": dbt_profile_target.get("path", ":memory:") + "?user=2",
+                                "type": "motherduck"
+                            }
+                        ]
+                    }
+                },
+                "target": "dev",
+            }
+        }
+
+
+@pytest.mark.skip_profile("buenavista", "file", "memory")
+class TestMDPluginSaaSModeViaAttachWithSettings(TestMDPluginSaaSMode):
+    @pytest.fixture(scope="class")
+    def profiles_config_update(self, dbt_profile_target):
+        md_setting = {
+            "motherduck_token": dbt_profile_target.get("token"),
+            "motherduck_saas_mode": True
+        }
         return {
             "test": {
                 "outputs": {
@@ -119,7 +151,7 @@ class TestMDPluginAttachWithSettings(TestMDPluginAttach):
                         "path": ":memory:",
                         "attach": [
                             {
-                                "path": dbt_profile_target.get("path", ":memory:"),
+                                "path": dbt_profile_target.get("path", ":memory:") + "?user=3",
                                 "type": "motherduck"
                             }
                         ],
@@ -132,10 +164,11 @@ class TestMDPluginAttachWithSettings(TestMDPluginAttach):
 
 
 @pytest.mark.skip_profile("buenavista", "file", "memory")
-class TestMDPluginAttachWithTokenInPath(TestMDPluginAttach):
+class TestMDPluginSaaSModeViaAttachWithTokenInPath(TestMDPluginSaaSMode):
     @pytest.fixture(scope="class")
     def profiles_config_update(self, dbt_profile_target):
         token = dbt_profile_target.get("token")
+        qs = f"?motherduck_token={token}&saas_mode=true&user=4"
         return {
             "test": {
                 "outputs": {
@@ -144,7 +177,7 @@ class TestMDPluginAttachWithTokenInPath(TestMDPluginAttach):
                         "path": ":memory:",
                         "attach": [
                             {
-                                "path": dbt_profile_target.get("path", ":memory:") + f"?motherduck_token={token}&user=1",
+                                "path": dbt_profile_target.get("path", ":memory:") + qs,
                                 "type": "motherduck"
                             }
                         ]

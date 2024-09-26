@@ -3,7 +3,6 @@ import pytest
 from dbt.tests.util import (
     run_dbt,
 )
-from dbt.artifacts.schemas.results import RunStatus
 
 random_logs_sql = """
 {{ config(materialized='table', meta=dict(temp_schema_name='dbt_temp_test')) }}
@@ -45,7 +44,7 @@ def model(dbt, con):
 """
 
 @pytest.mark.skip_profile("buenavista", "file", "memory")
-class TestMDPluginSaaSMode:
+class TestMDPluginAttach:
     @pytest.fixture(scope="class")
     def profiles_config_update(self, dbt_profile_target):
         md_config = {"token": dbt_profile_target.get("token")}
@@ -55,9 +54,14 @@ class TestMDPluginSaaSMode:
                 "outputs": {
                     "dev": {
                         "type": "duckdb",
-                        "path": dbt_profile_target.get("path", ":memory:"),
+                        "path": ":memory:",
                         "plugins": plugins,
-                        "config_options": {"motherduck_saas_mode": 1},
+                        "attach": [
+                            {
+                                "path": dbt_profile_target.get("path", ":memory:"),
+                                "type": "motherduck"
+                            }
+                        ]
                     }
                 },
                 "target": "dev",
@@ -86,19 +90,64 @@ class TestMDPluginSaaSMode:
     
     @pytest.fixture(autouse=True)
     def run_dbt_scope(self, project, database_name):
-        # CREATE DATABASE does not work with SaaS mode on duckdb 1.0.0
-        # This will be fixed in duckdb 1.1.0
-        # project.run_sql(f"CREATE DATABASE IF NOT EXISTS {database_name}")
-        project.run_sql("CREATE OR REPLACE TABLE plugin_table (i integer, j string)")
-        project.run_sql("INSERT INTO plugin_table (i, j) VALUES (1, 'foo')")
+        project.run_sql(f"CREATE DATABASE IF NOT EXISTS {database_name}")
+        project.run_sql(f"CREATE OR REPLACE TABLE {database_name}.plugin_table (i integer, j string)")
+        project.run_sql(f"INSERT INTO {database_name}.plugin_table (i, j) VALUES (1, 'foo')")
         yield
         project.run_sql("DROP VIEW md_table")
         project.run_sql("DROP TABLE random_logs_test")
         project.run_sql("DROP TABLE summary_of_logs_test")
-        project.run_sql("DROP TABLE plugin_table")
+        project.run_sql(f"DROP TABLE {database_name}.plugin_table")
         project.run_sql("DROP TABLE python_pyarrow_table_model")
 
     def test_motherduck(self, project):
-        result = run_dbt(expect_pass=False)
-        expected_msg = "Python models are disabled when MotherDuck SaaS Mode is on."
-        assert [_res for _res in result.results if _res.status != RunStatus.Success][0].message == expected_msg
+        run_dbt(expect_pass=True)
+
+
+@pytest.mark.skip_profile("buenavista", "file", "memory")
+class TestMDPluginAttachWithSettings(TestMDPluginAttach):
+    @pytest.fixture(scope="class")
+    def profiles_config_update(self, dbt_profile_target):
+        md_setting = {"motherduck_token": dbt_profile_target.get("token")}
+        return {
+            "test": {
+                "outputs": {
+                    "dev": {
+                        "type": "duckdb",
+                        "path": ":memory:",
+                        "attach": [
+                            {
+                                "path": dbt_profile_target.get("path", ":memory:"),
+                                "type": "motherduck"
+                            }
+                        ],
+                        "settings": md_setting
+                    }
+                },
+                "target": "dev",
+            }
+        }
+
+
+@pytest.mark.skip_profile("buenavista", "file", "memory")
+class TestMDPluginAttachWithTokenInPath(TestMDPluginAttach):
+    @pytest.fixture(scope="class")
+    def profiles_config_update(self, dbt_profile_target):
+        token = dbt_profile_target.get("token")
+        return {
+            "test": {
+                "outputs": {
+                    "dev": {
+                        "type": "duckdb",
+                        "path": ":memory:",
+                        "attach": [
+                            {
+                                "path": dbt_profile_target.get("path", ":memory:") + f"?motherduck_token={token}&user=1",
+                                "type": "motherduck"
+                            }
+                        ]
+                    }
+                },
+                "target": "dev",
+            }
+        }
