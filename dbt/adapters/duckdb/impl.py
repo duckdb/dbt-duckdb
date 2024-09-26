@@ -237,8 +237,17 @@ class DuckDBAdapter(SQLAdapter):
         """Render the given constraint as DDL text. Should be overriden by adapters which need custom constraint
         rendering."""
         if constraint.type == ConstraintType.foreign_key:
-            # DuckDB doesn't support 'foreign key' as an alias
-            return f"references {constraint.expression}"
+            if constraint.to and constraint.to_columns:
+                # TODO: this is a hack to get around a limitation in DuckDB around setting FKs
+                # across databases.
+                pieces = constraint.to.split(".")
+                if len(pieces) > 2:
+                    constraint_to = ".".join(pieces[1:])
+                else:
+                    constraint_to = constraint.to
+                return f"references {constraint_to} ({', '.join(constraint.to_columns)})"
+            else:
+                return f"references {constraint.expression}"
         else:
             return super().render_column_constraint(constraint)
 
