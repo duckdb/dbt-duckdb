@@ -2,6 +2,7 @@ import os
 import resource
 import subprocess
 import time
+from importlib import metadata
 
 import duckdb
 import pytest
@@ -21,6 +22,14 @@ TEST_MOTHERDUCK_TOKEN = "TEST_MOTHERDUCK_TOKEN"
 
 def pytest_addoption(parser):
     parser.addoption("--profile", action="store", default="memory", type=str)
+
+
+def pytest_report_header() -> list[str]:
+    """Return a list of strings to be displayed in the header of the report."""
+    return [
+        f"duckdb: {metadata.version('duckdb')}",
+        f"dbt-core: {metadata.version('dbt-core')}",
+    ]
 
 
 @pytest.fixture(scope="session")

@@ -11,7 +11,9 @@ from . import BasePlugin
 from . import pd_utils
 from ..utils import SourceConfig
 from ..utils import TargetConfig
-from dbt.logger import GLOBAL_LOGGER as logger
+from dbt.adapters.events.logging import AdapterLogger
+
+logger = AdapterLogger("DuckDB")
 
 
 class Plugin(BasePlugin):
