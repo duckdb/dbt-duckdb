@@ -5,7 +5,7 @@ from typing import Any
 from typing import Dict
 from typing import List
 from typing import Optional
-from typing import Tuple
+from typing import Union
 from urllib.parse import urlparse
 
 from dbt_common.dataclass_schema import dbtClassMixin
@@ -81,6 +81,12 @@ class Retries(dbtClassMixin):
 
 
 @dataclass
+class Extension(dbtClassMixin):
+    name: str
+    repo: str
+
+
+@dataclass
 class DuckDBCredentials(Credentials):
     database: str = "main"
     schema: str = "main"
@@ -91,7 +97,7 @@ class DuckDBCredentials(Credentials):
     config_options: Optional[Dict[str, Any]] = None
 
     # any DuckDB extensions we want to install and load (httpfs, parquet, etc.)
-    extensions: Optional[Tuple[str, ...]] = None
+    extensions: Optional[List[Union[str, Dict[str, str]]]] = None
 
     # any additional pragmas we want to configure on our DuckDB connections;
     # a list of the built-in pragmas can be found here:

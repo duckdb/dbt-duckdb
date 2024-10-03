@@ -12,6 +12,7 @@ import duckdb
 from dbt_common.exceptions import DbtRuntimeError
 
 from ..credentials import DuckDBCredentials
+from ..credentials import Extension
 from ..plugins import BasePlugin
 from ..utils import SourceConfig
 from ..utils import TargetConfig
@@ -167,8 +168,16 @@ class Environment(abc.ABC):
         # install any extensions on the connection
         if creds.extensions is not None:
             for extension in creds.extensions:
-                conn.install_extension(extension)
-                conn.load_extension(extension)
+                if isinstance(extension, str):
+                    conn.install_extension(extension)
+                    conn.load_extension(extension)
+                elif isinstance(extension, dict):
+                    try:
+                        ext = Extension(**extension)
+                    except Exception as e:
+                        raise DbtRuntimeError(f"Failed to parse extension: {e}")
+                    conn.execute(f"install {ext.name} from {ext.repo}")
+                    conn.load_extension(ext.name)
 
         # Attach any fsspec filesystems on the database
         if creds.filesystems:
