@@ -252,7 +252,7 @@ class DuckDBAdapter(SQLAdapter):
             return super().render_column_constraint(constraint)
 
     def _clean_up_temp_relation_for_incremental(self, config):
-        if self.is_motherduck():
+        if self.is_motherduck() and hasattr(config, "model"):
             if "incremental" == config.model.get_materialization():
                 temp_relation = self.Relation(
                     path=self.get_temp_relation_path(config.model), type=RelationType.Table
@@ -264,10 +264,11 @@ class DuckDBAdapter(SQLAdapter):
         Cleans up the remote temporary table on MotherDuck before running
         an incremental model.
         """
-        self._temp_schema_name = config.model.config.meta.get(
-            TEMP_SCHEMA_NAME, self._temp_schema_name
-        )
-        self._clean_up_temp_relation_for_incremental(config)
+        if hasattr(config, "model"):
+            self._temp_schema_name = config.model.config.meta.get(
+                TEMP_SCHEMA_NAME, self._temp_schema_name
+            )
+            self._clean_up_temp_relation_for_incremental(config)
         super().pre_model_hook(config)
 
     @available
