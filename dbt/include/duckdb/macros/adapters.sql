@@ -30,7 +30,7 @@
     select schema_name
     from system.information_schema.schemata
     {% if database is not none %}
-    where catalog_name = '{{ database }}'
+    where lower(catalog_name) = '{{ database | lower }}'
     {% endif %}
   {% endset %}
   {{ return(run_query(sql)) }}
