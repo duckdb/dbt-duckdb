@@ -2,7 +2,7 @@
   {%- call statement('create_schema') -%}
     {% set sql %}
         select type from duckdb_databases()
-        where database_name='{{ relation.database }}'
+        where lower(database_name)='{{ relation.database | lower }}'
         and type='sqlite'
     {% endset %}
     {% set results = run_query(sql) %}
@@ -135,7 +135,7 @@ def materialize(df, con):
       and table_schema = '{{ relation.schema }}'
       {% endif %}
       {% if relation.database %}
-      and table_catalog = '{{ relation.database }}'
+      and lower(table_catalog) = '{{ relation.database | lower }}'
       {% endif %}
       order by ordinal_position
 
@@ -157,7 +157,7 @@ def materialize(df, con):
         END as type
     from system.information_schema.tables
     where table_schema = '{{ schema_relation.schema }}'
-    and table_catalog = '{{ schema_relation.database }}'
+    and lower(table_catalog) = '{{ schema_relation.database | lower }}'
   {% endcall %}
   {{ return(load_result('list_relations_without_caching').table) }}
 {% endmacro %}

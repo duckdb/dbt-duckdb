@@ -1,3 +1,12 @@
+"""
+Test that the generate database name macro is case insensitive
+
+See DuckDB docs: https://duckdb.org/docs/sql/dialect/keywords_and_identifiers.html
+
+"Identifiers in DuckDB are always case-insensitive, similarly to PostgreSQL.
+However, unlike PostgreSQL (and some other major SQL implementations), DuckDB also
+treats quoted identifiers as case-insensitive."
+"""
 from urllib.parse import urlparse
 import pytest
 
@@ -14,7 +23,7 @@ from tests.functional.plugins.motherduck.fixtures import (
 
 class TestMacrosGenerateDatabaseName:
     @pytest.fixture(scope="class")
-    def database_name(self, dbt_profile_target):
+    def database_name(self, dbt_profile_target, request):
         return urlparse(dbt_profile_target["path"]).path + "_ducky_ducky"
 
     @pytest.fixture(autouse=True)
@@ -38,19 +47,23 @@ class TestMacrosGenerateDatabaseName:
     @pytest.fixture(scope="class")
     def macros(self):
         return {"db_name.sql": macros__generate_database_name}
-
-    @pytest.fixture(scope="class")
-    def project_config_update(self):
+    
+    @staticmethod
+    def gen_project_config_update(build_env, org_prefix):
         return {
             "config-version": 2,
             "vars": {
                 "test": {
-                    "build_env": "DUCKY",
-                    "org_prefix": "DUCKY"
+                    "build_env": build_env,
+                    "org_prefix": org_prefix
                 },
             },
             "macro-paths": ["macros"],
         }
+
+    @pytest.fixture(scope="class")
+    def project_config_update(self):
+        return self.gen_project_config_update("ducky", "ducky")
 
     def test_dbname_macro(self, project):
         # seed command
@@ -58,13 +71,37 @@ class TestMacrosGenerateDatabaseName:
         assert len(results) == 1
         check_result_nodes_by_name(results, ["seed"])
 
-        # run command
-        results = run_dbt(["run"])
-        assert len(results) == 1
-        check_result_nodes_by_name(results, ["model"])
+        for _ in range(3):
+            results = run_dbt(["run"])
+            assert len(results) == 1
+            check_result_nodes_by_name(results, ["model"])
 
-        # run second time
-        results = run_dbt(["run"], expect_pass=False)
-        assert len(results) == 1
-        assert """Catalog Error: Could not rename "model__dbt_tmp" to "model": another entry with this name already exists!""" \
-        in results[0].message
+
+class TestMacrosGenerateDatabaseNameUpperCase(TestMacrosGenerateDatabaseName):
+    @pytest.fixture(scope="class")
+    def database_name(self, dbt_profile_target, request):
+        return urlparse(dbt_profile_target["path"]).path + "_ducky_ducky"
+
+    @pytest.fixture(scope="class")
+    def project_config_update(self):
+        return self.gen_project_config_update("DUCKY", "DUCKY")
+
+
+class TestMacrosGenerateDatabaseNameLowerCase(TestMacrosGenerateDatabaseName):
+    @pytest.fixture(scope="class")
+    def database_name(self, dbt_profile_target, request):
+        return urlparse(dbt_profile_target["path"]).path + "_DUCKY_DUCKY"
+
+    @pytest.fixture(scope="class")
+    def project_config_update(self):
+        return self.gen_project_config_update("ducky", "ducky")
+
+
+class TestMacrosGenerateDatabaseNameAllMixedCase(TestMacrosGenerateDatabaseName):
+    @pytest.fixture(scope="class")
+    def database_name(self, dbt_profile_target, request):
+        return urlparse(dbt_profile_target["path"]).path + "_dUcKy_DUckY"
+
+    @pytest.fixture(scope="class")
+    def project_config_update(self):
+        return self.gen_project_config_update("DuCkY", "dUcKy")
