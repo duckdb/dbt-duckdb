@@ -62,3 +62,9 @@ class TestMacrosGenerateDatabaseName:
         results = run_dbt(["run"])
         assert len(results) == 1
         check_result_nodes_by_name(results, ["model"])
+
+        # run second time
+        results = run_dbt(["run"], expect_pass=False)
+        assert len(results) == 1
+        assert """Catalog Error: Could not rename "model__dbt_tmp" to "model": another entry with this name already exists!""" \
+        in results[0].message
