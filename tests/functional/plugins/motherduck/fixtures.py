@@ -16,6 +16,13 @@ macros__generate_database_name = """
 {%- endmacro %}
 """
 
+
+macros__generate_schema_name = """
+{% macro generate_schema_name(custom_schema_name=none, node=none) -%}
+    {{ target.schema | trim }}_{{ var("build_env") | trim }}_{{ var("org_prefix") | trim }}
+{%- endmacro %}
+"""
+
 #
 # Seeds
 #

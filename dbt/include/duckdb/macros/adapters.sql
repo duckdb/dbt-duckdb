@@ -40,8 +40,8 @@
   {% set sql -%}
         select count(*)
         from system.information_schema.schemata
-        where schema_name = '{{ schema }}'
-        and catalog_name = '{{ information_schema.database }}'
+        where lower(schema_name) = '{{ schema | lower }}'
+        and lower(catalog_name) = '{{ information_schema.database | lower }}'
   {%- endset %}
   {{ return(run_query(sql)) }}
 {% endmacro %}
@@ -132,7 +132,7 @@ def materialize(df, con):
       from system.information_schema.columns
       where table_name = '{{ relation.identifier }}'
       {% if relation.schema %}
-      and table_schema = '{{ relation.schema }}'
+      and lower(table_schema) = '{{ relation.schema | lower }}'
       {% endif %}
       {% if relation.database %}
       and lower(table_catalog) = '{{ relation.database | lower }}'
@@ -156,7 +156,7 @@ def materialize(df, con):
         WHEN 'LOCAL TEMPORARY' THEN 'table'
         END as type
     from system.information_schema.tables
-    where table_schema = '{{ schema_relation.schema }}'
+    where lower(table_schema) = '{{ schema_relation.schema | lower }}'
     and lower(table_catalog) = '{{ schema_relation.database | lower }}'
   {% endcall %}
   {{ return(load_result('list_relations_without_caching').table) }}

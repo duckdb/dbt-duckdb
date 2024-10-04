@@ -17,6 +17,7 @@ from dbt.tests.util import (
 from tests.functional.plugins.motherduck.fixtures import (
     models__gen_data_macro,
     macros__generate_database_name,
+    macros__generate_schema_name,
     seeds__example_seed_csv,
 )
 
@@ -47,7 +48,10 @@ class TestMacrosGenerateDatabaseName:
 
     @pytest.fixture(scope="class")
     def macros(self):
-        return {"db_name.sql": macros__generate_database_name}
+        return {
+            "db_name.sql": macros__generate_database_name,
+            "schema_name.sql": macros__generate_schema_name
+        }
     
     @staticmethod
     def gen_project_config_update(build_env, org_prefix):
