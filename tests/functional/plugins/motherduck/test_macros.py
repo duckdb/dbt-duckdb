@@ -21,6 +21,7 @@ from tests.functional.plugins.motherduck.fixtures import (
 )
 
 
+@pytest.mark.skip_profile("buenavista", "file", "memory")
 class TestMacrosGenerateDatabaseName:
     @pytest.fixture(scope="class")
     def database_name(self, dbt_profile_target, request):
@@ -77,6 +78,7 @@ class TestMacrosGenerateDatabaseName:
             check_result_nodes_by_name(results, ["model"])
 
 
+@pytest.mark.skip_profile("buenavista", "file", "memory")
 class TestMacrosGenerateDatabaseNameUpperCase(TestMacrosGenerateDatabaseName):
     @pytest.fixture(scope="class")
     def database_name(self, dbt_profile_target, request):
@@ -87,6 +89,7 @@ class TestMacrosGenerateDatabaseNameUpperCase(TestMacrosGenerateDatabaseName):
         return self.gen_project_config_update("DUCKY", "DUCKY")
 
 
+@pytest.mark.skip_profile("buenavista", "file", "memory")
 class TestMacrosGenerateDatabaseNameLowerCase(TestMacrosGenerateDatabaseName):
     @pytest.fixture(scope="class")
     def database_name(self, dbt_profile_target, request):
@@ -97,6 +100,7 @@ class TestMacrosGenerateDatabaseNameLowerCase(TestMacrosGenerateDatabaseName):
         return self.gen_project_config_update("ducky", "ducky")
 
 
+@pytest.mark.skip_profile("buenavista", "file", "memory")
 class TestMacrosGenerateDatabaseNameAllMixedCase(TestMacrosGenerateDatabaseName):
     @pytest.fixture(scope="class")
     def database_name(self, dbt_profile_target, request):
