@@ -59,9 +59,28 @@ option that will be automatically enabled if you are connecting to a MotherDuck 
 
 #### DuckDB Extensions, Settings, and Filesystems
 
-You can load any supported [DuckDB extensions](https://duckdb.org/docs/extensions/overview) by listing them in
-the `extensions` field in your profile. You can also set any additional [DuckDB configuration options](https://duckdb.org/docs/sql/configuration)
-via the `settings` field, including options that are supported in any loaded extensions. To use the [DuckDB Secrets Manager](https://duckdb.org/docs/configuration/secrets_manager.html), you can use the `secrets` field. For example, to be able to connect to S3 and read/write
+You can install and load any core [DuckDB extensions](https://duckdb.org/docs/extensions/overview) by listing them in
+the `extensions` field in your profile as a string. You can also set any additional [DuckDB configuration options](https://duckdb.org/docs/sql/configuration)
+via the `settings` field, including options that are supported in the loaded extensions. You can also configure extensions from outside of the core
+extension repository (e.g., a community extension) by configuring the extension as a `name`/`repo` pair:
+
+```
+default:
+  outputs:
+    dev:
+      type: duckdb
+      path: /tmp/dbt.duckdb
+      extensions:
+        - httpfs
+        - parquet
+        - name: h3
+          repo: community
+        - name: uc_catalog
+          repo: core_nightly
+  target: dev
+```
+
+To use the [DuckDB Secrets Manager](https://duckdb.org/docs/configuration/secrets_manager.html), you can use the `secrets` field. For example, to be able to connect to S3 and read/write
 Parquet files using an AWS access key and secret, your profile would look something like this:
 
 ```
