@@ -241,6 +241,6 @@ def materialize(df, con):
 {% macro duckdb__apply_grants(relation, grant_config, should_revoke=True) %}
     {#-- If grant_config is {} or None, this is a no-op --#}
     {% if grant_config %}
-      {{ log('Grants for relation ' ~ relation.render() ~ ' are not supported by DuckDB') }}
+      {{ adapter.warn_once('Grants for relations are not supported by DuckDB') }}
     {% endif %}
 {% endmacro %}

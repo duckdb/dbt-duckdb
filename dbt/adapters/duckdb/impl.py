@@ -22,6 +22,7 @@ from dbt.adapters.duckdb.connections import DuckDBConnectionManager
 from dbt.adapters.duckdb.relation import DuckDBRelation
 from dbt.adapters.duckdb.utils import TargetConfig
 from dbt.adapters.duckdb.utils import TargetLocation
+from dbt.adapters.events.logging import AdapterLogger
 from dbt.adapters.sql import SQLAdapter
 
 
@@ -30,6 +31,8 @@ DEFAULT_TEMP_SCHEMA_NAME = "dbt_temp"
 
 if TYPE_CHECKING:
     import agate
+
+logger = AdapterLogger("DuckDB")
 
 
 class DuckDBAdapter(SQLAdapter):
@@ -171,6 +174,11 @@ class DuckDBAdapter(SQLAdapter):
             return ".".join(["/".join(globs), str(rendered_options.get("format", "parquet"))])
         return write_location
 
+    @available
+    def warn_once(self, msg: str):
+        """Post a warning message once per dbt execution."""
+        DuckDBConnectionManager.warn_once(msg)
+
     def valid_incremental_strategies(self) -> Sequence[str]:
         """DuckDB does not currently support MERGE statement."""
         return ["append", "delete+insert"]
@@ -255,7 +263,8 @@ class DuckDBAdapter(SQLAdapter):
         if self.is_motherduck() and hasattr(config, "model"):
             if "incremental" == config.model.get_materialization():
                 temp_relation = self.Relation(
-                    path=self.get_temp_relation_path(config.model), type=RelationType.Table
+                    path=self.get_temp_relation_path(config.model),
+                    type=RelationType.Table,
                 )
                 self.drop_relation(temp_relation)
 
@@ -278,7 +287,9 @@ class DuckDBAdapter(SQLAdapter):
         table that is dropped at the end of the incremental macro or post-model hook.
         """
         return Path(
-            schema=self._temp_schema_name, database=model.database, identifier=model.identifier
+            schema=self._temp_schema_name,
+            database=model.database,
+            identifier=model.identifier,
         )
 
     def post_model_hook(self, config: Any, context: Any) -> None:
