@@ -3,6 +3,7 @@ import threading
 from contextlib import contextmanager
 from multiprocessing.context import SpawnContext
 from typing import Optional
+from typing import Set
 from typing import Tuple
 from typing import TYPE_CHECKING
 
@@ -25,6 +26,7 @@ class DuckDBConnectionManager(SQLConnectionManager):
     TYPE = "duckdb"
     _LOCK = threading.RLock()
     _ENV = None
+    _LOGGED_MESSAGES: Set[str] = set()
 
     def __init__(self, config: AdapterRequiredConfig, mp_context: SpawnContext) -> None:
         super().__init__(config, mp_context)
@@ -67,6 +69,15 @@ class DuckDBConnectionManager(SQLConnectionManager):
 
         connection = super(SQLConnectionManager, cls).close(connection)
         return connection
+
+    @classmethod
+    def warn_once(cls, msg: str):
+        """Post a warning message once per dbt execution."""
+        with cls._LOCK:
+            if msg in cls._LOGGED_MESSAGES:
+                return
+            cls._LOGGED_MESSAGES.add(msg)
+            logger.warning(msg)
 
     def cancel(self, connection: Connection):
         if self._ENV is not None:
