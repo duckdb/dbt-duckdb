@@ -5,6 +5,8 @@
   {%- set format = config.get('format', 'parquet') -%}
   {%- set write_options = adapter.external_write_options(location, rendered_options) -%}
   {%- set read_location = adapter.external_read_location(location, rendered_options) -%}
+  {%- set parquet_read_options = config.get('parquet_read_options', {'union_by_name': False}) -%}
+  {%- set json_read_options = config.get('json_read_options', {'maximum_object_size': 1000000000}) -%}
 
   -- set language - python or sql
   {%- set language = model['language'] -%}
@@ -49,9 +51,37 @@
   {{ write_to_file(temp_relation, location, write_options) }}
   -- create a view on top of the location
   {% call statement('main', language='sql') -%}
-    create or replace view {{ intermediate_relation }} as (
+    {% elif format == 'json' %}
+      create or replace view {{ intermediate_relation }} as (
+        select * from read_json_auto('{{ read_location }}'
+        {%- for key, value in json_read_options.items() -%}
+          , {{ key }}=
+          {%- if value is string -%}
+            '{{ value }}'
+          {%- else -%}
+            {{ value }}
+          {%- endif -%}
+        {%- endfor -%}
+        )
+      );
+    {% elif format == 'parquet' %}
+      create or replace view {{ intermediate_relation }} as (
+        select * from read_parquet('{{ read_location }}'
+        {%- for key, value in parquet_read_options.items() -%}
+          , {{ key }}=
+          {%- if value is string -%}
+            '{{ value }}'
+          {%- else -%}
+            {{ value }}
+          {%- endif -%}
+        {%- endfor -%}
+        )
+      );
+    {% else %}
+      create or replace view {{ intermediate_relation }} as (
         select * from '{{ read_location }}'
-    );
+      );
+    {% endif %}
   {%- endcall %}
 
   -- cleanup

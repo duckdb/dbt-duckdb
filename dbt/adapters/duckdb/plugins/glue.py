@@ -3,7 +3,7 @@ from typing import Dict
 from typing import List
 from typing import Optional
 from typing import Sequence
-
+import re
 import boto3
 from mypy_boto3_glue import GlueClient
 from mypy_boto3_glue.type_defs import ColumnTypeDef
@@ -65,6 +65,16 @@ def _dbt2glue(dtype: str, ignore_null: bool = False) -> str:  # pragma: no cover
         return "date"
     if data_type.lower() in ["blob", "bytea", "binary", "varbinary"]:
         return "binary"
+    if data_type.lower() in ["struct"]:
+        struct_fields = re.findall(r"(\w+)\s+(\w+)", dtype[dtype.find("(")+1:dtype.rfind(")")])
+        glue_fields = []
+        for field_name, field_type in struct_fields:
+            glue_field_type = _dbt2glue(field_type)
+            glue_fields.append(f"{field_name}:{glue_field_type}")
+        struct_schema = f"struct<{','.join(glue_fields)}>"
+        if dtype.strip().endswith("[]"):
+            return f"array<{struct_schema}>"
+        return struct_schema
     if data_type is None:
         if ignore_null:
             return ""
