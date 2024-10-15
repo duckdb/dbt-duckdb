@@ -1,3 +1,4 @@
+import re
 from typing import Any
 from typing import Dict
 from typing import List
@@ -66,7 +67,7 @@ def _dbt2glue(dtype: str, ignore_null: bool = False) -> str:  # pragma: no cover
     if data_type.lower() in ["blob", "bytea", "binary", "varbinary"]:
         return "binary"
     if data_type.lower() in ["struct"]:
-        struct_fields = re.findall(r"(\w+)\s+(\w+)", dtype[dtype.find("(")+1:dtype.rfind(")")])
+        struct_fields = re.findall(r"(\w+)\s+(\w+)", dtype[dtype.find("(") + 1 : dtype.rfind(")")])
         glue_fields = []
         for field_name, field_type in struct_fields:
             glue_field_type = _dbt2glue(field_type)
