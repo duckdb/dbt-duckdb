@@ -6,7 +6,8 @@
   {%- set write_options = adapter.external_write_options(location, rendered_options) -%}
   {%- set read_location = adapter.external_read_location(location, rendered_options) -%}
   {%- set parquet_read_options = config.get('parquet_read_options', {'union_by_name': False}) -%}
-  {%- set json_read_options = config.get('json_read_options', {'maximum_object_size': 1000000000}) -%}
+  {%- set json_read_options = config.get('json_read_options', {'auto_detect': False}) -%}
+  {%- set csv_read_options = config.get('csv_read_options', {'auto_detect': False}) -%}
 
   -- set language - python or sql
   {%- set language = model['language'] -%}
@@ -47,13 +48,14 @@
     {{- create_table_as(False, temp_relation, compiled_code, language) }}
   {%- endcall %}
 
-  -- write an temp relation into file
-  {{ write_to_file(temp_relation, location, write_options) }}
-  -- create a view on top of the location
+-- write a temp relation into file
+{{ write_to_file(temp_relation, location, write_options) }}
+
+-- create a view on top of the location
   {% call statement('main', language='sql') -%}
-    {% elif format == 'json' %}
+    {% if format == 'json' %}
       create or replace view {{ intermediate_relation }} as (
-        select * from read_json_auto('{{ read_location }}'
+        select * from read_json('{{ read_location }}'
         {%- for key, value in json_read_options.items() -%}
           , {{ key }}=
           {%- if value is string -%}
@@ -77,6 +79,19 @@
         {%- endfor -%}
         )
       );
+    {% elif format == 'csv' %}
+    create or replace view {{ intermediate_relation }} as (
+      select * from read_csv('{{ read_location }}'
+      {%- for key, value in csv_read_options.items() -%}
+        , {{ key }}=
+        {%- if value is string -%}
+          '{{ value }}'
+        {%- else -%}
+          {{ value }}
+        {%- endif -%}
+      {%- endfor -%}
+      )
+    );
     {% else %}
       create or replace view {{ intermediate_relation }} as (
         select * from '{{ read_location }}'
