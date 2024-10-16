@@ -4,6 +4,7 @@ from typing import Dict
 from typing import List
 from typing import Optional
 from typing import Sequence
+
 import boto3
 from mypy_boto3_glue import GlueClient
 from mypy_boto3_glue.type_defs import ColumnTypeDef
