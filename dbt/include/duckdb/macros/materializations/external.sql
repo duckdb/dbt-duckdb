@@ -6,8 +6,8 @@
   {%- set write_options = adapter.external_write_options(location, rendered_options) -%}
   {%- set read_location = adapter.external_read_location(location, rendered_options) -%}
   {%- set parquet_read_options = config.get('parquet_read_options', {'union_by_name': False}) -%}
-  {%- set json_read_options = config.get('json_read_options', {'auto_detect': False}) -%}
-  {%- set csv_read_options = config.get('csv_read_options', {'auto_detect': False}) -%}
+  {%- set json_read_options = config.get('json_read_options', {'auto_detect': True}) -%}
+  {%- set csv_read_options = config.get('csv_read_options', {'auto_detect': True}) -%}
 
   -- set language - python or sql
   {%- set language = model['language'] -%}
