@@ -278,6 +278,7 @@ def _get_table_def(
 def _get_glue_client(
     settings: Dict[str, Any], secrets: Optional[List[Dict[str, Any]]]
 ) -> "GlueClient":
+    client = None
     if secrets is not None:
         for secret in secrets:
             if isinstance(secret, Secret) and "config" == str(secret.provider).lower():
@@ -290,16 +291,17 @@ def _get_glue_client(
                     region_name=secret_kwargs.get("region"),
                 )
                 break
-    elif settings:
-        client = boto3.client(
-            "glue",
-            aws_access_key_id=settings.get("s3_access_key_id"),
-            aws_secret_access_key=settings.get("s3_secret_access_key"),
-            aws_session_token=settings.get("s3_session_token"),
-            region_name=settings.get("s3_region"),
-        )
-    else:
-        client = boto3.client("glue")
+    if client is None:
+        if settings:
+            client = boto3.client(
+                "glue",
+                aws_access_key_id=settings.get("s3_access_key_id"),
+                aws_secret_access_key=settings.get("s3_secret_access_key"),
+                aws_session_token=settings.get("s3_session_token"),
+                region_name=settings.get("s3_region"),
+            )
+        else:
+            client = boto3.client("glue")
     return client
 
 
