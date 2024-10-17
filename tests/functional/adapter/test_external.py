@@ -23,11 +23,11 @@ config_materialized_csv = """
 """
 
 config_materialized_parquet_location = """
-  {{ config(materialized="external", location="{{ adapter.external_root() }}/test.parquet", format="parquet") }}
+  {{ config(materialized="external", location="{{ adapter.external_root() }}/test.parquet") }}
 """
 
 config_materialized_csv_location_delim = """
-  {{ config(materialized="external", location="{{ adapter.external_root() }}/test_delim.csv", delimiter="|", format="csv") }}
+  {{ config(materialized="external", location="{{ adapter.external_root() }}/test_delim.csv", delimiter="|") }}
 """
 
 config_json = """

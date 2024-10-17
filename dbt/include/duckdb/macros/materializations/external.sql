@@ -2,7 +2,17 @@
 
   {%- set location = render(config.get('location', default=external_location(this, config))) -%})
   {%- set rendered_options = render_write_options(config) -%}
-  {%- set format = config.get('format', 'parquet') -%}
+
+  {%- set format = config.get('format') -%}
+  {%- set allowed_formats = ['csv', 'parquet', 'json'] -%}
+
+  {%- if format -%}
+      {%- set format = format if format in allowed_formats else 'parquet' -%}
+  {%- else -%}
+      {%- set format = location.split('.')[-1] if '.' in location else 'parquet' -%}
+      {%- set format = format if format in allowed_formats else 'parquet' -%}
+  {%- endif -%}
+
   {%- set write_options = adapter.external_write_options(location, rendered_options) -%}
   {%- set read_location = adapter.external_read_location(location, rendered_options) -%}
   {%- set parquet_read_options = config.get('parquet_read_options', {'union_by_name': False}) -%}
