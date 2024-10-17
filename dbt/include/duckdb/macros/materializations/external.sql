@@ -5,12 +5,13 @@
 
   {%- set format = config.get('format') -%}
   {%- set allowed_formats = ['csv', 'parquet', 'json'] -%}
-
   {%- if format -%}
-      {%- set format = format if format in allowed_formats else 'parquet' -%}
+      {%- if format not in allowed_formats -%}
+          {{ exceptions.raise_compiler_error("Invalid format: " ~ format ~ ". Allowed formats are: " ~ allowed_formats | join(', ')) }}
+      {%- endif -%}
   {%- else -%}
-      {%- set format = location.split('.')[-1] if '.' in location else 'parquet' -%}
-      {%- set format = format if format in allowed_formats else 'parquet' -%}
+    {%- set format = location.split('.')[-1].lower() if '.' in location else 'parquet' -%}
+    {%- set format = format if format in allowed_formats else 'parquet' -%}
   {%- endif -%}
 
   {%- set write_options = adapter.external_write_options(location, rendered_options) -%}
@@ -58,8 +59,8 @@
     {{- create_table_as(False, temp_relation, compiled_code, language) }}
   {%- endcall %}
 
--- write a temp relation into file
-{{ write_to_file(temp_relation, location, write_options) }}
+  -- write a temp relation into file
+  {{ write_to_file(temp_relation, location, write_options) }}
 
 -- create a view on top of the location
   {% call statement('main', language='sql') -%}
@@ -102,10 +103,6 @@
       {%- endfor -%}
       )
     );
-    {% else %}
-      create or replace view {{ intermediate_relation }} as (
-        select * from '{{ read_location }}'
-      );
     {% endif %}
   {%- endcall %}
 
