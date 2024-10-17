@@ -1,3 +1,4 @@
+import re
 from typing import Any
 from typing import Dict
 from typing import List
@@ -65,6 +66,16 @@ def _dbt2glue(dtype: str, ignore_null: bool = False) -> str:  # pragma: no cover
         return "date"
     if data_type.lower() in ["blob", "bytea", "binary", "varbinary"]:
         return "binary"
+    if data_type.lower() in ["struct"]:
+        struct_fields = re.findall(r"(\w+)\s+(\w+)", dtype[dtype.find("(") + 1 : dtype.rfind(")")])
+        glue_fields = []
+        for field_name, field_type in struct_fields:
+            glue_field_type = _dbt2glue(field_type)
+            glue_fields.append(f"{field_name}:{glue_field_type}")
+        struct_schema = f"struct<{','.join(glue_fields)}>"
+        if dtype.strip().endswith("[]"):
+            return f"array<{struct_schema}>"
+        return struct_schema
     if data_type is None:
         if ignore_null:
             return ""
@@ -267,6 +278,7 @@ def _get_table_def(
 def _get_glue_client(
     settings: Dict[str, Any], secrets: Optional[List[Dict[str, Any]]]
 ) -> "GlueClient":
+    client = None
     if secrets is not None:
         for secret in secrets:
             if isinstance(secret, Secret) and "config" == str(secret.provider).lower():
@@ -279,16 +291,17 @@ def _get_glue_client(
                     region_name=secret_kwargs.get("region"),
                 )
                 break
-    elif settings:
-        client = boto3.client(
-            "glue",
-            aws_access_key_id=settings.get("s3_access_key_id"),
-            aws_secret_access_key=settings.get("s3_secret_access_key"),
-            aws_session_token=settings.get("s3_session_token"),
-            region_name=settings.get("s3_region"),
-        )
-    else:
-        client = boto3.client("glue")
+    if client is None:
+        if settings:
+            client = boto3.client(
+                "glue",
+                aws_access_key_id=settings.get("s3_access_key_id"),
+                aws_secret_access_key=settings.get("s3_secret_access_key"),
+                aws_session_token=settings.get("s3_session_token"),
+                region_name=settings.get("s3_region"),
+            )
+        else:
+            client = boto3.client("glue")
     return client
 
 
