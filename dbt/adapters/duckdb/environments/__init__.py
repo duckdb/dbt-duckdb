@@ -179,6 +179,10 @@ class Environment(abc.ABC):
                     conn.execute(f"install {ext.name} from {ext.repo}")
                     conn.load_extension(ext.name)
 
+        # Create/update secrets on the database
+        for sql in creds.secrets_sql():
+            conn.execute(sql)
+
         # Attach any fsspec filesystems on the database
         if creds.filesystems:
             import fsspec
@@ -215,9 +219,6 @@ class Environment(abc.ABC):
                 # Okay to set these as strings because DuckDB will cast them
                 # to the correct type
                 cursor.execute(f"SET {key} = '{value}'")
-
-        for sql in creds.secrets_sql():
-            cursor.execute(sql)
 
         # update cursor if something is lost in the copy
         # of the parent connection
