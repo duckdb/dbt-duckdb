@@ -3,6 +3,7 @@
 {% set upstream_nodes = {} %}
 {% set upstream_schemas = {} %}
 {% for node in selected_resources %}
+  {% if node not in graph['nodes'] %}{% continue %}{% endif %}
   {% for upstream_node in graph['nodes'][node]['depends_on']['nodes'] %}
     {% if upstream_node not in upstream_nodes and upstream_node not in selected_resources %}
       {% do upstream_nodes.update({upstream_node: None}) %}
