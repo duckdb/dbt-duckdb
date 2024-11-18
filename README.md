@@ -163,13 +163,15 @@ default:
           read_only: true
         - path: sqlite.db
           type: sqlite
+        - path: postgresql://username@hostname/dbname
+          type: postgres
 ```
 
 The attached databases may be referred to in your dbt sources and models by either the basename of the database file minus its suffix (e.g., `/tmp/other.duckdb` is the `other` database
 and `s3://yep/even/this/works.duckdb` is the `works` database) or by an alias that you specify (so the `./yet/another.duckdb` database in the above configuration is referred to
 as `yet_another` instead of `another`.) Note that these additional databases do not necessarily have to be DuckDB files: DuckDB's storage and catalog engines are pluggable, and
-DuckDB `0.7.0` ships with support for reading and writing from attached SQLite databases. You can indicate the type of the database you are connecting to via the `type` argument,
-which currently supports `duckdb` and `sqlite`.
+DuckDB `0.7.0` ships with support for reading and writing from attached databases. You can indicate the type of the database you are connecting to via the `type` argument,
+which currently supports `duckdb`, `sqlite` and `postgres`.
 
 #### Configuring dbt-duckdb Plugins
 
