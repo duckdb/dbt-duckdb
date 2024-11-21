@@ -51,6 +51,15 @@
 			]
 		}
 	},
+	// "features": {
+	// 	// Allow the devcontainer to run host docker commands, see https://github.com/devcontainers/templates/tree/main/src/docker-outside-of-docker
+	// 	"ghcr.io/devcontainers/features/docker-outside-of-docker:1": {
+	// 		"enableNonRootDocker": true
+	// 	}
+	// },
+	// "mounts": [
+    	// 	"source=/var/run/docker.sock,target=/var/run/docker.sock,type=bind"
+  	// ],
 	// Use 'forwardPorts' to make a list of ports inside the container available locally.
 	// "forwardPorts": [],
 	// Use 'postCreateCommand' to run commands after the container is created.
