@@ -20,6 +20,7 @@ openpyxl
 pip-tools
 pre-commit
 psycopg2-binary
+psycopg[binary]
 pyiceberg
 pytest
 pytest-dotenv
@@ -27,6 +28,7 @@ pytest-logbook
 pytest-csv
 pytest-xdist
 pytest-mock
+testcontainers[postgres]
 pytz
 ruff
 sqlalchemy

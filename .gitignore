@@ -80,3 +80,5 @@ target/
 .idea/
 .vscode/
 .env
+
+.venv
