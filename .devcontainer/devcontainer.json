@@ -19,6 +19,8 @@
 			// Set *default* container specific settings.json values on container create.
 			"settings": {
 				"python.defaultInterpreterPath": "/usr/local/bin/python",
+				"python.testing.pytestEnabled": true,
+				"python.testing.unittestEnabled": false,
 				"python.linting.enabled": true,
 				"python.linting.flake8Enabled": true,
 				"python.linting.mypyEnabled": true,
@@ -49,11 +51,21 @@
 			]
 		}
 	},
+	// "features": {
+	// 	// Allow the devcontainer to run host docker commands, see https://github.com/devcontainers/templates/tree/main/src/docker-outside-of-docker
+	// 	"ghcr.io/devcontainers/features/docker-outside-of-docker:1": {
+	// 		"enableNonRootDocker": true
+	// 	}
+	// },
+	// "mounts": [
+    	// 	"source=/var/run/docker.sock,target=/var/run/docker.sock,type=bind"
+  	// ],
 	// Use 'forwardPorts' to make a list of ports inside the container available locally.
 	// "forwardPorts": [],
 	// Use 'postCreateCommand' to run commands after the container is created.
 	// "postCreateCommand": "pip3 install --user -r requirements.txt",
 	// Comment out to connect as root instead. More info: https://aka.ms/vscode-remote/containers/non-root.
 	"remoteUser": "vscode",
+	"workspaceFolder": "/workspaces/dbt-duckdb",
 	"postCreateCommand": "pip install -e . && pip install -r dev-requirements.txt"
 }
