@@ -5,7 +5,6 @@ from typing import List
 from typing import Optional
 from typing import Sequence
 from typing import TYPE_CHECKING
-from uuid import UUID
 from uuid import uuid4
 
 from dbt_common.contracts.constraints import ColumnLevelConstraint
