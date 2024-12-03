@@ -52,7 +52,7 @@ class DuckDBAdapter(SQLAdapter):
 
     # can be overridden via the model config metadata
     _temp_schema_name = DEFAULT_TEMP_SCHEMA_NAME
-    _temp_schema_unique_id = defaultdict(uuid4)
+    _temp_schema_model_uuid = defaultdict(uuid4)
 
     @classmethod
     def date_function(cls) -> str:
@@ -289,12 +289,12 @@ class DuckDBAdapter(SQLAdapter):
         currently doesn't support remote temporary tables. Instead we use a regular
         table that is dropped at the end of the incremental macro or post-model hook.
         """
-        # Add a unique identifier for this Python session to enable running the incremental model concurrently
-        unique_id = self._temp_schema_unique_id[model.identifier]
+        # Add a unique identifier for this model (scoped per dbt run)
+        uuid = self._temp_schema_model_uuid[model.identifier]
         return Path(
             schema=self._temp_schema_name,
             database=model.database,
-            identifier=f"{model.identifier}__{unique_id}",
+            identifier=f"{model.identifier}__{uuid}",
         )
 
     def post_model_hook(self, config: Any, context: Any) -> None:
