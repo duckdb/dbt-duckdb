@@ -1,11 +1,12 @@
-from collections import defaultdict
 import os
+from collections import defaultdict
 from typing import Any
 from typing import List
 from typing import Optional
 from typing import Sequence
 from typing import TYPE_CHECKING
-from uuid import UUID, uuid4
+from uuid import UUID
+from uuid import uuid4
 
 from dbt_common.contracts.constraints import ColumnLevelConstraint
 from dbt_common.contracts.constraints import ConstraintType
