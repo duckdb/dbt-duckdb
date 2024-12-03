@@ -290,11 +290,11 @@ class DuckDBAdapter(SQLAdapter):
         table that is dropped at the end of the incremental macro or post-model hook.
         """
         # Add a unique identifier for this model (scoped per dbt run)
-        uuid = self._temp_schema_model_uuid[model.identifier]
+        _uuid = self._temp_schema_model_uuid[model.identifier]
         return Path(
             schema=self._temp_schema_name,
             database=model.database,
-            identifier=f"{model.identifier}__{uuid}",
+            identifier=f"{model.identifier}__{_uuid}",
         )
 
     def post_model_hook(self, config: Any, context: Any) -> None:
