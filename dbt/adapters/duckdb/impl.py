@@ -53,7 +53,7 @@ class DuckDBAdapter(SQLAdapter):
 
     # can be overridden via the model config metadata
     _temp_schema_name = DEFAULT_TEMP_SCHEMA_NAME
-    _temp_schema_model_uuid: dict[str, UUID] = defaultdict(lambda: str(uuid4()).split("-")[-1])
+    _temp_schema_model_uuid: dict[str, str] = defaultdict(lambda: str(uuid4()).split("-")[-1])
 
     @classmethod
     def date_function(cls) -> str:
