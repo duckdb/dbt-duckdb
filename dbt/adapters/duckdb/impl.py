@@ -1,9 +1,11 @@
+from collections import defaultdict
 import os
 from typing import Any
 from typing import List
 from typing import Optional
 from typing import Sequence
 from typing import TYPE_CHECKING
+from uuid import uuid4
 
 from dbt_common.contracts.constraints import ColumnLevelConstraint
 from dbt_common.contracts.constraints import ConstraintType
@@ -50,6 +52,7 @@ class DuckDBAdapter(SQLAdapter):
 
     # can be overridden via the model config metadata
     _temp_schema_name = DEFAULT_TEMP_SCHEMA_NAME
+    _temp_schema_unique_id = defaultdict(uuid4)
 
     @classmethod
     def date_function(cls) -> str:
@@ -286,10 +289,12 @@ class DuckDBAdapter(SQLAdapter):
         currently doesn't support remote temporary tables. Instead we use a regular
         table that is dropped at the end of the incremental macro or post-model hook.
         """
+        # Add a unique identifier for this Python session to enable running the incremental model concurrently
+        unique_id = self._temp_schema_unique_id[model.identifier]
         return Path(
             schema=self._temp_schema_name,
             database=model.database,
-            identifier=model.identifier,
+            identifier=f"{model.identifier}__{unique_id}",
         )
 
     def post_model_hook(self, config: Any, context: Any) -> None:
