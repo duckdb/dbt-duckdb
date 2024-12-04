@@ -58,7 +58,7 @@ def bv_server_process(profile_type):
 # The profile dictionary, used to write out profiles.yml
 # dbt will supply a unique schema per test, so we do not specify 'schema' here
 @pytest.fixture(scope="session")
-def dbt_profile_target(profile_type, bv_server_process, tmp_path_factory):
+def dbt_profile_target(profile_type, bv_server_process, tmpdir_factory):
     profile = {"type": "duckdb", "threads": 4}
 
     if profile_type == "buenavista":
@@ -69,7 +69,7 @@ def dbt_profile_target(profile_type, bv_server_process, tmp_path_factory):
             "user": "test",
         }
     elif profile_type == "file":
-        profile["path"] = str(tmp_path_factory.getbasetemp() / "tmp.db")
+        profile["path"] = str(tmpdir_factory.mktemp("dbs") / "tmp.db")
     elif profile_type == "md":
         # Test against MotherDuck
         if MOTHERDUCK_TOKEN not in os.environ and MOTHERDUCK_TOKEN.lower() not in os.environ:
