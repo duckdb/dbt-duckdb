@@ -170,10 +170,11 @@ class DuckDBAdapter(SQLAdapter):
 
     @available
     def external_read_location(self, write_location: str, rendered_options: dict) -> str:
-        if rendered_options.get("partition_by"):
+        if rendered_options.get("partition_by") or rendered_options.get("per_thread_output"):
             globs = [write_location, "*"]
-            partition_by = str(rendered_options.get("partition_by"))
-            globs.extend(["*"] * len(partition_by.split(",")))
+            if rendered_options.get("partition_by"):
+                partition_by = str(rendered_options.get("partition_by"))
+                globs.extend(["*"] * len(partition_by.split(",")))
             return ".".join(["/".join(globs), str(rendered_options.get("format", "parquet"))])
         return write_location
 
