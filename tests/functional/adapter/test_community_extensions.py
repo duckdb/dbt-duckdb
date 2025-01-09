@@ -7,6 +7,7 @@ from dbt.tests.util import (
     run_dbt,
 )
 
+@pytest.mark.skip_profile("nightly", reason="Cannot install community extensions for nightly release")
 class BaseCommunityExtensions:
 
     @pytest.fixture(scope="class")
@@ -49,6 +50,7 @@ class BaseCommunityExtensions:
         }
         check_relation_types(project.adapter, expected)
 
+@pytest.mark.skip_profile("nightly", reason="Cannot install community extensions for nightly release")
 @pytest.mark.skip_profile("buenavista")
 class TestCommunityExtensions(BaseCommunityExtensions):
     pass

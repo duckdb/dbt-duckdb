@@ -94,6 +94,7 @@ def test_add_unsupported_secret():
         assert "Secret type 'scrooge_mcduck' not found" in str(e)
 
 
+@pytest.mark.skip_profile("nightly")
 def test_add_unsupported_secret_param():
     creds = DuckDBCredentials(
         secrets=[
