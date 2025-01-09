@@ -11,6 +11,8 @@
 name: Tests and Code Checks (DuckDB nightly)
 
 on:
+  schedule:
+    - cron: '0 0 * * *' # every 24 hours, top of the hour
   workflow_dispatch:
 
 permissions: read-all
