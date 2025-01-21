@@ -145,9 +145,7 @@ class DuckDBCredentials(Credentials):
     disable_transactions: bool = False
 
     # Whether to keep the DuckDB connection open between invocations of dbt
-    # (we do this automatically for in-memory or MD connections, but not for
-    # local DuckDB files, but this is a way to override that behavior)
-    keep_open: bool = False
+    keep_open: bool = True
 
     # A list of paths to Python modules that should be loaded into the
     # running Python environment when dbt is invoked; this is useful for
