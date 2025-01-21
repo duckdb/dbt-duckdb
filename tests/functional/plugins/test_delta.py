@@ -97,6 +97,7 @@ class TestPlugins:
                     "dev": {
                         "type": "duckdb",
                         "path": dbt_profile_target.get("path", ":memory:"),
+                        "keep_open": False,
                         "plugins": plugins,
                     }
                 },
