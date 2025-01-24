@@ -171,15 +171,28 @@ class DuckDBAdapter(SQLAdapter):
 
     @available
     def external_read_location(
-        self, write_location: str, rendered_options: dict, partition_columns: list
+        self,
+        write_location: str,
+        rendered_options: dict,
+        partition_columns: list,
+        partition_delimiter=None,
     ) -> str:
+        """
+        :param partition_columns: A list of dictionaries describing partition columns and values.
+                                e.g.: [{'Name': 'import_day', 'Value': '2'}, ...]
+        :param partition_delimiter: String used to join the partition name and value.
+                                    Defaults to "=" (Hive-style).
+                                    Examples: "_", "-", ""
+        """
         if rendered_options.get("partition_by"):
-            globs = [write_location]
+            parts = [write_location]
             for col in partition_columns:
-                globs.append(col["Name"] + "=" + col["Value"])
-            globs.append("*")
-            return ".".join(["/".join(globs), str(rendered_options.get("format", "parquet"))])
-        return write_location
+                # Use the delimiter to form the partition path
+                parts.append(f"{col['Name']}{partition_delimiter}{col['Value']}")
+            parts.append("*")
+            return "/".join(parts)
+        else:
+            return write_location
 
     @available
     def warn_once(self, msg: str):
