@@ -169,12 +169,14 @@ class DuckDBAdapter(SQLAdapter):
         return ", ".join(ret)
 
     @available
-    def external_read_location(self, write_location: str, rendered_options: dict) -> str:
-        if rendered_options.get("partition_by") or rendered_options.get("per_thread_output"):
-            globs = [write_location, "*"]
-            if rendered_options.get("partition_by"):
-                partition_by = str(rendered_options.get("partition_by"))
-                globs.extend(["*"] * len(partition_by.split(",")))
+    def external_read_location(
+        self, write_location: str, rendered_options: dict, partition_columns: list
+    ) -> str:
+        if rendered_options.get("partition_by"):
+            globs = [write_location]
+            for col in partition_columns:
+                globs.append(col["Name"] + "=" + col["Value"])
+            globs.append("*")
             return ".".join(["/".join(globs), str(rendered_options.get("format", "parquet"))])
         return write_location
 
