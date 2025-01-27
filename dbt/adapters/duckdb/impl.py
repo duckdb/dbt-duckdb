@@ -174,7 +174,7 @@ class DuckDBAdapter(SQLAdapter):
         write_location: str,
         rendered_options: dict,
         partition_columns: list,
-        partition_delimiter=None,
+        partition_delimiter= "=",
     ) -> str:
         """
         :param partition_columns: A list of dictionaries describing partition columns and values.

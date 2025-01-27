@@ -1,6 +1,8 @@
 CHANGES
 =======
 
+* adding a partition delimiter for more generic partitioning
+* added partition\_columns new argument for external\_read\_location. This will update the Glue schema to the schema of the latest partition (which in turn allows for append-only schema evolution in later partitions, this is supported by Glue)
 * Make keep\_open: true the default setting for dbt-duckdb going forward (#502)
 * remove package build/test build steps (#498)
 * run on schedule
