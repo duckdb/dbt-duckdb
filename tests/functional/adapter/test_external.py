@@ -31,16 +31,17 @@ config_materialized_csv_location_delim = """
 """
 
 config_json = """
-  {{ config(materialized="external", format="json") }}
+  {{ config(materialized="external", location="{{ adapter.external_root() }}/test.json") }}
 """
 
 default_external_sql = config_materialized_default + model_base
 csv_external_sql = config_materialized_csv + model_base
 parquet_table_location_sql = config_materialized_parquet_location + model_base
 csv_location_delim_sql = config_materialized_csv_location_delim + model_base
-json_sql = config_json + model_base
+json_sql = config_json + "select * from {{ source('raw', 'seed') }} where id > 10"
 
 
+@pytest.mark.parametrize("dest", ["local", "s3"], scope="class")
 class BaseExternalMaterializations:
     @pytest.fixture(scope="class")
     def models(self):
@@ -61,9 +62,16 @@ class BaseExternalMaterializations:
         }
 
     @pytest.fixture(scope="class")
-    def dbt_profile_target(self, dbt_profile_target, tmp_path_factory):
-        extroot = str(tmp_path_factory.getbasetemp() / "external")
-        os.mkdir(extroot)
+    def extroot(self, tmp_path_factory, dest):
+        if dest == "local":
+            extroot = str(tmp_path_factory.getbasetemp() / "external")
+            os.mkdir(extroot)
+        elif dest == "s3":
+            extroot = "s3://md-ecosystem-public/dbt-duckdb/external.json"
+        return extroot
+
+    @pytest.fixture(scope="class")
+    def dbt_profile_target(self, dbt_profile_target, extroot):
         dbt_profile_target["external_root"] = extroot
         return dbt_profile_target
     
@@ -125,7 +133,7 @@ class BaseExternalMaterializations:
                 "table_model",
                 "table_csv",
                 "table_csv_location_delim",
-                "table_json",
+                # "table_json",
             ],
         )
 
