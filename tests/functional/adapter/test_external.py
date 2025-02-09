@@ -1,4 +1,6 @@
 import os
+from uuid import uuid4
+import boto3
 import pytest
 from dbt.tests.adapter.basic.files import (
     base_table_sql,
@@ -38,20 +40,23 @@ default_external_sql = config_materialized_default + model_base
 csv_external_sql = config_materialized_csv + model_base
 parquet_table_location_sql = config_materialized_parquet_location + model_base
 csv_location_delim_sql = config_materialized_csv_location_delim + model_base
-json_sql = config_json + "select * from {{ source('raw', 'seed') }} where id > 10"
+json_sql = config_json + model_base
+make_empty = " where id > 10"
 
+DEST_LOCAL = "local"
+DEST_S3 = "s3"
+BUCKET_NAME = "md-ecosystem-public"
 
-@pytest.mark.parametrize("dest", ["local", "s3"], scope="class")
 class BaseExternalMaterializations:
     @pytest.fixture(scope="class")
-    def models(self):
+    def models(self, empty):
         return {
-            "table_model.sql": base_table_sql,
-            "table_default.sql": default_external_sql,
-            "table_csv.sql": csv_external_sql,
-            "table_parquet_location.sql": parquet_table_location_sql,
-            "table_csv_location_delim.sql": csv_location_delim_sql,
-            "table_json.sql": json_sql,
+            "table_model.sql": base_table_sql + (make_empty if empty else ""),
+            "table_default.sql": default_external_sql + (make_empty if empty else ""),
+            "table_csv.sql": csv_external_sql + (make_empty if empty else ""),
+            "table_parquet_location.sql": parquet_table_location_sql + (make_empty if empty else ""),
+            "table_csv_location_delim.sql": csv_location_delim_sql + (make_empty if empty else ""),
+            "table_json.sql": json_sql + (make_empty if empty else ""),
             "schema.yml": schema_base_yml,
         }
 
@@ -62,26 +67,57 @@ class BaseExternalMaterializations:
         }
 
     @pytest.fixture(scope="class")
-    def extroot(self, tmp_path_factory, dest):
-        if dest == "local":
-            extroot = str(tmp_path_factory.getbasetemp() / "external")
-            os.mkdir(extroot)
-        elif dest == "s3":
-            extroot = "s3://md-ecosystem-public/dbt-duckdb/external.json"
-        return extroot
+    def dest(self):
+        return DEST_LOCAL
 
     @pytest.fixture(scope="class")
-    def dbt_profile_target(self, dbt_profile_target, extroot):
+    def empty(self):
+        return False
+
+    @pytest.fixture(scope="class")
+    def extroot(self, tmp_path_factory, dest):
+        if dest == DEST_LOCAL:
+            extroot = str(tmp_path_factory.getbasetemp() / "external")
+            if not os.path.exists(extroot):
+                os.mkdir(extroot)
+
+        elif dest == DEST_S3:
+            s3_path = os.path.join("dbt-duckdb", "test_external", f"pytest-{uuid4()}")
+            extroot = os.path.join("s3://", BUCKET_NAME, s3_path)
+
+        yield extroot
+
+        if dest == DEST_S3:
+            session = boto3.Session(
+                aws_access_key_id=os.getenv("S3_MD_ORG_KEY"),
+                aws_secret_access_key=os.getenv("S3_MD_ORG_SECRET"),
+            )
+            s3 = session.resource('s3')
+            bucket = s3.Bucket('md-ecosystem-public')
+            bucket.objects.filter(Prefix=s3_path).delete()
+
+    @pytest.fixture(scope="class")
+    def dbt_profile_target(self, profile_type, dbt_profile_target, extroot):
         dbt_profile_target["external_root"] = extroot
+        dbt_profile_target["secrets"] = [
+            {
+                "type": DEST_S3,
+                "region": os.getenv("S3_MD_ORG_REGION"),
+                "key_id": os.getenv("S3_MD_ORG_KEY"),
+                "secret": os.getenv("S3_MD_ORG_SECRET"),
+            }
+        ]
+        if profile_type == "md":
+            dbt_profile_target["secrets"][0]["persistent"] = True
         return dbt_profile_target
-    
+
     @pytest.fixture(scope="class")
     def project_config_update(self):
         return {
             "name": "base",
         }
 
-    def test_base(self, project):
+    def test_base(self, project, empty):
 
         # seed command
         results = run_dbt(["seed"])
@@ -116,6 +152,9 @@ class BaseExternalMaterializations:
             "table_csv_location_delim": "view",
             "table_json": "view",
         }
+        if empty:
+            # if simulating an empty table, result will be empty
+            expected.pop("base")
         check_relation_types(project.adapter, expected)
 
         # base table rowcount
@@ -124,17 +163,21 @@ class BaseExternalMaterializations:
         assert result[0] == 10
 
         # relations_equal
+        models = [
+            "base",
+            "table_default",
+            "table_parquet_location",
+            "table_model",
+            "table_csv",
+            "table_csv_location_delim",
+            "table_json",
+        ]
+        if empty:
+            # if simulating an empty table, result will be empty, so don't compare to base table
+            models.pop(0)
         check_relations_equal(
             project.adapter,
-            [
-                "base",
-                "table_default",
-                "table_parquet_location",
-                "table_model",
-                "table_csv",
-                "table_csv_location_delim",
-                # "table_json",
-            ],
+            models,
         )
 
         # check relations in catalog
@@ -143,5 +186,39 @@ class BaseExternalMaterializations:
         assert len(catalog.sources) == 1
 
 
+@pytest.mark.skip_profile("buenavista")
 class TestExternalMaterializations(BaseExternalMaterializations):
     pass
+
+
+@pytest.mark.skip_profile("buenavista")
+class TestExternalMaterializationsLocalEmpty(BaseExternalMaterializations):
+    @pytest.fixture(scope="class")
+    def dest(self):
+        return DEST_LOCAL
+    
+    @pytest.fixture(scope="class")
+    def empty(self):
+        return True
+
+
+@pytest.mark.skip_profile("buenavista")
+class TestExternalMaterializationsS3(BaseExternalMaterializations):
+    @pytest.fixture(scope="class")
+    def dest(self):
+        return DEST_S3
+    
+    @pytest.fixture(scope="class")
+    def empty(self):
+        return False
+
+
+@pytest.mark.skip_profile("buenavista")
+class TestExternalMaterializationsS3Empty(BaseExternalMaterializations):
+    @pytest.fixture(scope="class")
+    def dest(self):
+        return DEST_S3
+    
+    @pytest.fixture(scope="class")
+    def empty(self):
+        return True

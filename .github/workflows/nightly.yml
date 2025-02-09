@@ -35,6 +35,9 @@ jobs:
     env:
       TOXENV: "nightly"
       PYTEST_ADDOPTS: "-v --color=yes --csv unit_results.csv"
+      S3_MD_ORG_KEY: ${{ secrets.S3_MD_ORG_KEY }}
+      S3_MD_ORG_REGION: ${{ secrets.S3_MD_ORG_REGION }}
+      S3_MD_ORG_SECRET: ${{ secrets.S3_MD_ORG_SECRET }}
 
     steps:
       - name: Check out the repository

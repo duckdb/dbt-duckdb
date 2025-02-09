@@ -123,6 +123,9 @@ jobs:
     env:
       TOXENV: "functional"
       PYTEST_ADDOPTS: "-v --color=yes --csv functional_results.csv"
+      S3_MD_ORG_KEY: ${{ secrets.S3_MD_ORG_KEY }}
+      S3_MD_ORG_REGION: ${{ secrets.S3_MD_ORG_REGION }}
+      S3_MD_ORG_SECRET: ${{ secrets.S3_MD_ORG_SECRET }}
 
     steps:
       - name: Check out the repository
@@ -168,6 +171,9 @@ jobs:
     env:
       TOXENV: "filebased"
       PYTEST_ADDOPTS: "-v --color=yes --csv filebased_results.csv"
+      S3_MD_ORG_KEY: ${{ secrets.S3_MD_ORG_KEY }}
+      S3_MD_ORG_REGION: ${{ secrets.S3_MD_ORG_REGION }}
+      S3_MD_ORG_SECRET: ${{ secrets.S3_MD_ORG_SECRET }}
 
     steps:
       - name: Check out the repository
@@ -228,6 +234,9 @@ jobs:
       TOXENV: "md"
       MOTHERDUCK_TOKEN: ${{ secrets.MOTHERDUCK_TOKEN_10 }}
       PYTEST_ADDOPTS: "-v --color=yes --csv motherduck_results.csv"
+      S3_MD_ORG_KEY: ${{ secrets.S3_MD_ORG_KEY }}
+      S3_MD_ORG_REGION: ${{ secrets.S3_MD_ORG_REGION }}
+      S3_MD_ORG_SECRET: ${{ secrets.S3_MD_ORG_SECRET }}
 
     steps:
       - name: Check out the repository
