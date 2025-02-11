@@ -2,7 +2,7 @@
 # git+https://github.com/dbt-labs/dbt-core.git#egg=dbt-core&subdirectory=core
 # git+https://github.com/dbt-labs/dbt-adapters.git#subdirectory=dbt-tests-adapter
 
-dbt-tests-adapter==1.10.4
+dbt-tests-adapter==1.11.0
 
 boto3
 mypy-boto3-glue
