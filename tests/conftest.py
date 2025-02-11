@@ -112,6 +112,5 @@ def pytest_collection_modifyitems(config, items):
     ):
         skip_s3 = pytest.mark.skip(reason="need S3 credentials to run this test")
         for item in items:
-            item.add_marker(pytest.mark.timeout(7200))  # 2 hours
             if "with_s3_creds" in item.keywords:
                 item.add_marker(skip_s3)
