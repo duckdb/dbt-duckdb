@@ -15,7 +15,7 @@ freezegun==1.5.1
 fsspec
 gspread
 ipdb
-mypy==1.14.1
+mypy==1.15.0
 openpyxl
 pip-tools
 pre-commit
