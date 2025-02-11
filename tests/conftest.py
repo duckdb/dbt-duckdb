@@ -103,3 +103,15 @@ def skip_by_profile_type(profile_type, request):
 def test_data_path():
     test_dir = os.path.dirname(os.path.abspath(__file__))
     return os.path.join(test_dir, "data")
+
+
+def pytest_collection_modifyitems(config, items):
+    # Skip the S3 tests if the secrets are not available
+    if not (
+        os.getenv("S3_MD_ORG_KEY") and os.getenv("S3_MD_ORG_REGION") and os.getenv("S3_MD_ORG_SECRET")
+    ):
+        skip_s3 = pytest.mark.skip(reason="need S3 credentials to run this test")
+        for item in items:
+            item.add_marker(pytest.mark.timeout(7200))  # 2 hours
+            if "with_s3_creds" in item.keywords:
+                item.add_marker(skip_s3)

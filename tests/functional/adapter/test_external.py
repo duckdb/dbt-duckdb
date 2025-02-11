@@ -202,6 +202,7 @@ class TestExternalMaterializationsLocalEmpty(BaseExternalMaterializations):
         return True
 
 
+@pytest.mark.with_s3_creds
 @pytest.mark.skip_profile("buenavista")
 class TestExternalMaterializationsS3(BaseExternalMaterializations):
     @pytest.fixture(scope="class")
@@ -213,6 +214,7 @@ class TestExternalMaterializationsS3(BaseExternalMaterializations):
         return False
 
 
+@pytest.mark.with_s3_creds
 @pytest.mark.skip_profile("buenavista")
 class TestExternalMaterializationsS3Empty(BaseExternalMaterializations):
     @pytest.fixture(scope="class")
