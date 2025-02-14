@@ -2,12 +2,12 @@
 # git+https://github.com/dbt-labs/dbt-core.git#egg=dbt-core&subdirectory=core
 # git+https://github.com/dbt-labs/dbt-adapters.git#subdirectory=dbt-tests-adapter
 
-dbt-tests-adapter==1.10.4
+dbt-tests-adapter==1.11.0
 
 boto3
 mypy-boto3-glue
 pandas
-pyarrow
+pyarrow==18.1.0
 buenavista==0.5.0
 bumpversion
 flaky
@@ -15,7 +15,7 @@ freezegun==1.5.1
 fsspec
 gspread
 ipdb
-mypy==1.14.1
+mypy==1.15.0
 openpyxl
 pip-tools
 pre-commit

@@ -59,6 +59,23 @@
     {{- create_table_as(False, temp_relation, compiled_code, language) }}
   {%- endcall %}
 
+  -- check if relation is empty
+  {%- set count_query -%}
+    select count(*) as row_count from {{ temp_relation }}
+  {%- endset -%}
+  {%- set row_count = run_query(count_query) -%}
+
+  -- if relation is empty, write a non-empty table with column names and null values
+  {% call statement('main', language='sql') -%}
+    {% if row_count[0][0] == 0 %}
+    insert into {{ temp_relation }} values (
+      {%- for col in get_columns_in_relation(temp_relation) -%}
+      NULL,
+      {%- endfor -%}
+    )
+    {% endif %}
+  {%- endcall %}
+
   -- write a temp relation into file
   {{ write_to_file(temp_relation, location, write_options) }}
 
@@ -76,6 +93,13 @@
           {%- endif -%}
         {%- endfor -%}
         )
+        -- if relation is empty, filter by all columns having null values
+        {% if row_count[0][0] == 0 %}
+          where 1
+          {%- for col in get_columns_in_relation(temp_relation) -%}
+            {{ print(' ') }} AND {{ col.column }} is not NULL
+          {%- endfor -%}
+        {% endif %}
       );
     {% elif format == 'parquet' %}
       create or replace view {{ intermediate_relation }} as (
@@ -89,6 +113,13 @@
           {%- endif -%}
         {%- endfor -%}
         )
+        -- if relation is empty, filter by all columns having null values
+        {% if row_count[0][0] == 0 %}
+          where 1
+          {%- for col in get_columns_in_relation(temp_relation) -%}
+            {{ print(' ') }} AND {{ col.column }} is not NULL
+          {%- endfor -%}
+        {% endif %}
       );
     {% elif format == 'csv' %}
     create or replace view {{ intermediate_relation }} as (
@@ -102,6 +133,13 @@
         {%- endif -%}
       {%- endfor -%}
       )
+      -- if relation is empty, filter by all columns having null values
+      {% if row_count[0][0] == 0 %}
+        where 1
+        {%- for col in get_columns_in_relation(temp_relation) -%}
+          {{ print(' ') }} AND {{ col.column }} is not NULL
+        {%- endfor -%}
+      {% endif %}
     );
     {% endif %}
   {%- endcall %}
