@@ -97,7 +97,7 @@
         {% if row_count[0][0] == 0 %}
           where 1
           {%- for col in get_columns_in_relation(temp_relation) -%}
-            {{ print(' ') }} AND {{ col.column }} is not NULL
+            {{ '' }} AND {{ col.column }} is not NULL
           {%- endfor -%}
         {% endif %}
       );
@@ -117,7 +117,7 @@
         {% if row_count[0][0] == 0 %}
           where 1
           {%- for col in get_columns_in_relation(temp_relation) -%}
-            {{ print(' ') }} AND {{ col.column }} is not NULL
+            {{ '' }} AND {{ col.column }} is not NULL
           {%- endfor -%}
         {% endif %}
       );
@@ -137,7 +137,7 @@
       {% if row_count[0][0] == 0 %}
         where 1
         {%- for col in get_columns_in_relation(temp_relation) -%}
-          {{ print(' ') }} AND {{ col.column }} is not NULL
+          {{ '' }} AND {{ col.column }} is not NULL
         {%- endfor -%}
       {% endif %}
     );
