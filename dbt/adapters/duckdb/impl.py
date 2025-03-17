@@ -33,9 +33,9 @@ from dbt.adapters.duckdb.connections import DuckDBConnectionManager
 from dbt.adapters.duckdb.relation import DuckDBRelation
 from dbt.adapters.duckdb.utils import TargetConfig
 from dbt.adapters.duckdb.utils import TargetLocation
+from dbt.adapters.events.logging import AdapterLogger
 from dbt.adapters.exceptions import IndexConfigError
 from dbt.adapters.exceptions import IndexConfigNotDictError
-from dbt.adapters.events.logging import AdapterLogger
 from dbt.adapters.sql import SQLAdapter
 
 
