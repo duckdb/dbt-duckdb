@@ -1,14 +1,15 @@
 #!/usr/bin/env python
 import cmd
 import os
-import readline
 import shlex
 import sys
-from typing import List, Optional
+from typing import List
+from typing import Optional
 
 # Try to import iterfzf, but don't fail if it's not available
 try:
     from iterfzf import iterfzf
+
     HAS_ITERFZF = True
 except ImportError:
     HAS_ITERFZF = False
@@ -16,7 +17,6 @@ except ImportError:
 from dbt.adapters.duckdb.connections import DuckDBConnectionManager
 from dbt.cli.main import dbtRunner
 from dbt.cli.main import dbtRunnerResult
-from dbt.contracts.graph.manifest import Manifest
 
 
 class DuckdbtShell(cmd.Cmd):
@@ -27,18 +27,16 @@ class DuckdbtShell(cmd.Cmd):
         super().__init__()
         self.dbt = dbtRunner()
         self.profile = profile
-        self.manifest = None
-        self.model_names_cache = []
-        
+
         # Run debug to test out the connection on startup
         result = self.dbt.invoke(["debug"])
         if result.success:
             # Parse the manifest
             res: dbtRunnerResult = self.dbt.invoke(["parse"])
             if res.success:
-                self.manifest: Manifest = res.result
+                self.manifest = res.result
                 self._update_model_names_cache()
-            
+
             if DuckDBConnectionManager._ENV:
                 env = DuckDBConnectionManager._ENV
                 cursor = env.handle().cursor()
@@ -125,20 +123,20 @@ class DuckdbtShell(cmd.Cmd):
         if result and result.success:
             self.manifest = result.result
             self._update_model_names_cache()
-            
+
     def _update_model_names_cache(self):
         """Update the cached list of model names from the manifest"""
         if not self.manifest:
             self.model_names_cache = []
             return
-            
+
         model_names = []
         # Get names of all models from the manifest
         for node_name, node in self.manifest.nodes.items():
-            if node.resource_type in ('model', 'seed', 'snapshot', 'source'):
+            if node.resource_type in ("model", "seed", "snapshot", "source"):
                 # Use the name without the project prefix
                 model_names.append(node.name)
-                
+
         self.model_names_cache = sorted(model_names)
 
     def do_exit(self, arg):
@@ -158,37 +156,29 @@ class DuckdbtShell(cmd.Cmd):
     def emptyline(self):
         """Do nothing on empty line"""
         pass
-        
+
     def completedefault(self, text, line, begidx, endidx):
         """Default completion handler for all commands"""
         # Check if the text contains the ** trigger
-        if "**" in text:
-            if not HAS_ITERFZF:
-                print("\nTo use model autocomplete (** pattern), please install iterfzf: pip install iterfzf")
-                return []
-            
-            # If we have no model names, return empty
-            if not self.model_names_cache:
-                return []
-                
-            # Extract the query prefix (content before **)
-            query_prefix = text.split("**")[0]
-            
+        if not HAS_ITERFZF:
+            print(
+                "\nTo use model autocomplete (** pattern), please install iterfzf: pip install iterfzf"
+            )
+        elif not self.model_names_cache:
+            pass
+        else:
+            query_prefix = text.split()[-1]
             try:
-                # Filter models that start with the query prefix
-                matching_models = [name for name in self.model_names_cache if name.startswith(query_prefix)]
-                
                 # Use fzf for interactive selection
-                selected = iterfzf(matching_models)
-                
+                models = [x for x in self.model_names_cache if x.startswith(query_prefix)]
+                selected = iterfzf(models)
+
                 # Return the selected model
                 if selected:
                     return [selected]
             except Exception as e:
                 print(f"\nError with fzf completion: {e}")
-            
-            return []
-            
+
         # Fall back to cmd's default completion behavior
         return super().completedefault(text, line, begidx, endidx)
 
