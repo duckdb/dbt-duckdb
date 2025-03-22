@@ -3,12 +3,12 @@ import cmd
 import os
 import shlex
 import sys
-from typing import List
-from typing import Optional
+from typing import List, Optional
 
 from dbt.adapters.duckdb.connections import DuckDBConnectionManager
 from dbt.cli.main import dbtRunner
 from dbt.cli.main import dbtRunnerResult
+from dbt.contracts.graph.manifest import Manifest
 
 
 class DuckdbtShell(cmd.Cmd):
@@ -19,10 +19,16 @@ class DuckdbtShell(cmd.Cmd):
         super().__init__()
         self.dbt = dbtRunner()
         self.profile = profile
-
+        self.manifest = None
+        
         # Run debug to test out the connection on startup
         result = self.dbt.invoke(["debug"])
         if result.success:
+            # Parse the manifest
+            res: dbtRunnerResult = self.dbt.invoke(["parse"])
+            if res.success:
+                self.manifest: Manifest = res.result
+            
             if DuckDBConnectionManager._ENV:
                 env = DuckDBConnectionManager._ENV
                 cursor = env.handle().cursor()
@@ -35,7 +41,7 @@ class DuckdbtShell(cmd.Cmd):
         project_name = os.path.basename(os.getcwd())
         self.prompt = f"duckdbt ({project_name})> "
 
-    def _run_dbt_command(self, command: List[str]) -> None:
+    def _run_dbt_command(self, command: List[str]) -> Optional[dbtRunnerResult]:
         """Run a dbt command with the runner"""
         cmd_args = []
 
@@ -49,12 +55,13 @@ class DuckdbtShell(cmd.Cmd):
         try:
             result: dbtRunnerResult = self.dbt.invoke(cmd_args)
             if result.success:
-                return
+                return result
             else:
                 print("Command failed: ", result.exception)
-                return
+                return None
         except Exception as e:
             print(f"Error: {str(e)}")
+            return None
 
     def do_run(self, arg):
         """Run models: run [options]"""
@@ -104,7 +111,9 @@ class DuckdbtShell(cmd.Cmd):
     def do_parse(self, arg):
         """Parse project: parse [options]"""
         args = ["parse"] + shlex.split(arg)
-        self._run_dbt_command(args)
+        result = self._run_dbt_command(args)
+        if result and result.success:
+            self.manifest = result.result
 
     def do_exit(self, arg):
         """Exit the shell"""
