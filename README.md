@@ -363,8 +363,8 @@ on-run-start:
 
 dbt-duckdb also provides a custom parameterize_view materialization to use DuckDB's Table Function / Table Macro feature to provide parameterized views.
 
-Why use this materialization? 
-* Late binding of functions means that the underlying table can change (have new columns added) and the function does not need to be recreated. 
+Why use this materialization?
+* Late binding of functions means that the underlying table can change (have new columns added) and the function does not need to be recreated.
   * (With a view, the create view statement would need to be re-run).
   * This allows for skipping parts of the dbt DAG, even if the underlying table changed.
 * Parameters can force filter pushdown
@@ -394,7 +394,7 @@ Example parameterized_view creation with 2 parameters:
         parameters=['where_a', 'where_b']
     )
 }}
-select * 
+select *
 from {{ ref("example_table") }}
 where 1=1
     and a = where_a
@@ -405,7 +405,6 @@ Example parameterized_view with 2 parameters invocation:
 ```sql
 select * from {{ ref("my_parameterized_view_with_parameters") }}(1, 2)
 ```
-  
 
 ### Python Support
 

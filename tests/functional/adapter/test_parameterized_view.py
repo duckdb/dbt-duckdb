@@ -1,5 +1,5 @@
 """
-Test that parameterized views work as intended. 
+Test that parameterized views work as intended.
 See README for reasons to use this materialization approach!
 """
 import pytest
