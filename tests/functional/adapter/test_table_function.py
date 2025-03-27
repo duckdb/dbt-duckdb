@@ -24,6 +24,7 @@ models__my_table_function = """
 {{ config(materialized='table_function') }}
 select * from {{ ref("example_table") }}
 """
+
 models__use_table_function = """
 {{ config(materialized='table') }}
 select * from {{ ref("my_table_function") }}()
@@ -34,6 +35,7 @@ models__my_table_function_1_param = """
 select * from {{ ref("example_table") }} 
 where a = where_a
 """
+
 models__use_table_function_1_param = """
 {{ config(materialized='table') }}
 select * from {{ ref("my_table_function_1_param") }}(4)
@@ -46,6 +48,7 @@ where 1=1
     and a = where_a 
     and b = where_b
 """
+
 models__use_table_function_1_param_with_comma = """
 {{ config(materialized='table') }}
 select * from {{ ref("my_table_function_1_param_with_comma") }}(4, 5)
@@ -58,6 +61,7 @@ where 1=1
     and a = where_a 
     and b = where_b
 """
+
 models__use_table_function_2_params = """
 {{ config(materialized='table') }}
 select * from {{ ref("my_table_function_2_params") }}(4, 5)
