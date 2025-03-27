@@ -359,9 +359,9 @@ on-run-start:
   - "{{ register_upstream_external_models() }}"
 ```
 
-### Parameterized View Materialization
+### `table_function` Materialization
 
-dbt-duckdb also provides a custom parameterize_view materialization to use DuckDB's Table Function / Table Macro feature to provide parameterized views.
+dbt-duckdb also provides a custom table_function materialization to use DuckDB's Table Function / Table Macro feature to provide parameterized views.
 
 Why use this materialization?
 * Late binding of functions means that the underlying table can change (have new columns added) and the function does not need to be recreated.
@@ -371,26 +371,26 @@ Why use this materialization?
 * Functions can provide advanced features like dynamic SQL (the query and query_table functions)
 
 
-Example parameterized_view creation with 0 parameters:
+Example table_function creation with 0 parameters:
 ```sql
 {{
     config(
-        materialized='parameterized_view'
+        materialized='table_function'
     )
 }}
 select * from {{ ref("example_table") }}
 ```
 
-Example parameterized_view invocation (note the parentheses are needed even with 0 parameters!):
+Example table_function invocation (note the parentheses are needed even with 0 parameters!):
 ```sql
-select * from {{ ref("my_parameterized_view") }}()
+select * from {{ ref("my_table_function") }}()
 ```
 
-Example parameterized_view creation with 2 parameters:
+Example table_function creation with 2 parameters:
 ```sql
 {{
     config(
-        materialized='parameterized_view',
+        materialized='table_function',
         parameters=['where_a', 'where_b']
     )
 }}
@@ -401,9 +401,9 @@ where 1=1
     and b = where_b
 ```
 
-Example parameterized_view with 2 parameters invocation:
+Example table_function with 2 parameters invocation:
 ```sql
-select * from {{ ref("my_parameterized_view_with_parameters") }}(1, 2)
+select * from {{ ref("my_table_function_with_parameters") }}(1, 2)
 ```
 
 ### Python Support

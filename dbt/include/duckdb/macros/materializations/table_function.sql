@@ -1,4 +1,4 @@
-{% materialization parameterized_view, adapter='duckdb' %}
+{% materialization table_function, adapter='duckdb' %}
   -- This materialization uses DuckDB's Table Function / Table Macro feature to provide parameterized views.
   -- Why use this?
   --     Late binding of functions means that the underlying table can change (have new columns added), and
@@ -7,8 +7,8 @@
   --     Parameters can force filter pushdown
   --     Functions can provide advanced features like dynamic SQL (the query and query_table functions)
 
-  -- For usage examples, see the tests at /dbt-duckdb/tests/functional/adapter/test_parameterized_view.py
-  --     (Don't forget parentheses when you pull from a parameterized_view!)
+  -- For usage examples, see the tests at /dbt-duckdb/tests/functional/adapter/test_table_function.py
+  --     (Don't forget parentheses when you pull from a table_function!)
 
   -- Using Redshift as an example:
   -- https://github.com/dbt-labs/dbt-adapters/blob/main/dbt-redshift/src/dbt/include/redshift/macros/materializations/table.sql
