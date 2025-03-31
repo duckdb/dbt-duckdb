@@ -6,6 +6,14 @@ import sys
 from typing import List
 from typing import Optional
 
+# Try to import iterfzf, but don't fail if it's not available
+try:
+    from iterfzf import iterfzf
+
+    HAS_ITERFZF = True
+except ImportError:
+    HAS_ITERFZF = False
+
 from dbt.adapters.duckdb.connections import DuckDBConnectionManager
 from dbt.cli.main import dbtRunner
 from dbt.cli.main import dbtRunnerResult
@@ -23,6 +31,12 @@ class DuckdbtShell(cmd.Cmd):
         # Run debug to test out the connection on startup
         result = self.dbt.invoke(["debug"])
         if result.success:
+            # Parse the manifest
+            res: dbtRunnerResult = self.dbt.invoke(["parse"])
+            if res.success:
+                self.manifest = res.result
+                self._update_model_names_cache()
+
             if DuckDBConnectionManager._ENV:
                 env = DuckDBConnectionManager._ENV
                 cursor = env.handle().cursor()
@@ -35,7 +49,7 @@ class DuckdbtShell(cmd.Cmd):
         project_name = os.path.basename(os.getcwd())
         self.prompt = f"duckdbt ({project_name})> "
 
-    def _run_dbt_command(self, command: List[str]) -> None:
+    def _run_dbt_command(self, command: List[str]) -> Optional[dbtRunnerResult]:
         """Run a dbt command with the runner"""
         cmd_args = []
 
@@ -49,12 +63,13 @@ class DuckdbtShell(cmd.Cmd):
         try:
             result: dbtRunnerResult = self.dbt.invoke(cmd_args)
             if result.success:
-                return
+                return result
             else:
                 print("Command failed: ", result.exception)
-                return
+                return None
         except Exception as e:
             print(f"Error: {str(e)}")
+            return None
 
     def do_run(self, arg):
         """Run models: run [options]"""
@@ -104,7 +119,25 @@ class DuckdbtShell(cmd.Cmd):
     def do_parse(self, arg):
         """Parse project: parse [options]"""
         args = ["parse"] + shlex.split(arg)
-        self._run_dbt_command(args)
+        result = self._run_dbt_command(args)
+        if result and result.success:
+            self.manifest = result.result
+            self._update_model_names_cache()
+
+    def _update_model_names_cache(self):
+        """Update the cached list of model names from the manifest"""
+        if not self.manifest:
+            self.model_names_cache = []
+            return
+
+        model_names = []
+        # Get names of all models from the manifest
+        for node_name, node in self.manifest.nodes.items():
+            if node.resource_type in ("model", "seed", "snapshot", "source"):
+                # Use the name without the project prefix
+                model_names.append(node.name)
+
+        self.model_names_cache = sorted(model_names)
 
     def do_exit(self, arg):
         """Exit the shell"""
@@ -123,6 +156,31 @@ class DuckdbtShell(cmd.Cmd):
     def emptyline(self):
         """Do nothing on empty line"""
         pass
+
+    def completedefault(self, text, line, begidx, endidx):
+        """Default completion handler for all commands"""
+        # Check if the text contains the ** trigger
+        if not HAS_ITERFZF:
+            print(
+                "\nTo use model autocomplete (** pattern), please install iterfzf: pip install iterfzf"
+            )
+        elif not self.model_names_cache:
+            pass
+        else:
+            query_prefix = text.split()[-1]
+            try:
+                # Use fzf for interactive selection
+                models = [x for x in self.model_names_cache if x.startswith(query_prefix)]
+                selected = iterfzf(models)
+
+                # Return the selected model
+                if selected:
+                    return [selected]
+            except Exception as e:
+                print(f"\nError with fzf completion: {e}")
+
+        # Fall back to cmd's default completion behavior
+        return super().completedefault(text, line, begidx, endidx)
 
 
 def main():
