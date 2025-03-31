@@ -8,6 +8,8 @@ from dbt.tests.adapter.basic.test_singular_tests_ephemeral import (
 from dbt.tests.adapter.basic.test_empty import BaseEmpty
 from dbt.tests.adapter.basic.test_ephemeral import BaseEphemeral
 from dbt.tests.adapter.basic.test_incremental import BaseIncremental
+from dbt.tests.adapter.basic.test_incremental import BaseIncrementalBadStrategy
+from dbt.tests.adapter.basic.test_incremental import BaseIncrementalNotSchemaChange
 from dbt.tests.adapter.basic.test_generic_tests import BaseGenericTests
 from dbt.tests.adapter.basic.test_snapshot_check_cols import BaseSnapshotCheckCols
 from dbt.tests.adapter.basic.test_snapshot_timestamp import BaseSnapshotTimestamp
@@ -45,6 +47,13 @@ class TestEphemeralDuckDB(BaseEphemeral):
 
 
 class TestIncrementalDuckDB(BaseIncremental):
+    pass
+
+class TestBaseIncrementalNotSchemaChange(BaseIncrementalNotSchemaChange):
+    pass
+
+
+class TestBaseIncrementalBadStrategy(BaseIncrementalBadStrategy):
     pass
 
 
