@@ -19,13 +19,7 @@ def test_load_basic_settings():
 def test_add_secret_with_empty_name():
     creds = DuckDBCredentials(
         secrets=[
-            dict(
-                type="s3",
-                name="",
-                key_id="abc",
-                secret="xyz",
-                region="us-west-2"
-            )
+            dict(type="s3", name="", key_id="abc", secret="xyz", region="us-west-2")
         ]
     )
     assert len(creds.secrets) == 1
@@ -35,27 +29,31 @@ def test_add_secret_with_empty_name():
     assert creds._secrets[0].secret_kwargs.get("region") == "us-west-2"
 
     sql = creds.secrets_sql()[0]
-    assert sql == \
-"""CREATE SECRET (
+    assert (
+        sql
+        == """CREATE SECRET (
     type s3,
     key_id 'abc',
     secret 'xyz',
     region 'us-west-2'
 )"""
+    )
 
 
 def test_add_secret_with_name():
     creds = DuckDBCredentials.from_dict(
-        dict(secrets=[
-            dict(
-                type="s3",
-                name="my_secret",
-                key_id="abc",
-                secret="xyz",
-                region="us-west-2",
-                scope="s3://my-bucket"
-            )
-        ])
+        dict(
+            secrets=[
+                dict(
+                    type="s3",
+                    name="my_secret",
+                    key_id="abc",
+                    secret="xyz",
+                    region="us-west-2",
+                    scope="s3://my-bucket",
+                )
+            ]
+        )
     )
     assert len(creds._secrets) == 1
     assert creds._secrets[0].type == "s3"
@@ -65,30 +63,63 @@ def test_add_secret_with_name():
     assert creds._secrets[0].scope == "s3://my-bucket"
 
     sql = creds.secrets_sql()[0]
-    assert sql == \
-"""CREATE OR REPLACE SECRET my_secret (
+    assert (
+        sql
+        == """CREATE OR REPLACE SECRET my_secret (
     type s3,
-    scope 's3://my-bucket',
     key_id 'abc',
     secret 'xyz',
-    region 'us-west-2'
+    region 'us-west-2',
+    scope 's3://my-bucket'
 )"""
+    )
+
+
+def test_add_secret_with_multiple_scopes():
+    creds = DuckDBCredentials.from_dict(
+        dict(
+            secrets=[
+                dict(
+                    type="s3",
+                    name="my_secret",
+                    key_id="abc",
+                    secret="xyz",
+                    region="us-west-2",
+                    scope=["s3://my-bucket", "s3://another-bucket"],
+                )
+            ]
+        )
+    )
+    assert len(creds._secrets) == 1
+    assert creds._secrets[0].type == "s3"
+    assert creds._secrets[0].secret_kwargs.get("key_id") == "abc"
+    assert creds._secrets[0].secret_kwargs.get("secret") == "xyz"
+    assert creds._secrets[0].secret_kwargs.get("region") == "us-west-2"
+    assert creds._secrets[0].scope == ["s3://my-bucket", "s3://another-bucket"]
+
+    sql = creds.secrets_sql()[0]
+    assert (
+        sql
+        == """CREATE OR REPLACE SECRET my_secret (
+    type s3,
+    key_id 'abc',
+    secret 'xyz',
+    region 'us-west-2',
+    scope 's3://my-bucket',
+    scope 's3://another-bucket'
+)"""
+    )
 
 
 def test_add_unsupported_secret():
-    creds = DuckDBCredentials(
-        secrets=[
-            dict(
-                type="scrooge_mcduck",
-                name="money"
-            )
-        ]
-    )
+    creds = DuckDBCredentials(secrets=[dict(type="scrooge_mcduck", name="money")])
     sql = creds.secrets_sql()[0]
-    assert sql == \
-"""CREATE OR REPLACE SECRET money (
+    assert (
+        sql
+        == """CREATE OR REPLACE SECRET money (
     type scrooge_mcduck
 )"""
+    )
     with pytest.raises(duckdb.InvalidInputException) as e:
         duckdb.sql(sql)
         assert "Secret type 'scrooge_mcduck' not found" in str(e)
@@ -96,20 +127,15 @@ def test_add_unsupported_secret():
 
 @pytest.mark.skip_profile("nightly")
 def test_add_unsupported_secret_param():
-    creds = DuckDBCredentials(
-        secrets=[
-            dict(
-                type="s3",
-                password="secret"
-            )
-        ]
-    )
+    creds = DuckDBCredentials(secrets=[dict(type="s3", password="secret")])
     sql = creds.secrets_sql()[0]
-    assert sql == \
-"""CREATE OR REPLACE SECRET _dbt_secret_1 (
+    assert (
+        sql
+        == """CREATE OR REPLACE SECRET _dbt_secret_1 (
     type s3,
     password 'secret'
 )"""
+    )
     with pytest.raises(duckdb.BinderException) as e:
         duckdb.sql(sql)
         msg = "Unknown parameter 'password' for secret type 's3' with default provider 'config'"
@@ -126,7 +152,7 @@ def test_add_azure_secret():
                 tenant_id="abc",
                 client_id="xyz",
                 client_certificate_path="foo\\bar\\baz.pem",
-                account_name="123"
+                account_name="123",
             )
         ]
     )
@@ -134,12 +160,16 @@ def test_add_azure_secret():
     assert creds._secrets[0].type == "azure"
     assert creds._secrets[0].secret_kwargs.get("tenant_id") == "abc"
     assert creds._secrets[0].secret_kwargs.get("client_id") == "xyz"
-    assert creds._secrets[0].secret_kwargs.get("client_certificate_path") == "foo\\bar\\baz.pem"
+    assert (
+        creds._secrets[0].secret_kwargs.get("client_certificate_path")
+        == "foo\\bar\\baz.pem"
+    )
     assert creds._secrets[0].secret_kwargs.get("account_name") == "123"
 
     sql = creds.secrets_sql()[0]
-    assert sql == \
-"""CREATE SECRET (
+    assert (
+        sql
+        == """CREATE SECRET (
     type azure,
     provider service_principal,
     tenant_id 'abc',
@@ -147,28 +177,23 @@ def test_add_azure_secret():
     client_certificate_path 'foo\\bar\\baz.pem',
     account_name '123'
 )"""
+    )
 
 
 def test_add_hf_secret():
-    creds = DuckDBCredentials(
-        secrets=[
-            dict(
-                type="huggingface",
-                name="",
-                token="abc"
-            )
-        ]
-    )
+    creds = DuckDBCredentials(secrets=[dict(type="huggingface", name="", token="abc")])
     assert len(creds.secrets) == 1
     assert creds._secrets[0].type == "huggingface"
     assert creds._secrets[0].secret_kwargs.get("token") == "abc"
 
     sql = creds.secrets_sql()[0]
-    assert sql == \
-"""CREATE SECRET (
+    assert (
+        sql
+        == """CREATE SECRET (
     type huggingface,
     token 'abc'
 )"""
+    )
 
 
 @mock.patch("boto3.session.Session")

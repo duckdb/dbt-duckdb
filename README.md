@@ -140,6 +140,31 @@ default:
   target: dev
 ```
 
+#### Scoped credentials by storage prefix
+
+Secrets can be scoped, such that different storage path can use different credentials.
+
+```
+default:
+  outputs:
+    dev:
+      type: duckdb
+      path: /tmp/dbt.duckdb
+      extensions:
+        - httpfs
+        - parquet
+      secrets:
+        - type: s3
+          provider: credential_chain
+          scope: [ "s3://bucket-in-eu-region", "s3://bucket-2-in-eu-region" ]
+          region: "eu-central-1"
+        - type: s3
+          region: us-west-2
+          scope: "s3://bucket-in-us-region"
+```
+
+When fetching a secret for a path, the secret scopes are compared to the path, returning the matching secret for the path. In the case of multiple matching secrets, the longest prefix is chosen.
+
 #### Attaching Additional Databases
 
 DuckDB version `0.7.0` added support for [attaching additional databases](https://duckdb.org/docs/sql/statements/attach.html) to your dbt-duckdb run so that you can read
