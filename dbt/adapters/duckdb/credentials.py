@@ -228,11 +228,7 @@ class DuckDBCredentials(Credentials):
             parsed = urlparse(path)
             base_file = os.path.basename(parsed.path)
             path_db = os.path.splitext(base_file)[0]
-            # For MotherDuck, turn on disable_transactions unless
-            # it's explicitly set already by the user
             if cls._is_motherduck(parsed.scheme):
-                if "disable_transactions" not in data:
-                    data["disable_transactions"] = True
                 if path_db == "":
                     path_db = "my_db"
 
