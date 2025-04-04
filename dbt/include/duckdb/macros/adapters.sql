@@ -244,3 +244,16 @@ def materialize(df, con):
       {{ adapter.warn_once('Grants for relations are not supported by DuckDB') }}
     {% endif %}
 {% endmacro %}
+
+{% macro duckdb__get_create_index_sql(relation, index_dict) -%}
+  {%- set index_config = adapter.parse_index(index_dict) -%}
+  {%- set comma_separated_columns = ", ".join(index_config.columns) -%}
+  {%- set index_name = index_config.render(relation) -%}
+
+  create {% if index_config.unique -%}
+    unique
+  {%- endif %} index
+  "{{ index_name }}"
+  on {{ relation }}
+  ({{ comma_separated_columns }});
+{%- endmacro %}
