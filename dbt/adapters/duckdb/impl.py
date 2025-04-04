@@ -1,11 +1,9 @@
 import os
-from collections import defaultdict
 from typing import Any
 from typing import List
 from typing import Optional
 from typing import Sequence
 from typing import TYPE_CHECKING
-from uuid import uuid4
 
 from dbt_common.contracts.constraints import ColumnLevelConstraint
 from dbt_common.contracts.constraints import ConstraintType
@@ -17,8 +15,6 @@ from dbt.adapters.base.column import Column as BaseColumn
 from dbt.adapters.base.impl import ConstraintSupport
 from dbt.adapters.base.meta import available
 from dbt.adapters.contracts.connection import AdapterResponse
-from dbt.adapters.contracts.relation import Path
-from dbt.adapters.contracts.relation import RelationType
 from dbt.adapters.duckdb.column import DuckDBColumn
 from dbt.adapters.duckdb.connections import DuckDBConnectionManager
 from dbt.adapters.duckdb.relation import DuckDBRelation
@@ -49,10 +45,6 @@ class DuckDBAdapter(SQLAdapter):
         ConstraintType.primary_key: ConstraintSupport.ENFORCED,
         ConstraintType.foreign_key: ConstraintSupport.ENFORCED,
     }
-
-    # can be overridden via the model config metadata
-    _temp_schema_name = DEFAULT_TEMP_SCHEMA_NAME
-    _temp_schema_model_uuid: dict[str, str] = defaultdict(lambda: str(uuid4()).split("-")[-1])
 
     @classmethod
     def date_function(cls) -> str:
@@ -262,48 +254,6 @@ class DuckDBAdapter(SQLAdapter):
                 return f"references {constraint.expression}"
         else:
             return super().render_column_constraint(constraint)
-
-    def _clean_up_temp_relation_for_incremental(self, config):
-        if self.is_motherduck() and hasattr(config, "model"):
-            if "incremental" == config.model.get_materialization():
-                temp_relation = self.Relation(
-                    path=self.get_temp_relation_path(config.model),
-                    type=RelationType.Table,
-                )
-                self.drop_relation(temp_relation)
-
-    def pre_model_hook(self, config: Any) -> None:
-        """A hook for getting the temp schema name from the model config.
-        Cleans up the remote temporary table on MotherDuck before running
-        an incremental model.
-        """
-        if hasattr(config, "model"):
-            self._temp_schema_name = config.model.config.meta.get(
-                TEMP_SCHEMA_NAME, self._temp_schema_name
-            )
-            self._clean_up_temp_relation_for_incremental(config)
-        super().pre_model_hook(config)
-
-    @available
-    def get_temp_relation_path(self, model: Any):
-        """This is a workaround to enable incremental models on MotherDuck because it
-        currently doesn't support remote temporary tables. Instead we use a regular
-        table that is dropped at the end of the incremental macro or post-model hook.
-        """
-        # Add a unique identifier for this model (scoped per dbt run)
-        _uuid = self._temp_schema_model_uuid[model.identifier]
-        return Path(
-            schema=self._temp_schema_name,
-            database=model.database,
-            identifier=f"{model.identifier}__{_uuid}",
-        )
-
-    def post_model_hook(self, config: Any, context: Any) -> None:
-        """A hook for cleaning up the remote temporary table on MotherDuck if the
-        incremental model materialization fails to do so.
-        """
-        self._clean_up_temp_relation_for_incremental(config)
-        super().post_model_hook(config, context)
 
 
 # Change `table_a/b` to `table_aaaaa/bbbbb` to avoid duckdb binding issues when relation_a/b
