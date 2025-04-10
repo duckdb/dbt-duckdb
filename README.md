@@ -36,7 +36,8 @@ in dbt-duckdb are provided in the docs on [reading and writing external files](#
 
 To have your dbt pipeline persist relations in a DuckDB file, set the `path` field in your profile to the path
 of the DuckDB file that you would like to read and write on your local filesystem. (For in-memory pipelines, the `path`
-is automatically set to the special value `:memory:`).
+is automatically set to the special value `:memory:`). By default, the `path` is relative to your `profiles.yml` file location.
+If the database doesn't exist at the specified `path`, DuckDB will automatically create it.
 
 `dbt-duckdb` also supports common profile fields like `schema` and `threads`, but the `database` property is special: its value is automatically set
 to the basename of the file in the `path` argument with the suffix removed. For example, if the `path` is `/tmp/a/dbfile.duckdb`, the `database`
