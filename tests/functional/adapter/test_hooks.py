@@ -6,7 +6,7 @@ basic_model_sql = """
 select range from range(3)
 """
 
-test_table = f"test_table_{str(uuid.uuid1()).replace("-", "_")}"
+test_table = f"test_table_{str(uuid.uuid1()).replace('-', '_')}"
 
 post_hook_sql = f"""
 create or replace table {test_table} as select 1;
