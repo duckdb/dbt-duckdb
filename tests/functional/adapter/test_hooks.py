@@ -8,9 +8,7 @@ select range from range(3)
 
 test_table = f"test_table_{str(uuid.uuid1()).replace('-', '_')}"
 
-post_hook_sql = f"""
-create or replace table {test_table} as select 1;
-"""
+post_hook_sql = f"create table {test_table} as select 1;"
 
 
 class TestPostHook:
