@@ -1,4 +1,4 @@
-import os
+import uuid
 import pytest
 from dbt.tests.util import run_dbt, relation_from_name
 
@@ -6,8 +6,10 @@ basic_model_sql = """
 select range from range(3)
 """
 
-post_hook_sql = """
-set TimeZone to 'America/Los_Angeles'
+test_table = f"test_table_{str(uuid.uuid1()).replace("-", "_")}"
+
+post_hook_sql = f"""
+create or replace table {test_table} as select 1;
 """
 
 
@@ -30,17 +32,6 @@ class TestPostHook:
         }
 
     def test_run(self, project):
-        default_timezone = project.run_sql(
-            "select value from duckdb_settings() where name = 'TimeZone';", fetch="one"
-        )[0]
-
-        # set timezone to NY
-        result = project.run_sql(
-            "set TimeZone to 'America/New_York'; select value from duckdb_settings() where name = 'TimeZone';",
-            fetch="one",
-        )
-        assert result[0] == "America/New_York"
-
         run_dbt(["run"])
 
         # check that the model was run
@@ -52,12 +43,12 @@ class TestPostHook:
 
         # check that the post hook was run
         result = project.run_sql(
-            "select value from duckdb_settings() where name = 'TimeZone'", fetch="one"
+            f"select count(*) as num_rows from {test_table}", fetch="one"
         )
-        assert result[0] == "America/Los_Angeles"
+        assert result[0] == 1
 
         # reset
-        result = project.run_sql(f"set TimeZone to '{default_timezone}'")
+        project.run_sql(f"drop table {test_table}")
 
 
 class TestPostHookTransactionFalse(TestPostHook):
