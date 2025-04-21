@@ -495,6 +495,53 @@ an external database, respectively.
 dbt-duckdb ships with a number of [built-in plugins](dbt/adapters/duckdb/plugins/) that can be used as examples
 for implementing your own.
 
+### Interactive Shell
+
+As of version 1.9.3, dbt-duckdb includes an interactive shell that allows you to run dbt commands and query the DuckDB database in an integrated CLI environment. The shell automatically launches the [DuckDB UI](https://duckdb.org/2025/03/12/duckdb-ui.html), providing a visual interface to explore your data while working with your dbt models.
+
+To start the interactive shell, use:
+
+```
+python -m dbt.adapters.duckdb.cli
+```
+
+You can specify a profile to use with the `--profile` flag:
+
+```
+python -m dbt.adapters.duckdb.cli --profile my_profile
+```
+
+The shell provides access to all standard dbt commands:
+- `run` - Run dbt models
+- `test` - Run tests on dbt models
+- `build` - Build and test dbt models
+- `seed` - Load seed files
+- `snapshot` - Run snapshots
+- `compile` - Compile models without running them
+- `parse` - Parse the project
+- `debug` - Debug connection
+- `deps` - Install dependencies
+- `list` - List resources
+
+When you launch the shell, it automatically:
+1. Runs `dbt debug` to test your connection
+2. Parses your dbt project
+3. Launches the DuckDB UI for visual data exploration
+
+The shell supports model name autocompletion if you install the optional `iterfzf` package:
+
+```
+pip install iterfzf
+```
+
+Example workflow:
+1. Start the interactive shell
+2. View your project's models in the launched DuckDB UI
+3. Run `build` to build your models
+4. Immediately see the results in the UI and continue iterating
+
+This interactive environment makes it easier to develop and test dbt models while simultaneously exploring the data in a visual interface.
+
 ### Roadmap
 
 Things that we would like to add in the near future:
