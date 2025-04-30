@@ -225,12 +225,10 @@ class Environment(abc.ABC):
         if plugins:
             for plugin in plugins.values():
                 plugin.configure_cursor(cursor)
+                cursor = plugin.modify_cursor(cursor)
 
         for df_name, df in registered_df.items():
             cursor.register(df_name, df)
-
-        if "sqlglot" in plugins:
-            cursor = plugins["sqlglot"].cursor(cursor)
 
         if creds.retries and creds.retries.query_attempts:
             cursor = RetryableCursor(
