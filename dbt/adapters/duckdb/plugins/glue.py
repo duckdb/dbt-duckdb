@@ -161,6 +161,20 @@ def _create_table(
         )
 
 
+def _add_partition(
+    client: "GlueClient",
+    database: str,
+    table_def: "TableInputTypeDef",
+    partition_columns: List[Dict[str, str]],
+) -> None:
+    if partition_columns != []:
+        partition_input, _ = _parse_partition_columns(partition_columns, table_def)
+
+        client.create_partition(
+            DatabaseName=database, TableName=table_def["Name"], PartitionInput=partition_input
+        )
+
+
 def _update_table(
     client: "GlueClient",
     database: str,
@@ -337,9 +351,21 @@ def create_or_update_table(
     if glue_table:
         # Existing columns in AWS Glue catalog
         glue_columns = _get_column_type_def(glue_table)
+        partition_names = {col["Name"] for col in partition_columns}
+
+        # Filter out dicts in model_columns that have a 'Name' in partition_names
+        columns = [col for col in columns if col["Name"] not in partition_names]
+
         # Create new version only if columns are changed
         if glue_columns != columns:
             _update_table(
+                client=client,
+                database=database,
+                table_def=table_def,
+                partition_columns=partition_columns,
+            )
+        else:
+            _add_partition(
                 client=client,
                 database=database,
                 table_def=table_def,
