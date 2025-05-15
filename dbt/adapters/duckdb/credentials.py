@@ -27,6 +27,9 @@ class Attachment(dbtClassMixin):
     # An optional alias for the attached database
     alias: Optional[str] = None
 
+    # An optional reference to a secret name from the secret manager
+    secret: Optional[str] = None
+
     # Whether the attached database is read-only or read/write
     read_only: bool = False
 
@@ -40,6 +43,8 @@ class Attachment(dbtClassMixin):
         options = []
         if self.type:
             options.append(f"TYPE {self.type}")
+        if self.secret:
+            options.append(f"SECRET {self.secret}")
         if self.read_only:
             options.append("READ_ONLY")
         if options:
