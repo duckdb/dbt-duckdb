@@ -40,6 +40,21 @@ class DuckdbtShell(cmd.Cmd):
             if DuckDBConnectionManager._ENV:
                 env = DuckDBConnectionManager._ENV
                 cursor = env.handle().cursor()
+
+                # Check if .duckdbrc file exists
+                # and execute the SQL commands if it does
+                duckdbrc_path = os.path.expanduser("~/.duckdbrc")
+                if os.path.exists(duckdbrc_path):
+                    print(f"Executing commands from {duckdbrc_path}...")
+                    try:
+                        with open(duckdbrc_path, "r") as f:
+                            sql_script = f.read()
+                            if sql_script.strip():
+                                cursor.execute(sql_script)
+                                print(f"Successfully executed {duckdbrc_path}")
+                    except Exception as e:
+                        print(f"Error executing {duckdbrc_path}: {e}")
+
                 print("Launching DuckDB UI...")
                 cursor.execute("CALL start_ui()")
                 cursor.close()
