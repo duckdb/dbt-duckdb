@@ -29,7 +29,7 @@
         c.column_index as column_index,
         c.data_type as column_type,
         {{ adapter.catalog_comment('c') }} as column_comment,
-        '' as table_owner
+        NULL as table_owner
     FROM relations r JOIN duckdb_columns() c ON r.schema_name = c.schema_name AND r.table_name = c.table_name
     WHERE (
         {%- for schema in schemas -%}
