@@ -43,7 +43,7 @@ class Attachment(dbtClassMixin):
         base = f"ATTACH '{path}'"
         if self.alias:
             base += f" AS {self.alias}"
-        
+
         # Check for conflicts between legacy fields and options dict
         if self.options:
             conflicts = []
@@ -53,46 +53,46 @@ class Attachment(dbtClassMixin):
                 conflicts.append("secret")
             if self.read_only and "read_only" in self.options:
                 conflicts.append("read_only")
-            
+
             if conflicts:
                 raise DbtRuntimeError(
                     f"Attachment option(s) {conflicts} specified in both direct fields and options dict. "
                     f"Please specify each option in only one location."
                 )
-        
+
         # Collect all options, prioritizing direct fields over options dict
         all_options = []
-        
+
         # Add legacy options for backward compatibility
         if self.type:
             all_options.append(f"TYPE {self.type}")
         elif self.options and "type" in self.options:
             all_options.append(f"TYPE {self.options['type']}")
-            
+
         if self.secret:
             all_options.append(f"SECRET {self.secret}")
         elif self.options and "secret" in self.options:
             all_options.append(f"SECRET {self.options['secret']}")
-            
+
         if self.read_only:
             all_options.append("READ_ONLY")
         elif self.options and "read_only" in self.options and self.options["read_only"]:
             all_options.append("READ_ONLY")
-        
+
         # Add arbitrary options from the options dict (excluding handled ones)
         if self.options:
             handled_keys = {"type", "secret", "read_only"}
             for key, value in self.options.items():
                 if key in handled_keys:
                     continue
-                
+
                 # Format the option appropriately
                 if isinstance(value, bool):
                     if value:  # Only add boolean options if they're True
                         all_options.append(key.upper())
                 elif value is not None:
                     all_options.append(f"{key.upper()} {value}")
-        
+
         if all_options:
             joined = ", ".join(all_options)
             base += f" ({joined})"

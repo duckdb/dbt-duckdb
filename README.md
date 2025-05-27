@@ -212,19 +212,19 @@ attach:
   - path: /tmp/db1.duckdb
     type: sqlite
     read_only: true
-    
+
   # New way using options dict (equivalent to above)
   - path: /tmp/db2.duckdb
     options:
       type: sqlite
       read_only: true
-      
+
   # Mix of both (no conflicts allowed)
   - path: /tmp/db3.duckdb
     type: sqlite
     options:
       block_size: 16384
-      
+
   # Using options dict for future DuckDB attachment options
   - path: /tmp/db4.duckdb
     options:
