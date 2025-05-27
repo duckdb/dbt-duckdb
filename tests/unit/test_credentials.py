@@ -335,3 +335,49 @@ def test_infer_database_name_from_path():
     }
     creds = DuckDBCredentials.from_dict(payload)
     assert creds.database == "remote"
+
+
+def test_database_matches_attach_alias():
+    """Test that database field can match an attach alias instead of path-derived name"""
+    payload = {
+        "path": "/tmp/primary.db",  # This would normally set database to "primary"
+        "database": "my_alias",    # But we want to use an attach alias instead
+        "attach": [
+            {"path": "/tmp/secondary.db", "alias": "my_alias"},
+            {"path": "/tmp/tertiary.db", "alias": "other_alias"}
+        ]
+    }
+    creds = DuckDBCredentials.from_dict(payload)
+    assert creds.database == "my_alias"
+
+
+def test_database_mismatch_without_attach_alias():
+    """Test that mismatched database still raises error when not in attach aliases"""
+    from dbt_common.exceptions import DbtRuntimeError
+    
+    payload = {
+        "path": "/tmp/primary.db",
+        "database": "nonexistent_alias",
+        "attach": [
+            {"path": "/tmp/secondary.db", "alias": "my_alias"}
+        ]
+    }
+    with pytest.raises(DbtRuntimeError) as exc:
+        DuckDBCredentials.from_dict(payload)
+    assert "Inconsistency detected between 'path' and 'database' fields" in str(exc.value)
+
+
+def test_database_matches_attach_alias_no_alias():
+    """Test that attach entries without aliases don't affect validation"""
+    from dbt_common.exceptions import DbtRuntimeError
+    
+    payload = {
+        "path": "/tmp/primary.db",
+        "database": "nonexistent_alias",
+        "attach": [
+            {"path": "/tmp/secondary.db"}  # No alias
+        ]
+    }
+    with pytest.raises(DbtRuntimeError) as exc:
+        DuckDBCredentials.from_dict(payload)
+    assert "Inconsistency detected between 'path' and 'database' fields" in str(exc.value)

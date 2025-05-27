@@ -283,10 +283,21 @@ class DuckDBCredentials(Credentials):
                 if path_db == "":
                     path_db = "my_db"
 
+        # Check if the database field matches any attach alias
+        attach_aliases = []
+        if data.get("attach"):
+            for attach_data in data["attach"]:
+                if isinstance(attach_data, dict) and attach_data.get("alias"):
+                    attach_aliases.append(attach_data["alias"])
+
+        database_from_data = data.get("database")
+        database_matches_attach_alias = database_from_data in attach_aliases
+
         if path_db and "database" not in data:
             data["database"] = path_db
         elif path_db and data["database"] != path_db:
-            if not data.get("remote"):
+            # Allow database name to differ from path_db if it matches an attach alias
+            if not data.get("remote") and not database_matches_attach_alias:
                 raise DbtRuntimeError(
                     "Inconsistency detected between 'path' and 'database' fields in profile; "
                     f"the 'database' property must be set to '{path_db}' to match the 'path'"
