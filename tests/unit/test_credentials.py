@@ -237,6 +237,73 @@ def test_attachments():
         assert expected_sql[i] == attachment.to_sql()
 
 
+def test_attachments_with_options():
+    # Test arbitrary options in options dict
+    attachment = Attachment(
+        path="/tmp/test.db",
+        alias="test_db",
+        options={
+            "cache_size": "1GB", 
+            "threads": 4,
+            "enable_fsst": True,
+            "disabled_feature": False
+        }
+    )
+    sql = attachment.to_sql()
+    assert "ATTACH '/tmp/test.db' AS test_db (CACHE_SIZE 1GB, THREADS 4, ENABLE_FSST)" == sql
+
+    # Test options dict with legacy options (no conflicts)
+    attachment = Attachment(
+        path="/tmp/test.db",
+        options={"type": "sqlite", "secret": "my_secret", "read_only": True}
+    )
+    sql = attachment.to_sql()
+    assert "ATTACH '/tmp/test.db' (TYPE sqlite, SECRET my_secret, READ_ONLY)" == sql
+
+    # Test mixed legacy and options dict (no conflicts)
+    attachment = Attachment(
+        path="/tmp/test.db",
+        type="sqlite",
+        options={"cache_size": "512MB", "enable_fsst": True}
+    )
+    sql = attachment.to_sql()
+    assert "ATTACH '/tmp/test.db' (TYPE sqlite, CACHE_SIZE 512MB, ENABLE_FSST)" == sql
+
+
+def test_attachment_option_conflicts():
+    from dbt_common.exceptions import DbtRuntimeError
+    
+    # Test conflict with type
+    with pytest.raises(DbtRuntimeError) as exc:
+        attachment = Attachment(
+            path="/tmp/test.db",
+            type="sqlite",
+            options={"type": "postgres"}
+        )
+        attachment.to_sql()
+    assert "type" in str(exc.value)
+    
+    # Test conflict with secret
+    with pytest.raises(DbtRuntimeError) as exc:
+        attachment = Attachment(
+            path="/tmp/test.db",
+            secret="secret1",
+            options={"secret": "secret2"}
+        )
+        attachment.to_sql()
+    assert "secret" in str(exc.value)
+    
+    # Test conflict with read_only
+    with pytest.raises(DbtRuntimeError) as exc:
+        attachment = Attachment(
+            path="/tmp/test.db",
+            read_only=True,
+            options={"read_only": True}
+        )
+        attachment.to_sql()
+    assert "read_only" in str(exc.value)
+
+
 def test_infer_database_name_from_path():
     payload = {}
     creds = DuckDBCredentials.from_dict(payload)

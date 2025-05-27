@@ -168,8 +168,8 @@ When fetching a secret for a path, the secret scopes are compared to the path, r
 
 #### Attaching Additional Databases
 
-DuckDB version `0.7.0` added support for [attaching additional databases](https://duckdb.org/docs/sql/statements/attach.html) to your dbt-duckdb run so that you can read
-and write from multiple databases. Additional databases may be configured using [dbt run hooks](https://docs.getdbt.com/docs/build/hooks-operations) or via the `attach` argument
+DuckDB supports [attaching additional databases](https://duckdb.org/docs/sql/statements/attach.html) to your dbt-duckdb run so that you can read
+and write from multiple databases. Additional databases may be configured via the `attach` argument
 in your profile that was added in dbt-duckdb `1.4.0`:
 
 ```
@@ -188,13 +188,53 @@ default:
           type: sqlite
         - path: postgresql://username@hostname/dbname
           type: postgres
+        # Using the options dict for arbitrary ATTACH options
+        - path: /tmp/special.duckdb
+          options:
+            cache_size: 1GB
+            threads: 4
+            enable_fsst: true
 ```
 
 The attached databases may be referred to in your dbt sources and models by either the basename of the database file minus its suffix (e.g., `/tmp/other.duckdb` is the `other` database
 and `s3://yep/even/this/works.duckdb` is the `works` database) or by an alias that you specify (so the `./yet/another.duckdb` database in the above configuration is referred to
 as `yet_another` instead of `another`.) Note that these additional databases do not necessarily have to be DuckDB files: DuckDB's storage and catalog engines are pluggable, and
-DuckDB `0.7.0` ships with support for reading and writing from attached databases. You can indicate the type of the database you are connecting to via the `type` argument,
+DuckDB ships with support for reading and writing from attached databases. You can indicate the type of the database you are connecting to via the `type` argument,
 which currently supports `duckdb`, `sqlite` and `postgres`.
+
+##### Arbitrary ATTACH Options
+
+As DuckDB continues to add new attachment options, you can use the `options` dictionary to specify any additional key-value pairs that will be passed to the `ATTACH` statement. This allows you to take advantage of new DuckDB features without waiting for explicit support in dbt-duckdb:
+
+```
+attach:
+  # Standard way using direct fields
+  - path: /tmp/db1.duckdb
+    type: sqlite
+    read_only: true
+    
+  # New way using options dict (equivalent to above)
+  - path: /tmp/db2.duckdb
+    options:
+      type: sqlite
+      read_only: true
+      
+  # Mix of both (no conflicts allowed)
+  - path: /tmp/db3.duckdb
+    type: sqlite
+    options:
+      block_size: 16384
+      
+  # Using options dict for future DuckDB attachment options
+  - path: /tmp/db4.duckdb
+    options:
+      type: duckdb
+      # Example: hypothetical future options DuckDB might add
+      compression: lz4
+      memory_limit: 2GB
+```
+
+Note: If you specify the same option in both a direct field (`type`, `secret`, `read_only`) and in the `options` dict, dbt-duckdb will raise an error to prevent conflicts.
 
 #### Configuring dbt-duckdb Plugins
 
