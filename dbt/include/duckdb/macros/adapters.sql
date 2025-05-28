@@ -36,7 +36,6 @@
     {% endif %}
     
     {% if ns.is_ducklake %}
-      {{ log("Dropping ducklake schema without cascade: " ~ relation.without_identifier(), info=True) }}
       drop schema if exists {{ relation.without_identifier() }}
     {% else %}
       drop schema if exists {{ relation.without_identifier() }} cascade
@@ -198,7 +197,6 @@ def materialize(df, con):
     {% endif %}
     
     {% if ns.is_ducklake %}
-      {{ log("Dropping ducklake relation without cascade: " ~ relation, info=True) }}
       drop {{ relation.type }} if exists {{ relation }}
     {% else %}
       drop {{ relation.type }} if exists {{ relation }} cascade
