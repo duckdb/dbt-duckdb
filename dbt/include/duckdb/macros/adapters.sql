@@ -164,7 +164,7 @@ def materialize(df, con):
 
 {% macro duckdb__drop_relation(relation) -%}
   {% call statement('drop_relation', auto_begin=False) -%}
-      drop {{ relation.type }} if exists {{ relation }}
+      drop {{ relation.type }} jif exists {{ relation }}
     {% endif %}
   {%- endcall %}
 {% endmacro %}
