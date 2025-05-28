@@ -19,24 +19,9 @@
   {%- endcall -%}
 {% endmacro %}
 
-{% macro is_ducklake_database(database) -%}
-  {% if execute %}
-    {% set profile = adapter.config.credentials %}
-    
-    {% if profile.attach is defined and profile.attach %}
-      {% for attachment in profile.attach %}
-        {% if attachment.alias == database and attachment.path is defined and 'ducklake:' in attachment.path %}
-          {% do return(true) %}
-        {% endif %}
-      {% endfor %}
-    {% endif %}
-  {% endif %}
-  {% do return(false) %}
-{%- endmacro %}
-
 {% macro duckdb__drop_schema(relation) -%}
   {%- call statement('drop_schema') -%}
-    {% if is_ducklake_database(relation.database) %}
+    {% if adapter.is_ducklake(relation) %}
       drop schema if exists {{ relation.without_identifier() }}
     {% else %}
       drop schema if exists {{ relation.without_identifier() }} cascade
@@ -183,7 +168,7 @@ def materialize(df, con):
 
 {% macro duckdb__drop_relation(relation) -%}
   {% call statement('drop_relation', auto_begin=False) -%}
-    {% if is_ducklake_database(relation.database) %}
+    {% if adapter.is_ducklake(relation) %}
       drop {{ relation.type }} if exists {{ relation }}
     {% else %}
       drop {{ relation.type }} if exists {{ relation }} cascade

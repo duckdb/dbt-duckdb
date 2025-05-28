@@ -70,6 +70,24 @@ class DuckDBAdapter(SQLAdapter):
         return self.config.credentials.is_motherduck
 
     @available
+    def is_ducklake(self, relation: DuckDBRelation) -> bool:
+        """Check if a relation's database is backed by a ducklake attachment."""
+        if not relation or not relation.database:
+            return False
+        
+        attach_configs = getattr(self.config.credentials, 'attach', None)
+        if not attach_configs:
+            return False
+        
+        for attachment in attach_configs:
+            if (hasattr(attachment, 'alias') and attachment.alias == relation.database and
+                hasattr(attachment, 'path') and attachment.path and 
+                'ducklake:' in attachment.path):
+                return True
+        
+        return False
+
+    @available
     def convert_datetimes_to_strs(self, table: "agate.Table") -> "agate.Table":
         import agate
 
