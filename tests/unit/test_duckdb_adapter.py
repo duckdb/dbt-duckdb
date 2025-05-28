@@ -185,7 +185,7 @@ class TestDuckDBAdapterIsDucklake(unittest.TestCase):
         profile_cfg["outputs"]["test"]["attach"] = [
             {
                 "alias": "ducklake_db",
-                "path": "ducklake:s3://my-bucket/data"
+                "path": "ducklake:sqlite:storage/metadata.sqlite"
             }
         ]
         
@@ -223,7 +223,7 @@ class TestDuckDBAdapterIsDucklake(unittest.TestCase):
             },
             {
                 "alias": "ducklake_db",
-                "path": "ducklake:s3://my-bucket/data"
+                "path": "ducklake:sqlite:storage/metadata.sqlite"
             },
             {
                 "alias": "another_db",
@@ -251,7 +251,7 @@ class TestDuckDBAdapterIsDucklake(unittest.TestCase):
         profile_cfg["outputs"]["test"]["attach"] = [
             {
                 "alias": "ducklake_db",
-                "path": "ducklake:s3://my-bucket/data"
+                "path": "ducklake:sqlite:storage/metadata.sqlite"
             }
         ]
         
@@ -275,7 +275,7 @@ class TestDuckDBAdapterIsDucklake(unittest.TestCase):
         profile_cfg = self.base_profile_cfg.copy()
         profile_cfg["outputs"]["test"]["attach"] = [
             {
-                "path": "ducklake:s3://my-bucket/data"
+                "path": "ducklake:sqlite:storage/metadata.sqlite"
                 # Missing alias
             }
         ]
