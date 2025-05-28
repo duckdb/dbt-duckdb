@@ -164,7 +164,8 @@ def materialize(df, con):
 
 {% macro duckdb__drop_relation(relation) -%}
   {% call statement('drop_relation', auto_begin=False) -%}
-    {% if relation.path is defined and relation.path.identifier is defined and relation.path.identifier | string | lower is string and relation.path.identifier | string | lower starts with 'ducklake:' %}
+    {% set relation_str = relation | string %}
+    {% if 'ducklake:' in relation_str %}
       {{ log("Dropping ducklake relation without cascade: " ~ relation, info=True) }}
       drop {{ relation.type }} if exists {{ relation }}
     {% else %}
