@@ -70,6 +70,14 @@ class DuckDBAdapter(SQLAdapter):
         return self.config.credentials.is_motherduck
 
     @available
+    def is_ducklake(self, relation: DuckDBRelation) -> bool:
+        """Check if a relation's database is backed by a ducklake attachment."""
+        if not relation or not relation.database:
+            return False
+
+        return relation.database in self.config.credentials._ducklake_dbs
+
+    @available
     def convert_datetimes_to_strs(self, table: "agate.Table") -> "agate.Table":
         import agate
 

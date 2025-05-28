@@ -164,7 +164,11 @@ def materialize(df, con):
 
 {% macro duckdb__drop_relation(relation) -%}
   {% call statement('drop_relation', auto_begin=False) -%}
-    drop {{ relation.type }} if exists {{ relation }} cascade
+    {% if adapter.is_ducklake(relation) %}
+      drop {{ relation.type }} if exists {{ relation }}
+    {% else %}
+      drop {{ relation.type }} if exists {{ relation }} cascade
+    {% endif %}
   {%- endcall %}
 {% endmacro %}
 
