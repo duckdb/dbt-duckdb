@@ -21,11 +21,7 @@
 
 {% macro duckdb__drop_schema(relation) -%}
   {%- call statement('drop_schema') -%}
-    {% if adapter.is_ducklake(relation) %}
-      drop schema if exists {{ relation.without_identifier() }}
-    {% else %}
-      drop schema if exists {{ relation.without_identifier() }} cascade
-    {% endif %}
+    drop schema if exists {{ relation.without_identifier() }} cascade
   {%- endcall -%}
 {% endmacro %}
 
