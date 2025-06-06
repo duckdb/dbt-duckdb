@@ -103,3 +103,25 @@ class TestDataPathQuoting:
         # Should keep existing double quotes
         assert 'DATA_PATH "s3://my-bucket/path"' in sql
         assert 'DATA_PATH \'"s3://my-bucket/path"\'' not in sql
+
+    def test_quoted_strings_with_whitespace_preserved(self):
+        """Test that quoted strings with surrounding whitespace are preserved."""
+        attachment = Attachment(
+            path="/tmp/test.db",
+            options={"data_path": "  's3://my-bucket/path'  "}
+        )
+        sql = attachment.to_sql()
+        # Should detect quotes despite whitespace and preserve original value
+        assert "DATA_PATH   's3://my-bucket/path'  " in sql
+        assert "DATA_PATH '  's3://my-bucket/path'  '" not in sql
+
+    def test_quoted_strings_with_whitespace_double_quotes(self):
+        """Test that double quoted strings with surrounding whitespace are preserved."""
+        attachment = Attachment(
+            path="/tmp/test.db",
+            options={"data_path": '  "s3://my-bucket/path"  '}
+        )
+        sql = attachment.to_sql()
+        # Should detect quotes despite whitespace and preserve original value
+        assert 'DATA_PATH   "s3://my-bucket/path"  ' in sql
+        assert 'DATA_PATH \'  "s3://my-bucket/path"  \'' not in sql

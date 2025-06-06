@@ -94,8 +94,9 @@ class Attachment(dbtClassMixin):
                     # Quote string values for DuckDB SQL compatibility
                     if isinstance(value, str):
                         # Only quote if not already quoted (single or double quotes)
-                        if (value.startswith("'") and value.endswith("'")) or (
-                            value.startswith('"') and value.endswith('"')
+                        stripped_value = value.strip()
+                        if (stripped_value.startswith("'") and stripped_value.endswith("'")) or (
+                            stripped_value.startswith('"') and stripped_value.endswith('"')
                         ):
                             all_options.append(f"{key.upper()} {value}")
                         else:
