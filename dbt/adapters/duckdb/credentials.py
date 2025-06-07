@@ -91,7 +91,18 @@ class Attachment(dbtClassMixin):
                     if value:  # Only add boolean options if they're True
                         all_options.append(key.upper())
                 elif value is not None:
-                    all_options.append(f"{key.upper()} {value}")
+                    # Quote string values for DuckDB SQL compatibility
+                    if isinstance(value, str):
+                        # Only quote if not already quoted (single or double quotes)
+                        stripped_value = value.strip()
+                        if (stripped_value.startswith("'") and stripped_value.endswith("'")) or (
+                            stripped_value.startswith('"') and stripped_value.endswith('"')
+                        ):
+                            all_options.append(f"{key.upper()} {value}")
+                        else:
+                            all_options.append(f"{key.upper()} '{value}'")
+                    else:
+                        all_options.append(f"{key.upper()} {value}")
 
         if all_options:
             joined = ", ".join(all_options)
