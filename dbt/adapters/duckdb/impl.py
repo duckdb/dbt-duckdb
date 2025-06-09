@@ -138,10 +138,7 @@ class DuckDBAdapter(SQLAdapter):
 
     @available
     def catalog_comment(self, prefix):
-        if DuckDBConnectionManager.env().supports_comments():
-            return f"{prefix}.comment"
-        else:
-            return "''"
+        return f"{prefix}.comment"
 
     @available
     def external_write_options(self, write_location: str, rendered_options: dict) -> str:
