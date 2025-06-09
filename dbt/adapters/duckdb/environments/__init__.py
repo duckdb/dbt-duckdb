@@ -88,12 +88,6 @@ class Environment(abc.ABC):
                 if path not in sys.path:
                     sys.path.append(path)
 
-        major, minor, patch = [int(x) for x in duckdb.__version__.split("-")[0].split(".")]
-        if major == 0 and (minor < 10 or (minor == 10 and patch == 0)):
-            self._supports_comments = False
-        else:
-            self._supports_comments = True
-
     @property
     def creds(self) -> DuckDBCredentials:
         return self._creds
@@ -116,9 +110,6 @@ class Environment(abc.ABC):
 
     def get_binding_char(self) -> str:
         return "?"
-
-    def supports_comments(self) -> bool:
-        return self._supports_comments
 
     @classmethod
     @abc.abstractmethod

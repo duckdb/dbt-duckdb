@@ -7,7 +7,7 @@
         , t.database_name
         , t.schema_name
         , 'BASE TABLE' as table_type
-        , {{ adapter.catalog_comment('t') }} as table_comment
+        , t.comment as table_comment
       from duckdb_tables() t
       WHERE t.database_name = '{{ database }}'
       UNION ALL
@@ -15,7 +15,7 @@
       , v.database_name
       , v.schema_name
       , 'VIEW' as table_type
-      , {{ adapter.catalog_comment('v') }} as table_comment
+      , v.comment as table_comment
       from duckdb_views() v
       WHERE v.database_name = '{{ database }}'
     )
@@ -28,7 +28,7 @@
         c.column_name,
         c.column_index as column_index,
         c.data_type as column_type,
-        {{ adapter.catalog_comment('c') }} as column_comment,
+        c.comment as column_comment,
         NULL as table_owner
     FROM relations r JOIN duckdb_columns() c ON r.schema_name = c.schema_name AND r.table_name = c.table_name
     WHERE (
