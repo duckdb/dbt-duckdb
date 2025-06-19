@@ -22,7 +22,7 @@
         {%- set upstream_location = adapter.external_read_location(location, rendered_options) -%}
         {% if upstream_rel.schema not in upstream_schemas %}
           {% call statement('main', language='sql') -%}
-            create schema if not exists {{ upstream_rel.schema }}
+            create schema if not exists {{ upstream_rel.without_identifier() }}
           {%- endcall %}
           {% do upstream_schemas.update({upstream_rel.schema: None}) %}
         {% endif %}
