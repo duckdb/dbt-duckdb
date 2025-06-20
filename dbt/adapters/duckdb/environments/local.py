@@ -24,7 +24,8 @@ class DuckDBCursorWrapper:
             else:
                 return self._cursor.execute(sql, bindings)
         except RuntimeError as e:
-            raise DbtRuntimeError(str(e))
+            # Preserve original error with full context including potential transaction state info
+            raise DbtRuntimeError(str(e)) from e
 
 
 class DuckDBConnectionWrapper:
