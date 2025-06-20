@@ -194,7 +194,7 @@ class DuckDBAdapter(SQLAdapter):
             self.connections.commit_if_has_connection()
         except DbtInternalError as e:
             # Log commit errors instead of silently swallowing them to aid debugging
-            logger.debug(f"Commit failed with DbtInternalError: {e}")
+            logger.exception(f"Commit failed with DbtInternalError: {e}")
             # Still pass to maintain backward compatibility, but now with visibility
             pass
 
