@@ -192,7 +192,10 @@ class DuckDBAdapter(SQLAdapter):
         """This is just a quick-fix. Python models do not execute begin function so the transaction_open is always false."""
         try:
             self.connections.commit_if_has_connection()
-        except DbtInternalError:
+        except DbtInternalError as e:
+            # Log commit errors instead of silently swallowing them to aid debugging
+            logger.exception(f"Commit failed with DbtInternalError: {e}")
+            # Still pass to maintain backward compatibility, but now with visibility
             pass
 
     def submit_python_job(self, parsed_model: dict, compiled_code: str) -> AdapterResponse:
