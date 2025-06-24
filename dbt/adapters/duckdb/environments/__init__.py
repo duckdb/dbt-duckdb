@@ -11,6 +11,7 @@ from typing import Optional
 import duckdb
 from dbt_common.exceptions import DbtRuntimeError
 
+from ..constants import DEFAULT_TEMP_SCHEMA_NAME
 from ..credentials import DuckDBCredentials
 from ..credentials import Extension
 from ..plugins import BasePlugin
@@ -194,6 +195,14 @@ class Environment(abc.ABC):
         if creds.attach:
             for attachment in creds.attach:
                 conn.execute(attachment.to_sql())
+
+        if creds.is_motherduck:
+            # Each incremental model will try to create a temporary schema, usually the
+            # DEFAULT_TEMP_SCHEMA_NAME, in its own transaction, which will result in all
+            # except the first-run model to fail with a write-write conflict. By creating
+            # the schema here, we make the CREATE SCHEMA statement in the incremental models
+            # a no-op, which will prevent the write-write conflict.
+            conn.execute("CREATE SCHEMA IF NOT EXISTS {}".format(DEFAULT_TEMP_SCHEMA_NAME))
 
         return conn
 
