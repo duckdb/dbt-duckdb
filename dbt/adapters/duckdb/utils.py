@@ -11,7 +11,6 @@ from dbt.adapters.contracts.relation import RelationConfig
 # TODO
 # from dbt.context.providers import RuntimeConfigObject
 
-
 @dataclass
 class SourceConfig:
     name: str

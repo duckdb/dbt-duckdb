@@ -26,10 +26,8 @@ from dbt.adapters.duckdb.utils import TargetConfig
 from dbt.adapters.duckdb.utils import TargetLocation
 from dbt.adapters.events.logging import AdapterLogger
 from dbt.adapters.sql import SQLAdapter
+from .constants import DEFAULT_TEMP_SCHEMA_NAME, TEMP_SCHEMA_NAME
 
-
-TEMP_SCHEMA_NAME = "temp_schema_name"
-DEFAULT_TEMP_SCHEMA_NAME = "dbt_temp"
 
 if TYPE_CHECKING:
     import agate
