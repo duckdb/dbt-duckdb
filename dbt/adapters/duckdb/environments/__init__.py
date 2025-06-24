@@ -197,11 +197,11 @@ class Environment(abc.ABC):
                 conn.execute(attachment.to_sql())
 
         if creds.is_motherduck:
-            # Each incremental model will try to create a temporary schema, usually the 
-            # DEFAULT_TEMP_SCHEMA_NAME, in its own transaction, which will result in all 
+            # Each incremental model will try to create a temporary schema, usually the
+            # DEFAULT_TEMP_SCHEMA_NAME, in its own transaction, which will result in all
             # except the first-run model to fail with a write-write conflict. By creating
             # the schema here, we make the CREATE SCHEMA statement in the incremental models
-            # a no-op, which will prevent the write-write conflict. 
+            # a no-op, which will prevent the write-write conflict.
             conn.execute("CREATE SCHEMA IF NOT EXISTS {}".format(DEFAULT_TEMP_SCHEMA_NAME))
 
         return conn

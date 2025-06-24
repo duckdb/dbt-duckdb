@@ -12,6 +12,8 @@ from dbt_common.contracts.constraints import ConstraintType
 from dbt_common.exceptions import DbtInternalError
 from dbt_common.exceptions import DbtRuntimeError
 
+from .constants import DEFAULT_TEMP_SCHEMA_NAME
+from .constants import TEMP_SCHEMA_NAME
 from dbt.adapters.base import BaseRelation
 from dbt.adapters.base.column import Column as BaseColumn
 from dbt.adapters.base.impl import ConstraintSupport
@@ -26,7 +28,6 @@ from dbt.adapters.duckdb.utils import TargetConfig
 from dbt.adapters.duckdb.utils import TargetLocation
 from dbt.adapters.events.logging import AdapterLogger
 from dbt.adapters.sql import SQLAdapter
-from .constants import DEFAULT_TEMP_SCHEMA_NAME, TEMP_SCHEMA_NAME
 
 
 if TYPE_CHECKING:
