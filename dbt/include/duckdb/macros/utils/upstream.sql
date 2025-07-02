@@ -35,6 +35,8 @@
     {% endif %}
   {% endfor %}
 {% endfor %}
-{% do adapter.commit() %}
+{% if upstream_nodes %}
+  {% do adapter.commit() %}
+{% endif %}
 {% endif %}
 {%- endmacro -%}
