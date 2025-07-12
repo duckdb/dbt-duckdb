@@ -51,10 +51,10 @@ class DuckDBColumn(Column):
             return [self]
 
         flat_columns: List["DuckDBColumn"] = []
-        for field in self.fields:
-            if field.is_struct():
+        for column_field in self.fields:
+            if column_field.is_struct():
                 # Recursively flatten nested structs
-                for nested_field in field.flatten():
+                for nested_field in column_field.flatten():
                     flat_columns.append(
                         DuckDBColumn(
                             column=f"{self.column}.{nested_field.column}",
@@ -64,8 +64,8 @@ class DuckDBColumn(Column):
             else:
                 flat_columns.append(
                     DuckDBColumn(
-                        column=f"{self.column}.{field.column}",
-                        dtype=field.dtype,
+                        column=f"{self.column}.{column_field.column}",
+                        dtype=column_field.dtype,
                     )
                 )
         return flat_columns
