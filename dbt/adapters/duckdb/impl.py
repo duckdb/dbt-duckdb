@@ -234,7 +234,7 @@ class DuckDBAdapter(SQLAdapter):
         return sql
 
     @available.parse(lambda *a, **k: [])
-    def get_column_schema_from_query(self, sql: str) -> List[BaseColumn]:
+    def get_column_schema_from_query(self, sql: str) -> Sequence[BaseColumn]:
         """Get a list of the Columns with names and data types from the given sql."""
 
         # Taking advantage of yet another amazing DuckDB SQL feature right here: the
