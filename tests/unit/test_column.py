@@ -58,11 +58,7 @@ def test_is_struct(dtype, expected):
 
 # Test cases for flatten method
 def test_flatten_simple_struct():
-    fields = [
-        DuckDBColumn(column="a", dtype="integer"),
-        DuckDBColumn(column="b", dtype="varchar"),
-    ]
-    column = DuckDBColumn(column="struct_test", dtype="struct(a integer, b varchar)", fields=fields)
+    column = DuckDBColumn(column="struct_test", dtype="struct(a integer, b varchar)")
     flattened = column.flatten()
     assert len(flattened) == 2
     assert flattened[0].column == "struct_test.a"
@@ -71,15 +67,7 @@ def test_flatten_simple_struct():
     assert flattened[1].dtype == "varchar"
 
 def test_flatten_nested_struct():
-    nested_fields = [
-        DuckDBColumn(column="c", dtype="integer"),
-        DuckDBColumn(column="d", dtype="varchar"),
-    ]
-    fields = [
-        DuckDBColumn(column="a", dtype="integer"),
-        DuckDBColumn(column="b", dtype="struct(c integer, d varchar)", fields=nested_fields),
-    ]
-    column = DuckDBColumn(column="struct_test", dtype="struct(a integer, b struct(c integer, d varchar))", fields=fields)
+    column = DuckDBColumn(column="struct_test", dtype="struct(a integer, b struct(c integer, d varchar))")
     flattened = column.flatten()
     assert len(flattened) == 3
     assert flattened[0].column == "struct_test.a"

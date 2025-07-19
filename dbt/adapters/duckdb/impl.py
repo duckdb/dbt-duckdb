@@ -234,18 +234,22 @@ class DuckDBAdapter(SQLAdapter):
         return sql
 
     @available.parse(lambda *a, **k: [])
-    def get_column_schema_from_query(self, sql: str) -> Sequence[BaseColumn]:
-        """Get a list of the Columns with names and data types from the given sql."""
+    def get_column_schema_from_query(self, sql: str) -> List[DuckDBColumn]:
+        """Get a list of the column names and data types from the given sql.
 
+        :param str sql: The sql to execute.
+        :return: List[DuckDBColumn]
+        """
         # Taking advantage of yet another amazing DuckDB SQL feature right here: the
         # ability to DESCRIBE a query instead of a relation
         describe_sql = f"DESCRIBE ({sql})"
         _, cursor = self.connections.add_select_query(describe_sql)
-        ret = []
+        flattened_columns = []
         for row in cursor.fetchall():
             name, dtype = row[0], row[1]
-            ret.append(DuckDBColumn.create(name, dtype))
-        return ret
+            column = DuckDBColumn(column=name, dtype=dtype)
+            flattened_columns.extend(column.flatten())
+        return flattened_columns
 
     @classmethod
     def render_column_constraint(cls, constraint: ColumnLevelConstraint) -> Optional[str]:
