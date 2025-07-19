@@ -80,6 +80,8 @@
   {% endcall %}
 
   {% if need_swap %}
+      {#-- Drop indexes on target relation before renaming to backup to avoid dependency errors --#}
+      {% do drop_indexes_on_relation(target_relation) %}
       {% do adapter.rename_relation(target_relation, backup_relation) %}
       {% do adapter.rename_relation(intermediate_relation, target_relation) %}
       {% do to_drop.append(backup_relation) %}
@@ -100,6 +102,7 @@
   {% do adapter.commit() %}
 
   {% for rel in to_drop %}
+      {% do drop_indexes_on_relation(rel) %}
       {% do adapter.drop_relation(rel) %}
   {% endfor %}
 
