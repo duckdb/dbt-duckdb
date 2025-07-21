@@ -54,8 +54,6 @@ class TestDuckDBAdapterGetColumnSchemaFromQuery(unittest.TestCase):
         with mock.patch.object(self.adapter.connections, 'add_select_query', return_value=(None, mock_cursor)):
             result = self.adapter.get_column_schema_from_query("SELECT * FROM test_table")
             
-            print("Actual result:", [(r.column, r.dtype) for r in result])
-            
             # Verify result contains flattened columns (1 simple + 2 from struct)
             self.assertEqual(len(result), 3)
             self.assertEqual(result[0].column, "id")
