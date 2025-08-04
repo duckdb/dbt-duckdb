@@ -11,7 +11,7 @@ pyarrow==21.0.0
 buenavista==0.5.0
 bumpversion
 flaky
-freezegun==1.5.3
+freezegun==1.5.4
 fsspec
 gspread
 ipdb
