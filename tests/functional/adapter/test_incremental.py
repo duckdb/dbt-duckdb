@@ -777,4 +777,195 @@ class TestMergeComplexConfiguration:
         # Verify the updates happened correctly
         run_dbt(["run", "--select", "test_complex_expected"])
         check_relations_equal(project.adapter, ["test_complex_incremental", "test_complex_expected"])
+
+
+# Test models for merge_update_columns functionality
+models__test_update_cols_source = """
+select 1 as id, 'A' as name, 100 as amount, 'old' as status, 'original' as category
+union all
+select 2 as id, 'B' as name, 200 as amount, 'old' as status, 'original' as category
+union all  
+select 3 as id, 'C' as name, 300 as amount, 'old' as status, 'original' as category
+"""
+
+models__test_update_cols_update = """
+{{ config(materialized='table') }}
+select 1 as id, 'AA' as name, 150 as amount, 'new' as status, 'updated' as category
+union all
+select 2 as id, 'BB' as name, 250 as amount, 'new' as status, 'updated' as category
+union all
+select 4 as id, 'D' as name, 400 as amount, 'new' as status, 'updated' as category
+"""
+
+models__test_update_cols_incremental = """
+-- depends_on: {{ ref('test_update_cols_update') }}
+{{
+  config(
+    materialized='incremental',
+    incremental_strategy='merge',
+    unique_key='id',
+    merge_update_columns=['name', 'amount']
+  )
+}}
+
+{% if is_incremental() %}
+  select * from {{ ref('test_update_cols_update') }}
+{% else %}
+  select * from {{ ref('test_update_cols_source') }}
+{% endif %}
+"""
+
+models__test_update_cols_expected = """
+{{ config(materialized='table') }}
+select 1 as id, 'AA' as name, 150 as amount, 'old' as status, 'original' as category
+union all
+select 2 as id, 'BB' as name, 250 as amount, 'old' as status, 'original' as category
+union all
+select 3 as id, 'C' as name, 300 as amount, 'old' as status, 'original' as category
+union all
+select 4 as id, 'D' as name, 400 as amount, 'new' as status, 'updated' as category
+"""
+
+
+class TestMergeUpdateColumns:
+    @pytest.fixture(scope="class")
+    def models(self):
+        return {
+            "test_update_cols_source.sql": models__test_update_cols_source,
+            "test_update_cols_update.sql": models__test_update_cols_update,
+            "test_update_cols_incremental.sql": models__test_update_cols_incremental,
+            "test_update_cols_expected.sql": models__test_update_cols_expected,
+        }
+
+    def test_merge_update_columns(self, project):
+        run_dbt(["run", "--select", "test_update_cols_source test_update_cols_update test_update_cols_incremental"])
+        
+        results = project.run_sql(
+            f"select count(*) as cnt from {project.test_schema}.test_update_cols_incremental", 
+            fetch="one"
+        )
+        assert results[0] == 3
+        
+        run_dbt(["run", "--select", "test_update_cols_incremental"])
+        
+        results = project.run_sql(
+            f"select count(*) as cnt from {project.test_schema}.test_update_cols_incremental", 
+            fetch="one"
+        )
+        assert results[0] == 4
+        
+        # Verify only specified columns (name, amount) were updated, status and category should remain unchanged
+        results = project.run_sql(
+            f"SELECT COUNT(*) as cnt FROM {project.test_schema}.test_update_cols_incremental WHERE status = 'old' AND id IN (1, 2)", 
+            fetch="one"
+        )
+        assert results[0] == 2  # Records 1,2 should still have status='old'
+        
+        results = project.run_sql(
+            f"SELECT COUNT(*) as cnt FROM {project.test_schema}.test_update_cols_incremental WHERE category = 'original' AND id IN (1, 2)", 
+            fetch="one"
+        )
+        assert results[0] == 2  # Records 1,2 should still have category='original'
+        
+        run_dbt(["run", "--select", "test_update_cols_expected"])
+        check_relations_equal(project.adapter, ["test_update_cols_incremental", "test_update_cols_expected"])
+
+
+# Test models for merge_exclude_columns functionality  
+models__test_exclude_cols_source = """
+select 1 as id, 'A' as name, 100 as amount, 'old' as status, 'original' as category
+union all
+select 2 as id, 'B' as name, 200 as amount, 'old' as status, 'original' as category
+union all  
+select 3 as id, 'C' as name, 300 as amount, 'old' as status, 'original' as category
+"""
+
+models__test_exclude_cols_update = """
+{{ config(materialized='table') }}
+select 1 as id, 'AA' as name, 150 as amount, 'new' as status, 'updated' as category
+union all
+select 2 as id, 'BB' as name, 250 as amount, 'new' as status, 'updated' as category
+union all
+select 4 as id, 'D' as name, 400 as amount, 'new' as status, 'updated' as category
+"""
+
+models__test_exclude_cols_incremental = """
+-- depends_on: {{ ref('test_exclude_cols_update') }}
+{{
+  config(
+    materialized='incremental',
+    incremental_strategy='merge',
+    unique_key='id',
+    merge_exclude_columns=['status', 'category']
+  )
+}}
+
+{% if is_incremental() %}
+  select * from {{ ref('test_exclude_cols_update') }}
+{% else %}
+  select * from {{ ref('test_exclude_cols_source') }}
+{% endif %}
+"""
+
+models__test_exclude_cols_expected = """
+{{ config(materialized='table') }}
+select 1 as id, 'AA' as name, 150 as amount, 'old' as status, 'original' as category
+union all
+select 2 as id, 'BB' as name, 250 as amount, 'old' as status, 'original' as category
+union all
+select 3 as id, 'C' as name, 300 as amount, 'old' as status, 'original' as category
+union all
+select 4 as id, 'D' as name, 400 as amount, 'new' as status, 'updated' as category
+"""
+
+
+class TestMergeExcludeColumns:
+    @pytest.fixture(scope="class")
+    def models(self):
+        return {
+            "test_exclude_cols_source.sql": models__test_exclude_cols_source,
+            "test_exclude_cols_update.sql": models__test_exclude_cols_update,
+            "test_exclude_cols_incremental.sql": models__test_exclude_cols_incremental,
+            "test_exclude_cols_expected.sql": models__test_exclude_cols_expected,
+        }
+
+    def test_merge_exclude_columns(self, project):
+        run_dbt(["run", "--select", "test_exclude_cols_source test_exclude_cols_update test_exclude_cols_incremental"])
+        
+        results = project.run_sql(
+            f"select count(*) as cnt from {project.test_schema}.test_exclude_cols_incremental", 
+            fetch="one"
+        )
+        assert results[0] == 3
+        
+        run_dbt(["run", "--select", "test_exclude_cols_incremental"])
+        
+        results = project.run_sql(
+            f"select count(*) as cnt from {project.test_schema}.test_exclude_cols_incremental", 
+            fetch="one"
+        )
+        assert results[0] == 4
+        
+        # Verify excluded columns (status, category) were NOT updated, should remain unchanged
+        results = project.run_sql(
+            f"SELECT COUNT(*) as cnt FROM {project.test_schema}.test_exclude_cols_incremental WHERE status = 'old' AND id IN (1, 2)", 
+            fetch="one"
+        )
+        assert results[0] == 2  # Records 1,2 should still have status='old'
+        
+        results = project.run_sql(
+            f"SELECT COUNT(*) as cnt FROM {project.test_schema}.test_exclude_cols_incremental WHERE category = 'original' AND id IN (1, 2)", 
+            fetch="one"
+        )
+        assert results[0] == 2  # Records 1,2 should still have category='original'
+        
+        # Verify non-excluded columns (name, amount) were updated
+        results = project.run_sql(
+            f"SELECT COUNT(*) as cnt FROM {project.test_schema}.test_exclude_cols_incremental WHERE name IN ('AA', 'BB') AND id IN (1, 2)", 
+            fetch="one"
+        )
+        assert results[0] == 2  # Records 1,2 should have updated names
+        
+        run_dbt(["run", "--select", "test_exclude_cols_expected"])
+        check_relations_equal(project.adapter, ["test_exclude_cols_incremental", "test_exclude_cols_expected"])
     
