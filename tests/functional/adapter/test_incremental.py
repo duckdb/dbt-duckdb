@@ -9,7 +9,7 @@ from dbt.tests.adapter.incremental.test_incremental_on_schema_change import (
     BaseIncrementalOnSchemaChangeSetup
 )
 from dbt.artifacts.schemas.results import RunStatus
-from dbt.tests.util import run_dbt
+from dbt.tests.util import run_dbt, check_relations_equal
 import pytest
 
 
@@ -141,4 +141,640 @@ class TestIncrementalOnSchemaChangeQuotingTrue(BaseIncrementalOnSchemaChangeSetu
             expect_pass_2nd_run=True
         )
         assert status == RunStatus.Success
+
+
+# Test models for MERGE strategy
+models__test_merge_source = """
+select 1 as id, 'initial' as status, 100 as amount
+union all
+select 2 as id, 'pending' as status, 200 as amount
+union all  
+select 3 as id, 'complete' as status, 300 as amount
+"""
+
+models__test_merge_update = """
+{{ config(materialized='table') }}
+select 1 as id, 'updated' as status, 150 as amount
+union all
+select 2 as id, 'cancelled' as status, 200 as amount
+union all
+select 4 as id, 'new' as status, 400 as amount
+"""
+
+models__test_merge_incremental = """
+-- depends_on: {{ ref('test_merge_update') }}
+{{
+  config(
+    materialized='incremental',
+    incremental_strategy='merge',
+    unique_key='id'
+  )
+}}
+
+{% if is_incremental() %}
+  -- On incremental runs, only process the update/new data
+  select * from {{ ref('test_merge_update') }}
+{% else %}
+  -- On initial run, use the source data
+  select * from {{ ref('test_merge_source') }}
+{% endif %}
+"""
+
+models__test_merge_expected = """
+{{ config(materialized='table') }}
+select 1 as id, 'updated' as status, 150 as amount
+union all
+select 2 as id, 'cancelled' as status, 200 as amount
+union all
+select 3 as id, 'complete' as status, 300 as amount
+union all
+select 4 as id, 'new' as status, 400 as amount
+"""
+
+
+class TestMergeStrategy:
+    @pytest.fixture(scope="class")
+    def models(self):
+        return {
+            "test_merge_source.sql": models__test_merge_source,
+            "test_merge_update.sql": models__test_merge_update,
+            "test_merge_incremental.sql": models__test_merge_incremental,
+            "test_merge_expected.sql": models__test_merge_expected,
+        }
+
+    def test_merge_incremental_strategy(self, project):
+        
+        run_dbt(["run", "--select", "test_merge_source test_merge_update test_merge_incremental"])
+        
+        results = project.run_sql(
+            f"select count(*) as cnt from {project.test_schema}.test_merge_incremental", 
+            fetch="one"
+        )
+        assert results[0] == 3
+        
+        run_dbt(["run", "--select", "test_merge_incremental"])
+        
+        results = project.run_sql(
+            f"select count(*) as cnt from {project.test_schema}.test_merge_incremental", 
+            fetch="one"
+        )
+        assert results[0] == 4
+        
+        run_dbt(["run", "--select", "test_merge_expected"])
+        check_relations_equal(project.adapter, ["test_merge_incremental", "test_merge_expected"])
+
+
+# Test models for UPDATE/INSERT BY NAME functionality
+models__test_by_name_source = """
+select 1 as id, 'A' as name, 100 as value, 'old' as status, cast(null as varchar) as extra_col
+union all
+select 2 as id, 'B' as name, 200 as value, 'old' as status, cast(null as varchar) as extra_col
+union all  
+select 3 as id, 'C' as name, 300 as value, 'old' as status, cast(null as varchar) as extra_col
+"""
+
+models__test_by_name_update = """
+{{ config(materialized='table') }}
+select 1 as id, 'AA' as name, 150 as value, 'new' as status, 'extra' as extra_col
+union all
+select 2 as id, 'BB' as name, 250 as value, 'new' as status, 'extra' as extra_col
+union all
+select 4 as id, 'D' as name, 400 as value, 'new' as status, 'extra' as extra_col
+"""
+
+models__test_by_name_incremental = """
+-- depends_on: {{ ref('test_by_name_update') }}
+{{
+  config(
+    materialized='incremental',
+    incremental_strategy='merge',
+    unique_key='id',
+    merge_update_by_name=true,
+    merge_insert_by_name=true
+  )
+}}
+
+{% if is_incremental() %}
+  select * from {{ ref('test_by_name_update') }}
+{% else %}
+  select * from {{ ref('test_by_name_source') }}
+{% endif %}
+"""
+
+models__test_by_name_expected = """
+{{ config(materialized='table') }}
+select 1 as id, 'AA' as name, 150 as value, 'new' as status, 'extra' as extra_col
+union all
+select 2 as id, 'BB' as name, 250 as value, 'new' as status, 'extra' as extra_col
+union all
+select 3 as id, 'C' as name, 300 as value, 'old' as status, null as extra_col
+union all
+select 4 as id, 'D' as name, 400 as value, 'new' as status, 'extra' as extra_col
+"""
+
+
+class TestMergeByName:
+    @pytest.fixture(scope="class")
+    def models(self):
+        return {
+            "test_by_name_source.sql": models__test_by_name_source,
+            "test_by_name_update.sql": models__test_by_name_update,
+            "test_by_name_incremental.sql": models__test_by_name_incremental,
+            "test_by_name_expected.sql": models__test_by_name_expected,
+        }
+
+    def test_merge_by_name(self, project):
+        run_dbt(["run", "--select", "test_by_name_source test_by_name_update test_by_name_incremental"])
+        
+        results = project.run_sql(
+            f"select count(*) as cnt from {project.test_schema}.test_by_name_incremental", 
+            fetch="one"
+        )
+        assert results[0] == 3
+        
+        run_dbt(["run", "--select", "test_by_name_incremental"])
+        
+        # After incremental run: 4 total records, 3 with extra_col='extra' (updated records 1,2 + new record 4)
+        results = project.run_sql(
+            f"select count(*) as cnt from {project.test_schema}.test_by_name_incremental", 
+            fetch="one"
+        )
+        assert results[0] == 4
+        
+        results = project.run_sql(
+            f"SELECT COUNT(*) as cnt FROM {project.test_schema}.test_by_name_incremental WHERE extra_col = 'extra'", 
+            fetch="one"
+        )
+        assert results[0] == 3  # Records 1,2,4 should have extra_col='extra'
+        
+        # Test the expected results
+        run_dbt(["run", "--select", "test_by_name_expected"])
+        check_relations_equal(project.adapter, ["test_by_name_incremental", "test_by_name_expected"])
+
+
+# Test models for SET */INSERT * functionality
+models__test_set_all_source = """
+select 1 as id, 'initial' as status, 100 as amount, 'A' as category
+union all
+select 2 as id, 'pending' as status, 200 as amount, 'B' as category
+union all  
+select 3 as id, 'complete' as status, 300 as amount, 'C' as category
+"""
+
+models__test_set_all_update = """
+{{ config(materialized='table') }}
+select 1 as id, 'updated' as status, 150 as amount, 'AA' as category
+union all
+select 2 as id, 'cancelled' as status, 250 as amount, 'BB' as category
+union all
+select 4 as id, 'new' as status, 400 as amount, 'D' as category
+"""
+
+models__test_set_all_incremental = """
+-- depends_on: {{ ref('test_set_all_update') }}
+{{
+  config(
+    materialized='incremental',
+    incremental_strategy='merge',
+    unique_key='id',
+    merge_update_all=true,
+    merge_insert_all=true
+  )
+}}
+
+{% if is_incremental() %}
+  select * from {{ ref('test_set_all_update') }}
+{% else %}
+  select * from {{ ref('test_set_all_source') }}
+{% endif %}
+"""
+
+models__test_set_all_expected = """
+{{ config(materialized='table') }}
+select 1 as id, 'updated' as status, 150 as amount, 'AA' as category
+union all
+select 2 as id, 'cancelled' as status, 250 as amount, 'BB' as category
+union all
+select 3 as id, 'complete' as status, 300 as amount, 'C' as category
+union all
+select 4 as id, 'new' as status, 400 as amount, 'D' as category
+"""
+
+
+class TestMergeSetAll:
+    @pytest.fixture(scope="class")
+    def models(self):
+        return {
+            "test_set_all_source.sql": models__test_set_all_source,
+            "test_set_all_update.sql": models__test_set_all_update,
+            "test_set_all_incremental.sql": models__test_set_all_incremental,
+            "test_set_all_expected.sql": models__test_set_all_expected,
+        }
+
+    def test_merge_set_all(self, project):
+        run_dbt(["run", "--select", "test_set_all_source test_set_all_update test_set_all_incremental"])
+        
+        results = project.run_sql(
+            f"select count(*) as cnt from {project.test_schema}.test_set_all_incremental", 
+            fetch="one"
+        )
+        assert results[0] == 3
+        
+        run_dbt(["run", "--select", "test_set_all_incremental"])
+        
+        results = project.run_sql(
+            f"select count(*) as cnt from {project.test_schema}.test_set_all_incremental", 
+            fetch="one"
+        )
+        assert results[0] == 4
+        
+        run_dbt(["run", "--select", "test_set_all_expected"])
+        check_relations_equal(project.adapter, ["test_set_all_incremental", "test_set_all_expected"])
+
+
+# Test models for NOT MATCHED BY SOURCE functionality
+models__test_by_source_source = """
+select 1 as id, 'keep' as status, 100 as amount
+union all
+select 2 as id, 'keep' as status, 200 as amount
+union all  
+select 3 as id, 'delete_me' as status, 300 as amount
+union all
+select 4 as id, 'delete_me' as status, 400 as amount
+"""
+
+models__test_by_source_update = """
+{{ config(materialized='table') }}
+select 1 as id, 'updated' as status, 150 as amount
+union all
+select 2 as id, 'updated' as status, 250 as amount
+union all
+select 5 as id, 'new' as status, 500 as amount
+"""
+
+models__test_by_source_incremental = """
+-- depends_on: {{ ref('test_by_source_update') }}
+{{
+  config(
+    materialized='incremental',
+    incremental_strategy='merge',
+    unique_key='id',
+    when_not_matched_by_source='delete'
+  )
+}}
+
+{% if is_incremental() %}
+  select * from {{ ref('test_by_source_update') }}
+{% else %}
+  select * from {{ ref('test_by_source_source') }}
+{% endif %}
+"""
+
+models__test_by_source_expected = """
+{{ config(materialized='table') }}
+select 1 as id, 'updated' as status, 150 as amount
+union all
+select 2 as id, 'updated' as status, 250 as amount
+union all
+select 5 as id, 'new' as status, 500 as amount
+"""
+
+
+class TestMergeBySource:
+    @pytest.fixture(scope="class")
+    def models(self):
+        return {
+            "test_by_source_source.sql": models__test_by_source_source,
+            "test_by_source_update.sql": models__test_by_source_update,
+            "test_by_source_incremental.sql": models__test_by_source_incremental,
+            "test_by_source_expected.sql": models__test_by_source_expected,
+        }
+
+    def test_merge_by_source(self, project):
+        run_dbt(["run", "--select", "test_by_source_source test_by_source_update test_by_source_incremental"])
+        
+        results = project.run_sql(
+            f"select count(*) as cnt from {project.test_schema}.test_by_source_incremental", 
+            fetch="one"
+        )
+        assert results[0] == 4
+        
+        run_dbt(["run", "--select", "test_by_source_incremental"])
+        
+        results = project.run_sql(
+            f"select count(*) as cnt from {project.test_schema}.test_by_source_incremental", 
+            fetch="one"
+        )
+        assert results[0] == 3  # Records 3 and 4 should be deleted
+        
+        run_dbt(["run", "--select", "test_by_source_expected"])
+        check_relations_equal(project.adapter, ["test_by_source_incremental", "test_by_source_expected"])
+
+
+# Test models for DO NOTHING functionality
+models__test_do_nothing_source = """
+select 1 as id, 'keep' as status, 100 as amount
+union all
+select 2 as id, 'keep' as status, 200 as amount
+union all  
+select 3 as id, 'keep' as status, 300 as amount
+"""
+
+models__test_do_nothing_update = """
+{{ config(materialized='table') }}
+select 1 as id, 'should_not_update' as status, 999 as amount
+union all
+select 2 as id, 'should_not_update' as status, 999 as amount
+union all
+select 4 as id, 'should_not_insert' as status, 999 as amount
+"""
+
+models__test_do_nothing_incremental = """
+-- depends_on: {{ ref('test_do_nothing_update') }}
+{{
+  config(
+    materialized='incremental',
+    incremental_strategy='merge',
+    unique_key='id',
+    merge_matched_action='do_nothing',
+    merge_not_matched_action='do_nothing'
+  )
+}}
+
+{% if is_incremental() %}
+  select * from {{ ref('test_do_nothing_update') }}
+{% else %}
+  select * from {{ ref('test_do_nothing_source') }}
+{% endif %}
+"""
+
+models__test_do_nothing_expected = """
+{{ config(materialized='table') }}
+select 1 as id, 'keep' as status, 100 as amount
+union all
+select 2 as id, 'keep' as status, 200 as amount
+union all
+select 3 as id, 'keep' as status, 300 as amount
+"""
+
+
+class TestMergeDoNothing:
+    @pytest.fixture(scope="class")
+    def models(self):
+        return {
+            "test_do_nothing_source.sql": models__test_do_nothing_source,
+            "test_do_nothing_update.sql": models__test_do_nothing_update,
+            "test_do_nothing_incremental.sql": models__test_do_nothing_incremental,
+            "test_do_nothing_expected.sql": models__test_do_nothing_expected,
+        }
+
+    def test_merge_do_nothing(self, project):
+        run_dbt(["run", "--select", "test_do_nothing_source test_do_nothing_update test_do_nothing_incremental"])
+        
+        results = project.run_sql(
+            f"select count(*) as cnt from {project.test_schema}.test_do_nothing_incremental", 
+            fetch="one"
+        )
+        assert results[0] == 3
+        
+        run_dbt(["run", "--select", "test_do_nothing_incremental"])
+        
+        results = project.run_sql(
+            f"select count(*) as cnt from {project.test_schema}.test_do_nothing_incremental", 
+            fetch="one"
+        )
+        assert results[0] == 3  # Should remain unchanged
+        
+        run_dbt(["run", "--select", "test_do_nothing_expected"])
+        check_relations_equal(project.adapter, ["test_do_nothing_incremental", "test_do_nothing_expected"])
+
+
+# Test models for USING clause functionality
+models__test_using_clause_source = """
+select 1 as id, 'A' as name, 100 as amount
+union all
+select 2 as id, 'B' as name, 200 as amount
+union all  
+select 3 as id, 'C' as name, 300 as amount
+"""
+
+models__test_using_clause_update = """
+{{ config(materialized='table') }}
+select 1 as id, 'AA' as name, 150 as amount
+union all
+select 2 as id, 'BB' as name, 250 as amount
+union all
+select 4 as id, 'D' as name, 400 as amount
+"""
+
+models__test_using_clause_incremental = """
+-- depends_on: {{ ref('test_using_clause_update') }}
+{{
+  config(
+    materialized='incremental',
+    incremental_strategy='merge',
+    unique_key='id',
+    merge_use_using_clause=true,
+    merge_using_columns=['id']
+  )
+}}
+
+{% if is_incremental() %}
+  select * from {{ ref('test_using_clause_update') }}
+{% else %}
+  select * from {{ ref('test_using_clause_source') }}
+{% endif %}
+"""
+
+models__test_using_clause_expected = """
+{{ config(materialized='table') }}
+select 1 as id, 'AA' as name, 150 as amount
+union all
+select 2 as id, 'BB' as name, 250 as amount
+union all
+select 3 as id, 'C' as name, 300 as amount
+union all
+select 4 as id, 'D' as name, 400 as amount
+"""
+
+
+class TestMergeUsingClause:
+    @pytest.fixture(scope="class")
+    def models(self):
+        return {
+            "test_using_clause_source.sql": models__test_using_clause_source,
+            "test_using_clause_update.sql": models__test_using_clause_update,
+            "test_using_clause_incremental.sql": models__test_using_clause_incremental,
+            "test_using_clause_expected.sql": models__test_using_clause_expected,
+        }
+
+    def test_merge_using_clause(self, project):
+        run_dbt(["run", "--select", "test_using_clause_source test_using_clause_update test_using_clause_incremental"])
+        
+        results = project.run_sql(
+            f"select count(*) as cnt from {project.test_schema}.test_using_clause_incremental", 
+            fetch="one"
+        )
+        assert results[0] == 3
+        
+        run_dbt(["run", "--select", "test_using_clause_incremental"])
+        
+        results = project.run_sql(
+            f"select count(*) as cnt from {project.test_schema}.test_using_clause_incremental", 
+            fetch="one"
+        )
+        assert results[0] == 4
+        
+        run_dbt(["run", "--select", "test_using_clause_expected"])
+        check_relations_equal(project.adapter, ["test_using_clause_incremental", "test_using_clause_expected"])
+
+
+# Test models for ERROR functionality
+models__test_error_source = """
+select 1 as id, 'safe' as status, 100 as amount
+union all
+select 2 as id, 'safe' as status, 200 as amount
+union all  
+select 3 as id, 'safe' as status, 300 as amount
+"""
+
+models__test_error_update = """
+{{ config(materialized='table') }}
+select 1 as id, 'error_trigger' as status, 150 as amount
+union all
+select 2 as id, 'safe' as status, 250 as amount
+union all
+select 4 as id, 'new' as status, 400 as amount
+"""
+
+models__test_error_incremental = """
+-- depends_on: {{ ref('test_error_update') }}
+{{
+  config(
+    materialized='incremental',
+    incremental_strategy='merge',
+    unique_key='id',
+    merge_error_on_matched={
+      'condition': "DBT_INTERNAL_SOURCE.status = 'error_trigger'",
+      'message': "'Cannot update record with error_trigger status'"
+    }
+  )
+}}
+
+{% if is_incremental() %}
+  select * from {{ ref('test_error_update') }}
+{% else %}
+  select * from {{ ref('test_error_source') }}
+{% endif %}
+"""
+
+
+class TestMergeError:
+    @pytest.fixture(scope="class")
+    def models(self):
+        return {
+            "test_error_source.sql": models__test_error_source,
+            "test_error_update.sql": models__test_error_update,
+            "test_error_incremental.sql": models__test_error_incremental,
+        }
+
+    def test_merge_error_handling(self, project):
+        # First run should succeed
+        run_dbt(["run", "--select", "test_error_source test_error_update test_error_incremental"])
+        
+        results = project.run_sql(
+            f"select count(*) as cnt from {project.test_schema}.test_error_incremental", 
+            fetch="one"
+        )
+        assert results[0] == 3
+        
+        # Second run should fail due to error condition
+        run_result = run_dbt(["run", "--select", "test_error_incremental"], expect_pass=False)
+        assert run_result.results[0].status == RunStatus.Error
+        
+        # Verify error message contains our custom message
+        assert "error_trigger" in str(run_result.results[0].message).lower()
+
+
+# Test models for complex configuration combination
+models__test_complex_source = """
+select 1 as id, 'A' as name, 100 as amount, 'keep' as category
+union all
+select 2 as id, 'B' as name, 200 as amount, 'keep' as category
+union all  
+select 3 as id, 'C' as name, 300 as amount, 'delete' as category
+union all
+select 4 as id, 'D' as name, 400 as amount, 'delete' as category
+"""
+
+models__test_complex_update = """
+{{ config(materialized='table') }}
+select 1 as id, 'AA' as name, 150 as amount, 'updated' as category
+union all
+select 2 as id, 'BB' as name, 250 as amount, 'updated' as category
+union all
+select 5 as id, 'E' as name, 500 as amount, 'new' as category
+"""
+
+models__test_complex_incremental = """
+-- depends_on: {{ ref('test_complex_update') }}
+{{
+  config(
+    materialized='incremental',
+    incremental_strategy='merge',
+    unique_key='id',
+    merge_update_all=true,
+    when_not_matched_by_source='delete'
+  )
+}}
+
+{% if is_incremental() %}
+  select * from {{ ref('test_complex_update') }}
+{% else %}
+  select * from {{ ref('test_complex_source') }}
+{% endif %}
+"""
+
+models__test_complex_expected = """
+{{ config(materialized='table') }}
+select 1 as id, 'AA' as name, 150 as amount, 'updated' as category
+union all
+select 2 as id, 'BB' as name, 250 as amount, 'updated' as category
+union all
+select 5 as id, 'E' as name, 500 as amount, 'new' as category
+"""
+
+
+class TestMergeComplexConfiguration:
+    @pytest.fixture(scope="class")
+    def models(self):
+        return {
+            "test_complex_source.sql": models__test_complex_source,
+            "test_complex_update.sql": models__test_complex_update,
+            "test_complex_incremental.sql": models__test_complex_incremental,
+            "test_complex_expected.sql": models__test_complex_expected,
+        }
+
+    def test_merge_complex_config(self, project):
+        # Initial run
+        run_dbt(["run", "--select", "test_complex_source test_complex_update test_complex_incremental"])
+        
+        results = project.run_sql(
+            f"select count(*) as cnt from {project.test_schema}.test_complex_incremental", 
+            fetch="one"
+        )
+        assert results[0] == 4
+        
+        # Incremental run - should update matched records and delete unmatched by source
+        run_dbt(["run", "--select", "test_complex_incremental"])
+        
+        results = project.run_sql(
+            f"select count(*) as cnt from {project.test_schema}.test_complex_incremental", 
+            fetch="one"
+        )
+        assert results[0] == 3  # Records 3 and 4 should be deleted
+        
+        # Verify the updates happened correctly
+        run_dbt(["run", "--select", "test_complex_expected"])
+        check_relations_equal(project.adapter, ["test_complex_incremental", "test_complex_expected"])
     
