@@ -194,13 +194,10 @@ class DuckDBAdapter(SQLAdapter):
             version_match = re.search(r"v?(\d+)\.(\d+)\.(\d+)(?:\.dev\d+)?", version_string)
             if version_match:
                 major, minor, patch = map(int, version_match.groups())
-                logger.info(f"Parsed version: {major}.{minor}.{patch}")
                 supports_merge = (major > 1) or (major == 1 and minor >= 4)
-                logger.info(f"Supports MERGE: {supports_merge}")
                 return supports_merge
             return False
         except Exception as e:
-            logger.info(f"Exception in version check: {e}")
             return False
 
     def valid_incremental_strategies(self) -> Sequence[str]:
