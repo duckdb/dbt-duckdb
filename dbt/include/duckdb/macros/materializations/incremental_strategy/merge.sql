@@ -20,7 +20,9 @@
     
     {#-- DuckDB specific configurations --#}
     {%- set merge_update_by_name = config.get('merge_update_by_name', false) -%}
+    {%- set merge_update_by_position = config.get('merge_update_by_position', false) -%}
     {%- set merge_insert_by_name = config.get('merge_insert_by_name', false) -%}
+    {%- set merge_insert_by_position = config.get('merge_insert_by_position', false) -%}
     {%- set merge_update_all = config.get('merge_update_all', false) -%}
     {%- set merge_insert_all = config.get('merge_insert_all', false) -%}
     {%- set when_not_matched_by_source = config.get('when_not_matched_by_source') -%}
@@ -51,20 +53,32 @@
         {% do predicates.append('FALSE') %}
     {% endif %}
 
+    {{ validate_merge_unique_key_and_using_clause(unique_key, merge_use_using_clause, merge_using_columns) }}
+    {{ validate_merge_update_options(merge_update_all, merge_update_by_name, merge_update_by_position) }}
+    {{ validate_merge_insert_options(merge_insert_all, merge_insert_by_name, merge_insert_by_position) }}
+    {{ validate_merge_using_clause(merge_use_using_clause, merge_using_columns) }}
+    {{ validate_merge_action_values(merge_matched_action, merge_not_matched_action, when_not_matched_by_source) }}
+    {{ validate_merge_column_configs(merge_update_all, merge_update_by_name, merge_update_by_position, merge_update_columns, merge_exclude_columns) }}
+    {{ validate_merge_error_config('merge_error_on_matched', merge_error_on_matched) }}
+    {{ validate_merge_error_config('merge_error_on_not_matched', merge_error_on_not_matched) }}
+    {{ validate_merge_error_config('merge_error_on_not_matched_by_source', merge_error_on_not_matched_by_source) }}
+    {{ validate_merge_custom_update_mapping(when_not_matched_by_source) }}
+    {{ validate_merge_matched_and_not_matched_actions(merge_matched_action, merge_update_all, merge_update_by_name, merge_update_by_position) }}
+    {{ validate_merge_not_matched_and_insert_options(merge_not_matched_action, merge_insert_all, merge_insert_by_name, merge_insert_by_position) }}
+
     {{ sql_header if sql_header is not none }}
 
     merge into {{ target }} as DBT_INTERNAL_DEST
-        {%- if merge_use_using_clause and merge_using_columns %}
         using {{ source }} as DBT_INTERNAL_SOURCE
+        {%- if merge_use_using_clause and merge_using_columns %}
         using ({{ merge_using_columns | join(', ') }})
         {%- else %}
-        using {{ source }} as DBT_INTERNAL_SOURCE
         on {{"(" ~ predicates | join(") and (") ~ ")"}}
         {%- endif %}
 
     {% if unique_key %}
         {%- if merge_error_on_matched %}
-    when matched {% if merge_error_on_matched.condition %}and {{ merge_error_on_matched.condition }}{% endif %} then error {% if merge_error_on_matched.message %}{{ merge_error_on_matched.message }}{% endif %}
+    when matched {% if merge_error_on_matched.condition %}and {{ merge_error_on_matched.condition }}{% endif %} then error {% if merge_error_on_matched.message %}'{{ merge_error_on_matched.message }}'{% endif %}
         {%- endif %}
         
         {%- if merge_matched_action == 'update' %}
@@ -73,6 +87,8 @@
         update set *
             {%- elif merge_update_by_name %}
         update by name
+            {%- elif merge_update_by_position %}
+        update by position
             {%- else %}
         update set
         {% for column_name in update_columns -%}
@@ -89,7 +105,7 @@
 
     {% if when_not_matched_by_source %}
         {%- if merge_error_on_not_matched_by_source %}
-    when not matched by source {% if merge_error_on_not_matched_by_source.condition %}and {{ merge_error_on_not_matched_by_source.condition }}{% endif %} then error {% if merge_error_on_not_matched_by_source.message %}{{ merge_error_on_not_matched_by_source.message }}{% endif %}
+    when not matched by source {% if merge_error_on_not_matched_by_source.condition %}and {{ merge_error_on_not_matched_by_source.condition }}{% endif %} then error {% if merge_error_on_not_matched_by_source.message %}'{{ merge_error_on_not_matched_by_source.message }}'{% endif %}
         {%- endif %}
         
         {%- if when_not_matched_by_source == 'delete' %}
@@ -99,6 +115,8 @@
     when not matched by source then update set *
             {%- elif merge_update_by_name %}
     when not matched by source then update by name
+            {%- elif merge_update_by_position %}
+    when not matched by source then update by position
             {%- elif when_not_matched_by_source is mapping and when_not_matched_by_source.update_columns %}
     when not matched by source then update set
         {% for column_name in when_not_matched_by_source.update_columns -%}
@@ -118,7 +136,7 @@
     {% endif %}
 
     {%- if merge_error_on_not_matched %}
-    when not matched {% if merge_error_on_not_matched.condition %}and {{ merge_error_on_not_matched.condition }}{% endif %} then error {% if merge_error_on_not_matched.message %}{{ merge_error_on_not_matched.message }}{% endif %}
+    when not matched {% if merge_error_on_not_matched.condition %}and {{ merge_error_on_not_matched.condition }}{% endif %} then error {% if merge_error_on_not_matched.message %}'{{ merge_error_on_not_matched.message }}'{% endif %}
     {%- endif %}
     
     {%- if merge_not_matched_action == 'insert' %}
@@ -127,6 +145,8 @@
     when not matched then insert *
         {%- elif merge_insert_by_name %}
     when not matched then insert by name
+        {%- elif merge_insert_by_position %}
+    when not matched then insert by position
         {%- else %}
     when not matched then insert
         ({{ dest_cols_csv }})
@@ -138,48 +158,3 @@
     {%- endif %}
 
 {% endmacro %}
-
-
-
-{% macro duckdb__get_delete_insert_merge_sql(target, source, unique_key, dest_columns, incremental_predicates) -%}
-
-    {%- set dest_cols_csv = get_quoted_csv(dest_columns | map(attribute="name")) -%}
-
-    {% if unique_key %}
-        {% if unique_key is sequence and unique_key is not string %}
-            delete from {{target }} as DBT_INCREMENTAL_TARGET
-            using {{ source }}
-            where (
-                {% for key in unique_key %}
-                    {{ source }}.{{ key }} = DBT_INCREMENTAL_TARGET.{{ key }}
-                    {{ "and " if not loop.last}}
-                {% endfor %}
-                {% if incremental_predicates %}
-                    {% for predicate in incremental_predicates %}
-                        and {{ predicate }}
-                    {% endfor %}
-                {% endif %}
-            );
-        {% else %}
-            delete from {{ target }}
-            where (
-                {{ unique_key }}) in (
-                select ({{ unique_key }})
-                from {{ source }}
-            )
-            {%- if incremental_predicates %}
-                {% for predicate in incremental_predicates %}
-                    and {{ predicate }}
-                {% endfor %}
-            {%- endif -%};
-
-        {% endif %}
-    {% endif %}
-
-    insert into {{ target }} ({{ dest_cols_csv }})
-    (
-        select {{ dest_cols_csv }}
-        from {{ source }}
-    )
-
-{%- endmacro %}
