@@ -17,7 +17,7 @@
     {%- set merge_exclude_columns = config.get('merge_exclude_columns') -%}
     {%- set update_columns = get_merge_update_columns(merge_update_columns, merge_exclude_columns, dest_columns) -%}
     {%- set sql_header = config.get('sql_header', none) -%}
-    
+
     {#-- DuckDB specific configurations --#}
     {%- set merge_update_by_name = config.get('merge_update_by_name', false) -%}
     {%- set merge_update_by_position = config.get('merge_update_by_position', false) -%}
@@ -80,9 +80,9 @@
         {%- if merge_error_on_matched %}
     when matched {% if merge_error_on_matched.condition %}and {{ merge_error_on_matched.condition }}{% endif %} then error {% if merge_error_on_matched.message %}'{{ merge_error_on_matched.message }}'{% endif %}
         {%- endif %}
-        
+
         {%- if merge_matched_action == 'update' %}
-    when matched then 
+    when matched then
             {%- if merge_update_all %}
         update set *
             {%- elif merge_update_by_name %}
@@ -107,7 +107,7 @@
         {%- if merge_error_on_not_matched_by_source %}
     when not matched by source {% if merge_error_on_not_matched_by_source.condition %}and {{ merge_error_on_not_matched_by_source.condition }}{% endif %} then error {% if merge_error_on_not_matched_by_source.message %}'{{ merge_error_on_not_matched_by_source.message }}'{% endif %}
         {%- endif %}
-        
+
         {%- if when_not_matched_by_source == 'delete' %}
     when not matched by source then delete
         {%- elif when_not_matched_by_source == 'update' %}
@@ -138,7 +138,7 @@
     {%- if merge_error_on_not_matched %}
     when not matched {% if merge_error_on_not_matched.condition %}and {{ merge_error_on_not_matched.condition }}{% endif %} then error {% if merge_error_on_not_matched.message %}'{{ merge_error_on_not_matched.message }}'{% endif %}
     {%- endif %}
-    
+
     {%- if merge_not_matched_action == 'insert' %}
         {%- if when_not_matched_by_target == false %}
         {%- elif merge_insert_all %}

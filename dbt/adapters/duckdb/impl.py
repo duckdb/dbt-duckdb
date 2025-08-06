@@ -188,18 +188,16 @@ class DuckDBAdapter(SQLAdapter):
         try:
             _, cursor = self.connections.add_select_query("SELECT version()")
             version_string = cursor.fetchone()[0]
-            
-            logger.info(f"DuckDB version: '{version_string}'")
-            
+
             import re
-            version_match = re.search(r'v?(\d+)\.(\d+)\.(\d+)(?:\.dev\d+)?', version_string)
+
+            version_match = re.search(r"v?(\d+)\.(\d+)\.(\d+)(?:\.dev\d+)?", version_string)
             if version_match:
                 major, minor, patch = map(int, version_match.groups())
                 logger.info(f"Parsed version: {major}.{minor}.{patch}")
                 supports_merge = (major > 1) or (major == 1 and minor >= 4)
                 logger.info(f"Supports MERGE: {supports_merge}")
                 return supports_merge
-            logger.info(f"Could not parse version string: '{version_string}'")
             return False
         except Exception as e:
             logger.info(f"Exception in version check: {e}")
@@ -208,11 +206,13 @@ class DuckDBAdapter(SQLAdapter):
     def valid_incremental_strategies(self) -> Sequence[str]:
         """DuckDB supports MERGE statements starting from version 1.4.0."""
         base_strategies = ["append", "delete+insert"]
-        
+
         if self._supports_merge_strategy():
             return base_strategies + ["merge"]
 
-        logger.info("Only APPEND and DELETE+INSERT - MERGE not available - requires DuckDB >= 1.4.0")            
+        logger.info(
+            "Only APPEND and DELETE+INSERT - MERGE not available - requires DuckDB >= 1.4.0"
+        )
         return base_strategies
 
     def commit_if_has_connection(self) -> None:

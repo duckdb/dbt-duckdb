@@ -3,10 +3,10 @@
   {%- if update_all -%}{%- do update_options.append('merge_update_all') -%}{%- endif -%}
   {%- if update_by_name -%}{%- do update_options.append('merge_update_by_name') -%}{%- endif -%}
   {%- if update_by_position -%}{%- do update_options.append('merge_update_by_position') -%}{%- endif -%}
-  
+
   {%- if update_options | length > 1 -%}
     {{ exceptions.raise_compiler_error(
-      "Conflicting update options: " ~ update_options | join(', ') ~ 
+      "Conflicting update options: " ~ update_options | join(', ') ~
       ". Only one update method can be specified."
     ) }}
   {%- endif -%}
@@ -17,10 +17,10 @@
   {%- if insert_all -%}{%- do insert_options.append('merge_insert_all') -%}{%- endif -%}
   {%- if insert_by_name -%}{%- do insert_options.append('merge_insert_by_name') -%}{%- endif -%}
   {%- if insert_by_position -%}{%- do insert_options.append('merge_insert_by_position') -%}{%- endif -%}
-  
+
   {%- if insert_options | length > 1 -%}
     {{ exceptions.raise_compiler_error(
-      "Conflicting insert options: " ~ insert_options | join(', ') ~ 
+      "Conflicting insert options: " ~ insert_options | join(', ') ~
       ". Only one insert method can be specified."
     ) }}
   {%- endif -%}
@@ -33,13 +33,13 @@
       "Example: merge_using_columns=['id', 'updated_at']"
     ) }}
   {%- endif -%}
-  
+
   {%- if using_columns and not use_using_clause -%}
     {{ exceptions.raise_compiler_error(
       "'merge_use_using_clause' must be set to true when 'merge_using_columns' is specified"
     ) }}
   {%- endif -%}
-  
+
   {%- if using_columns and not (using_columns is sequence and using_columns is not string) -%}
     {{ exceptions.raise_compiler_error(
       "'merge_using_columns' must be a list of column names. " ~
@@ -56,7 +56,7 @@
       ". Got: '" ~ matched_action ~ "'"
     ) }}
   {%- endif -%}
-  
+
   {%- set valid_not_matched_actions = ['insert', 'do_nothing'] -%}
   {%- if not_matched_action not in valid_not_matched_actions -%}
     {{ exceptions.raise_compiler_error(
@@ -64,7 +64,7 @@
       ". Got: '" ~ not_matched_action ~ "'"
     ) }}
   {%- endif -%}
-  
+
   {%- if not_matched_by_source -%}
     {%- set valid_not_matched_by_source = ['delete', 'update', 'do_nothing'] -%}
     {%- if not_matched_by_source is string and not_matched_by_source not in valid_not_matched_by_source -%}
@@ -78,14 +78,14 @@
 
 {% macro validate_merge_column_configs(update_all, update_by_name, update_by_position, update_columns, exclude_columns) %}
   {%- set has_auto_update = update_all or update_by_name or update_by_position -%}
-  
+
   {%- if has_auto_update and update_columns -%}
     {{ exceptions.raise_compiler_error(
       "Cannot specify 'merge_update_columns' when using automatic update options " ~
       "('merge_update_all', 'merge_update_by_name', or 'merge_update_by_position')"
     ) }}
   {%- endif -%}
-  
+
   {%- if has_auto_update and exclude_columns -%}
     {{ exceptions.raise_compiler_error(
       "Cannot specify 'merge_exclude_columns' when using automatic update options " ~
@@ -102,7 +102,7 @@
         "Example: " ~ config_name ~ "={'condition': 'target.status = \"locked\"', 'message': 'Cannot update locked records'}"
       ) }}
     {%- endif -%}
-    
+
     {%- set valid_keys = ['condition', 'message'] -%}
     {%- for key in config_value.keys() -%}
       {%- if key not in valid_keys -%}
@@ -122,19 +122,19 @@
         "Example: when_not_matched_by_source={'update_columns': ['status'], 'update_values': {'status': '\"inactive\"'}}"
       ) }}
     {%- endif -%}
-    
+
     {%- if not (not_matched_by_source.update_columns is sequence and not_matched_by_source.update_columns is not string) -%}
       {{ exceptions.raise_compiler_error(
         "'update_columns' must be a list of column names"
       ) }}
     {%- endif -%}
-    
+
     {%- if not_matched_by_source.update_values and not not_matched_by_source.update_values is mapping -%}
       {{ exceptions.raise_compiler_error(
         "'update_values' must be a dictionary mapping column names to values"
       ) }}
     {%- endif -%}
-    
+
     {%- if not_matched_by_source.update_values -%}
       {%- set missing_values = [] -%}
       {%- for col in not_matched_by_source.update_columns -%}
@@ -144,7 +144,7 @@
       {%- endfor -%}
       {%- if missing_values -%}
         {{ log(
-          "Warning: Columns " ~ missing_values | join(', ') ~ 
+          "Warning: Columns " ~ missing_values | join(', ') ~
           " in 'update_columns' have no corresponding values in 'update_values'. They will be set to NULL.",
           info=true
         ) }}
