@@ -197,7 +197,7 @@ class DuckDBAdapter(SQLAdapter):
                 supports_merge = (major > 1) or (major == 1 and minor >= 4)
                 return supports_merge
             return False
-        except Exception as e:
+        except Exception:
             return False
 
     def valid_incremental_strategies(self) -> Sequence[str]:
