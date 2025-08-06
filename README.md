@@ -422,11 +422,28 @@ Unfortunately incremental materialization strategies are not yet supported for `
 
 dbt-duckdb supports the `delete+insert`, `append`, and `merge` strategies for incremental `table` models. The `merge` strategy requires DuckDB >= 1.4.0 and provides access to DuckDB's native MERGE statement.
 
+**Append Strategy:**
+
+| Configuration | Type | Default | Description |
+|---------------|------|---------|-------------|
+| `incremental_predicates` | list | null | SQL conditions to filter which records get appended |
+
+Example:
+```yaml
+models:
+  - name: my_incremental_model
+    config:
+      materialized: incremental
+      incremental_strategy: append
+      incremental_predicates: ["created_at > (select max(created_at) from {{ this }})"]
+```
+
 **Delete+Insert Strategy:**
 
 | Configuration | Type | Default | Description |
 |---------------|------|---------|-------------|
 | `unique_key` | string/list | required | Column(s) used to identify records for deletion |
+| `incremental_predicates` | list | null | SQL conditions to filter the delete and insert operations |
 
 Example:
 ```yaml
@@ -436,6 +453,7 @@ models:
       materialized: incremental
       incremental_strategy: delete+insert
       unique_key: id  # or ['id', 'date'] for composite keys
+      incremental_predicates: ["updated_at >= '2023-01-01'"]
 ```
 
 **Merge Strategy (DuckDB >= 1.4.0):**
@@ -443,6 +461,7 @@ models:
 | Configuration | Type | Default | Options | Description |
 |---------------|------|---------|---------|-------------|
 | `unique_key` | string/list | required | column names | Join condition for MERGE |
+| `incremental_predicates` | list | null | SQL conditions | Additional predicates to filter the MERGE operation |
 | `merge_update_all` | boolean | false | true/false | Use `UPDATE SET *` |
 | `merge_update_by_name` | boolean | false | true/false | Use `UPDATE BY NAME` |
 | `merge_insert_all` | boolean | false | true/false | Use `INSERT *` |
@@ -468,9 +487,10 @@ models:
       unique_key: id  # or ['id', 'date'] for composite keys
       merge_update_all: true
       merge_insert_by_name: true
+      incremental_predicates: ["updated_at >= '2023-01-01'", "status != 'archived'"]
 ```
 
-For detailed documentation, see the [DuckDB MERGE documentation](https://duckdb.org/docs/sql/statements/merge.html).
+For detailed documentation, see the [DuckDB MERGE support PR](https://github.com/duckdb/duckdb/pull/18135).
 
 #### Re-running external models with an in-memory version of dbt-duckdb
 When using `:memory:` as the DuckDB database, subsequent dbt runs can fail when selecting a subset of models that depend on external tables. This is because external files are only registered as  DuckDB views when they are created, not when they are referenced. To overcome this issue we have provided the `register_upstream_external_models` macro that can be triggered at the beginning of a run. To enable this automatic registration, place the following in your `dbt_project.yml` file:
