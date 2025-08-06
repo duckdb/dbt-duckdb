@@ -656,7 +656,7 @@ models__test_error_incremental = """
     unique_key='id',
     merge_error_on_matched={
       'condition': "DBT_INTERNAL_SOURCE.status = 'error_trigger'",
-      'message': "'Cannot update record with error_trigger status'"
+      'message': "Cannot update record with error_trigger status"
     }
   )
 }}
@@ -968,4 +968,228 @@ class TestMergeExcludeColumns:
         
         run_dbt(["run", "--select", "test_exclude_cols_expected"])
         check_relations_equal(project.adapter, ["test_exclude_cols_incremental", "test_exclude_cols_expected"])
-    
+
+
+# Test models for validation errors
+models__test_validation_conflicting_update = """
+{{
+  config(
+    materialized='incremental',
+    incremental_strategy='merge',
+    unique_key='id',
+    merge_update_all=true,
+    merge_update_by_name=true
+  )
+}}
+
+select 1 as id, 'test' as name
+"""
+
+models__test_validation_conflicting_insert = """
+{{
+  config(
+    materialized='incremental',
+    incremental_strategy='merge',
+    unique_key='id',
+    merge_insert_all=true,
+    merge_insert_by_position=true
+  )
+}}
+
+select 1 as id, 'test' as name
+"""
+
+models__test_validation_using_clause_missing_columns = """
+{{
+  config(
+    materialized='incremental',
+    incremental_strategy='merge',
+    unique_key='id',
+    merge_use_using_clause=true
+  )
+}}
+
+select 1 as id, 'test' as name
+"""
+
+models__test_validation_using_columns_without_flag = """
+{{
+  config(
+    materialized='incremental',
+    incremental_strategy='merge',
+    unique_key='id',
+    merge_using_columns=['id']
+  )
+}}
+
+select 1 as id, 'test' as name
+"""
+
+models__test_validation_invalid_matched_action = """
+{{
+  config(
+    materialized='incremental',
+    incremental_strategy='merge',
+    unique_key='id',
+    merge_matched_action='invalid_action'
+  )
+}}
+
+select 1 as id, 'test' as name
+"""
+
+models__test_validation_column_config_conflict = """
+{{
+  config(
+    materialized='incremental',
+    incremental_strategy='merge',
+    unique_key='id',
+    merge_update_all=true,
+    merge_update_columns=['name']
+  )
+}}
+
+select 1 as id, 'test' as name
+"""
+
+models__test_validation_update_options_with_delete = """
+{{
+  config(
+    materialized='incremental',
+    incremental_strategy='merge',
+    unique_key='id',
+    merge_matched_action='delete',
+    merge_update_all=true
+  )
+}}
+
+select 1 as id, 'test' as name
+"""
+
+models__test_validation_insert_options_with_do_nothing = """
+{{
+  config(
+    materialized='incremental',
+    incremental_strategy='merge',
+    unique_key='id',
+    merge_not_matched_action='do_nothing',
+    merge_insert_by_name=true
+  )
+}}
+
+select 1 as id, 'test' as name
+"""
+
+models__test_validation_invalid_error_config = """
+{{
+  config(
+    materialized='incremental',
+    incremental_strategy='merge',
+    unique_key='id',
+    merge_error_on_matched='invalid_string'
+  )
+}}
+
+select 1 as id, 'test' as name
+"""
+
+models__test_validation_source_mapping_missing_columns = """
+{{
+  config(
+    materialized='incremental',
+    incremental_strategy='merge',
+    unique_key='id',
+    when_not_matched_by_source={'update_values': {'status': 'inactive'}}
+  )
+}}
+
+select 1 as id, 'test' as name
+"""
+
+class TestMergeValidationErrors:
+    @pytest.fixture(scope="class")
+    def models(self):
+        return {
+            "test_validation_conflicting_update.sql": models__test_validation_conflicting_update,
+            "test_validation_conflicting_insert.sql": models__test_validation_conflicting_insert,
+            "test_validation_using_clause_missing_columns.sql": models__test_validation_using_clause_missing_columns,
+            "test_validation_using_columns_without_flag.sql": models__test_validation_using_columns_without_flag,
+            "test_validation_invalid_matched_action.sql": models__test_validation_invalid_matched_action,
+            "test_validation_column_config_conflict.sql": models__test_validation_column_config_conflict,
+            "test_validation_update_options_with_delete.sql": models__test_validation_update_options_with_delete,
+            "test_validation_insert_options_with_do_nothing.sql": models__test_validation_insert_options_with_do_nothing,
+            "test_validation_invalid_error_config.sql": models__test_validation_invalid_error_config,
+            "test_validation_source_mapping_missing_columns.sql": models__test_validation_source_mapping_missing_columns,
+        }
+
+    def test_conflicting_update_options(self, project):
+        """Test that conflicting update options trigger validation error"""
+        # First run should succeed (initial run, no merge)
+        run_dbt(["run", "--select", "test_validation_conflicting_update"])
+        # Second run should fail (incremental run with validation)
+        run_result = run_dbt(["run", "--select", "test_validation_conflicting_update"], expect_pass=False)
+        assert run_result.results[0].status == RunStatus.Error
+        assert "conflicting update options" in str(run_result.results[0].message).lower()
+
+    def test_conflicting_insert_options(self, project):
+        """Test that conflicting insert options trigger validation error"""
+        run_dbt(["run", "--select", "test_validation_conflicting_insert"])
+        run_result = run_dbt(["run", "--select", "test_validation_conflicting_insert"], expect_pass=False)
+        assert run_result.results[0].status == RunStatus.Error
+        assert "conflicting insert options" in str(run_result.results[0].message).lower()
+
+    def test_using_clause_missing_columns(self, project):
+        """Test that using_clause=true without columns triggers validation error"""
+        run_dbt(["run", "--select", "test_validation_using_clause_missing_columns"])
+        run_result = run_dbt(["run", "--select", "test_validation_using_clause_missing_columns"], expect_pass=False)
+        assert run_result.results[0].status == RunStatus.Error
+        assert "merge_using_columns" in str(run_result.results[0].message).lower()
+
+    def test_using_columns_without_flag(self, project):
+        """Test that using_columns without flag triggers validation error"""
+        run_dbt(["run", "--select", "test_validation_using_columns_without_flag"])
+        run_result = run_dbt(["run", "--select", "test_validation_using_columns_without_flag"], expect_pass=False)
+        assert run_result.results[0].status == RunStatus.Error
+        assert "merge_use_using_clause" in str(run_result.results[0].message).lower()
+
+    def test_invalid_matched_action(self, project):
+        """Test that invalid matched action triggers validation error"""
+        run_dbt(["run", "--select", "test_validation_invalid_matched_action"])
+        run_result = run_dbt(["run", "--select", "test_validation_invalid_matched_action"], expect_pass=False)
+        assert run_result.results[0].status == RunStatus.Error
+        assert "merge_matched_action" in str(run_result.results[0].message).lower()
+
+    def test_column_config_conflict(self, project):
+        """Test that conflicting column configs trigger validation error"""
+        run_dbt(["run", "--select", "test_validation_column_config_conflict"])
+        run_result = run_dbt(["run", "--select", "test_validation_column_config_conflict"], expect_pass=False)
+        assert run_result.results[0].status == RunStatus.Error
+        assert "cannot specify" in str(run_result.results[0].message).lower()
+
+    def test_update_options_with_delete(self, project):
+        """Test that update options with delete action trigger validation error"""
+        run_dbt(["run", "--select", "test_validation_update_options_with_delete"])
+        run_result = run_dbt(["run", "--select", "test_validation_update_options_with_delete"], expect_pass=False)
+        assert run_result.results[0].status == RunStatus.Error
+        assert "can only be used when" in str(run_result.results[0].message).lower()
+
+    def test_insert_options_with_do_nothing(self, project):
+        """Test that insert options with do_nothing action trigger validation error"""
+        run_dbt(["run", "--select", "test_validation_insert_options_with_do_nothing"])
+        run_result = run_dbt(["run", "--select", "test_validation_insert_options_with_do_nothing"], expect_pass=False)
+        assert run_result.results[0].status == RunStatus.Error
+        assert "can only be used when" in str(run_result.results[0].message).lower()
+
+    def test_invalid_error_config(self, project):
+        """Test that invalid error config triggers validation error"""
+        run_dbt(["run", "--select", "test_validation_invalid_error_config"])
+        run_result = run_dbt(["run", "--select", "test_validation_invalid_error_config"], expect_pass=False)
+        assert run_result.results[0].status == RunStatus.Error
+        assert "must be a dictionary" in str(run_result.results[0].message).lower()
+
+    def test_source_mapping_missing_columns(self, project):
+        """Test that source mapping without update_columns triggers validation error"""
+        run_dbt(["run", "--select", "test_validation_source_mapping_missing_columns"])
+        run_result = run_dbt(["run", "--select", "test_validation_source_mapping_missing_columns"], expect_pass=False)
+        assert run_result.results[0].status == RunStatus.Error
+        assert "must include" in str(run_result.results[0].message).lower()
