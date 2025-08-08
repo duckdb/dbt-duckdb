@@ -53,6 +53,7 @@
         {% do predicates.append('FALSE') %}
     {% endif %}
 
+    {{ validate_merge_ducklake_restrictions(target, merge_matched_action, when_not_matched_by_source) }}
     {{ validate_merge_unique_key_and_using_clause(unique_key, merge_use_using_clause, merge_using_columns) }}
     {{ validate_merge_update_options(merge_update_all, merge_update_by_name, merge_update_by_position) }}
     {{ validate_merge_insert_options(merge_insert_all, merge_insert_by_name, merge_insert_by_position) }}

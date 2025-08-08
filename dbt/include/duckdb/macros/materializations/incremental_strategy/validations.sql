@@ -183,3 +183,54 @@
     ) }}
   {%- endif -%}
 {% endmacro %}
+
+{% macro validate_merge_ducklake_restrictions(target_relation, matched_action, not_matched_by_source) %}
+  {%- if adapter.is_ducklake(target_relation) -%}
+    {%- set update_actions = [] -%}
+    {%- set delete_actions = [] -%}
+
+    {# Check matched actions #}
+    {%- if matched_action == 'update' -%}
+      {%- do update_actions.append('merge_matched_action: update') -%}
+    {%- elif matched_action == 'delete' -%}
+      {%- do delete_actions.append('merge_matched_action: delete') -%}
+    {%- endif -%}
+
+    {# Check not matched by source actions #}
+    {%- if not_matched_by_source == 'update' or (not_matched_by_source is mapping and not_matched_by_source.update_columns) -%}
+      {%- do update_actions.append('when_not_matched_by_source: update') -%}
+    {%- elif not_matched_by_source == 'delete' -%}
+      {%- do delete_actions.append('when_not_matched_by_source: delete') -%}
+    {%- endif -%}
+
+    {# Check if both UPDATE and DELETE operations are configured #}
+    {%- if update_actions and delete_actions -%}
+      {{ exceptions.raise_compiler_error(
+        "DuckLake does not support mixing UPDATE and DELETE operations in the same MERGE statement. " ~
+        "You have configured both: " ~ (update_actions + delete_actions) | join(', ') ~ ". " ~
+        "Please use either UPDATE operations only (with optional INSERT) or DELETE operations only (with optional INSERT). " ~
+        "See: https://github.com/duckdb/ducklake/pull/351"
+      ) }}
+    {%- endif -%}
+
+    {# Check for multiple UPDATE operations #}
+    {%- if update_actions | length > 1 -%}
+      {{ exceptions.raise_compiler_error(
+        "DuckLake only allows one UPDATE operation per MERGE statement. " ~
+        "You have configured multiple: " ~ update_actions | join(', ') ~ ". " ~
+        "Please use only one UPDATE operation. " ~
+        "See: https://github.com/duckdb/ducklake/pull/351"
+      ) }}
+    {%- endif -%}
+
+    {# Check for multiple DELETE operations #}
+    {%- if delete_actions | length > 1 -%}
+      {{ exceptions.raise_compiler_error(
+        "DuckLake only allows one DELETE operation per MERGE statement. " ~
+        "You have configured multiple: " ~ delete_actions | join(', ') ~ ". " ~
+        "Please use only one DELETE operation. " ~
+        "See: https://github.com/duckdb/ducklake/pull/351"
+      ) }}
+    {%- endif -%}
+  {%- endif -%}
+{% endmacro %}
