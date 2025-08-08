@@ -1,5 +1,6 @@
 import os
 from collections import defaultdict
+from functools import cached_property
 from typing import Any
 from typing import List
 from typing import Optional
@@ -9,10 +10,13 @@ from uuid import uuid4
 
 from dbt_common.contracts.constraints import ColumnLevelConstraint
 from dbt_common.contracts.constraints import ConstraintType
+from dbt_common.exceptions import DbtDatabaseError
 from dbt_common.exceptions import DbtInternalError
 from dbt_common.exceptions import DbtRuntimeError
 
 from .constants import DEFAULT_TEMP_SCHEMA_NAME
+from .constants import DUCKDB_BASE_INCREMENTAL_STRATEGIES
+from .constants import DUCKDB_MERGE_MIN_VERSION
 from .constants import TEMP_SCHEMA_NAME
 from dbt.adapters.base import BaseRelation
 from dbt.adapters.base.column import Column as BaseColumn
@@ -24,6 +28,7 @@ from dbt.adapters.contracts.relation import RelationType
 from dbt.adapters.duckdb.column import DuckDBColumn
 from dbt.adapters.duckdb.connections import DuckDBConnectionManager
 from dbt.adapters.duckdb.relation import DuckDBRelation
+from dbt.adapters.duckdb.utils import DuckDBVersion
 from dbt.adapters.duckdb.utils import TargetConfig
 from dbt.adapters.duckdb.utils import TargetLocation
 from dbt.adapters.events.logging import AdapterLogger
@@ -183,34 +188,31 @@ class DuckDBAdapter(SQLAdapter):
         """Post a warning message once per dbt execution."""
         DuckDBConnectionManager.warn_once(msg)
 
-    def _supports_merge_strategy(self) -> bool:
-        """Check if the current DuckDB version supports MERGE statements."""
-        try:
-            _, cursor = self.connections.add_select_query("SELECT version()")
-            version_string = cursor.fetchone()[0]
+    @cached_property
+    def duckdb_version(self) -> DuckDBVersion:
+        """Get the DuckDB version for the current DuckDB connection (cached)."""
+        _, cursor = self.connections.add_select_query("SELECT version()")
+        row = cursor.fetchone()
+        version_string = row[0] if row else None
 
-            import re
+        if not version_string:
+            raise DbtDatabaseError(
+                "Unable to determine DuckDB version: version() query returned no results"
+            )
 
-            version_match = re.search(r"v?(\d+)\.(\d+)\.(\d+)(?:\.dev\d+)?", version_string)
-            if version_match:
-                major, minor, patch = map(int, version_match.groups())
-                supports_merge = (major > 1) or (major == 1 and minor >= 4)
-                return supports_merge
-            return False
-        except Exception:
-            return False
+        return DuckDBVersion.from_string(version_string)
+
+    @cached_property
+    def duckdb_incremental_strategies(self) -> Sequence[str]:
+        """Return valid incremental strategies for the current DuckDB connection (cached)."""
+        if self.duckdb_version >= DuckDBVersion.from_string(DUCKDB_MERGE_MIN_VERSION):
+            return DUCKDB_BASE_INCREMENTAL_STRATEGIES + ["merge"]
+
+        return DUCKDB_BASE_INCREMENTAL_STRATEGIES
 
     def valid_incremental_strategies(self) -> Sequence[str]:
-        """DuckDB supports MERGE statements starting from version 1.4.0."""
-        base_strategies = ["append", "delete+insert"]
-
-        if self._supports_merge_strategy():
-            return base_strategies + ["merge"]
-
-        logger.info(
-            "Only APPEND and DELETE+INSERT - MERGE not available - requires DuckDB >= 1.4.0"
-        )
-        return base_strategies
+        """Return valid incremental strategies for the current DuckDB connection."""
+        return self.duckdb_incremental_strategies
 
     def commit_if_has_connection(self) -> None:
         """This is just a quick-fix. Python models do not execute begin function so the transaction_open is always false."""
