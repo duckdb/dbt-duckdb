@@ -1,2 +1,4 @@
 TEMP_SCHEMA_NAME = "temp_schema_name"
 DEFAULT_TEMP_SCHEMA_NAME = "dbt_temp"
+DUCKDB_MERGE_MIN_VERSION = "1.4.0"
+DUCKDB_BASE_INCREMENTAL_STRATEGIES = ["append", "delete+insert"]
