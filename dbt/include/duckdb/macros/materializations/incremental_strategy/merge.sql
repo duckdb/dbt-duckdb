@@ -12,150 +12,151 @@
 
 {% macro duckdb__get_merge_sql(target, source, unique_key, dest_columns, incremental_predicates=none) -%}
     {%- set predicates = [] if incremental_predicates is none else [] + incremental_predicates -%}
-    {%- set dest_cols_csv = get_quoted_csv(dest_columns | map(attribute="name")) -%}
-    {%- set merge_update_columns = config.get('merge_update_columns') -%}
-    {%- set merge_exclude_columns = config.get('merge_exclude_columns') -%}
-    {%- set update_columns = get_merge_update_columns(merge_update_columns, merge_exclude_columns, dest_columns) -%}
-    {%- set sql_header = config.get('sql_header', none) -%}
 
-    {#-- DuckDB specific configurations --#}
-    {%- set merge_update_by_name = config.get('merge_update_by_name', false) -%}
-    {%- set merge_update_by_position = config.get('merge_update_by_position', false) -%}
-    {%- set merge_insert_by_name = config.get('merge_insert_by_name', false) -%}
-    {%- set merge_insert_by_position = config.get('merge_insert_by_position', false) -%}
-    {%- set merge_update_all = config.get('merge_update_all', false) -%}
-    {%- set merge_insert_all = config.get('merge_insert_all', false) -%}
-    {%- set when_not_matched_by_source = config.get('when_not_matched_by_source') -%}
-    {%- set when_not_matched_by_target = config.get('when_not_matched_by_target') -%}
-    {%- set merge_error_on_matched = config.get('merge_error_on_matched') -%}
-    {%- set merge_error_on_not_matched = config.get('merge_error_on_not_matched') -%}
-    {%- set merge_error_on_not_matched_by_source = config.get('merge_error_on_not_matched_by_source') -%}
-    {%- set merge_matched_action = config.get('merge_matched_action', 'update') -%}
-    {%- set merge_not_matched_action = config.get('merge_not_matched_action', 'insert') -%}
-    {%- set merge_use_using_clause = config.get('merge_use_using_clause', false) -%}
-    {%- set merge_using_columns = config.get('merge_using_columns') -%}
+    {{ validate_merge_config(config, target) }}
+
+    {%- set sql_header = config.get('sql_header', none) -%}
+    {%- set merge_on_using_columns = config.get('merge_on_using_columns', []) -%}
+    {%- set merge_update_condition = config.get('merge_update_condition', none) -%}
+    {%- set merge_insert_condition = config.get('merge_insert_condition', none) -%}
+    {%- set merge_update_columns = config.get('merge_update_columns', []) -%}
+    {%- set merge_exclude_columns = config.get('merge_exclude_columns', []) -%}
+    {%- set merge_update_set_expressions = config.get('merge_update_set_expressions', {}) -%}
+    {%- set merge_returning_columns = config.get('merge_returning_columns', []) -%}
+
+    {%- set merge_clause_defaults = merge_clause_defaults(
+        merge_update_condition,
+        merge_insert_condition,
+        merge_update_columns,
+        merge_exclude_columns,
+        merge_update_set_expressions
+    ) -%}
+
+    {%- set merge_clauses = config.get('merge_clauses', {}) -%}
+    {%- set when_matched_clauses = merge_clauses.get('when_matched', [
+        merge_clause_defaults.when_matched_update_explicit
+        if (merge_update_columns|length != 0 or merge_exclude_columns|length != 0 or merge_update_set_expressions|length != 0)
+        else merge_clause_defaults.when_matched_update_by_name
+    ]) -%}
+
+    {%- set when_not_matched_clauses = merge_clauses.get('when_not_matched', [
+        merge_clause_defaults.when_not_matched_insert_by_name
+    ]) -%}
 
     {% if unique_key %}
         {% if unique_key is sequence and unique_key is not mapping and unique_key is not string %}
             {% for key in unique_key %}
-                {% set this_key_match %}
-                    DBT_INTERNAL_SOURCE.{{ key }} = DBT_INTERNAL_DEST.{{ key }}
-                {% endset %}
-                {% do predicates.append(this_key_match) %}
+                {% do predicates.append("DBT_INTERNAL_SOURCE." ~ key ~ " = DBT_INTERNAL_DEST." ~ key) %}
             {% endfor %}
         {% else %}
-            {% set source_unique_key = ("DBT_INTERNAL_SOURCE." ~ unique_key) | trim %}
-            {% set target_unique_key = ("DBT_INTERNAL_DEST." ~ unique_key) | trim %}
-            {% set unique_key_match = equals(source_unique_key, target_unique_key) | trim %}
-            {% do predicates.append(unique_key_match) %}
+            {% do predicates.append("DBT_INTERNAL_SOURCE." ~ unique_key ~ " = DBT_INTERNAL_DEST." ~ unique_key) %}
         {% endif %}
     {% else %}
         {% do predicates.append('FALSE') %}
     {% endif %}
 
-    {{ validate_merge_ducklake_restrictions(target, merge_matched_action, when_not_matched_by_source) }}
-    {{ validate_merge_unique_key_and_using_clause(unique_key, merge_use_using_clause, merge_using_columns) }}
-    {{ validate_merge_update_options(merge_update_all, merge_update_by_name, merge_update_by_position) }}
-    {{ validate_merge_insert_options(merge_insert_all, merge_insert_by_name, merge_insert_by_position) }}
-    {{ validate_merge_using_clause(merge_use_using_clause, merge_using_columns) }}
-    {{ validate_merge_action_values(merge_matched_action, merge_not_matched_action, when_not_matched_by_source) }}
-    {{ validate_merge_column_configs(merge_update_all, merge_update_by_name, merge_update_by_position, merge_update_columns, merge_exclude_columns) }}
-    {{ validate_merge_error_config('merge_error_on_matched', merge_error_on_matched) }}
-    {{ validate_merge_error_config('merge_error_on_not_matched', merge_error_on_not_matched) }}
-    {{ validate_merge_error_config('merge_error_on_not_matched_by_source', merge_error_on_not_matched_by_source) }}
-    {{ validate_merge_custom_update_mapping(when_not_matched_by_source) }}
-    {{ validate_merge_matched_and_not_matched_actions(merge_matched_action, merge_update_all, merge_update_by_name, merge_update_by_position) }}
-    {{ validate_merge_not_matched_and_insert_options(merge_not_matched_action, merge_insert_all, merge_insert_by_name, merge_insert_by_position) }}
-
     {{ sql_header if sql_header is not none }}
 
-    merge into {{ target }} as DBT_INTERNAL_DEST
-        using {{ source }} as DBT_INTERNAL_SOURCE
-        {%- if merge_use_using_clause and merge_using_columns %}
-        using ({{ merge_using_columns | join(', ') }})
+    MERGE INTO {{ target }} AS DBT_INTERNAL_DEST
+        USING {{ source }} AS DBT_INTERNAL_SOURCE
+        {%- if merge_on_using_columns %}
+            USING ({{ merge_on_using_columns | join(', ') }})
         {%- else %}
-        on {{"(" ~ predicates | join(") and (") ~ ")"}}
+            ON ({{ predicates | join(") AND (") }})
         {%- endif %}
 
-    {% if unique_key %}
-        {%- if merge_error_on_matched %}
-    when matched {% if merge_error_on_matched.condition %}and {{ merge_error_on_matched.condition }}{% endif %} then error {% if merge_error_on_matched.message %}'{{ merge_error_on_matched.message }}'{% endif %}
+    {%- for when_matched in when_matched_clauses %}
+    WHEN MATCHED
+        {%- if when_matched.get('condition') -%}
+            {%- if when_matched.get('condition') is string %} AND {{ when_matched.get('condition') }}
+            {%- else %} AND ({{ when_matched.get('condition') | join(') AND (') }})
+            {%- endif -%}
         {%- endif %}
+    THEN
+        {% if when_matched.get('action') == 'update' %}
+            {%- if when_matched.get('mode') == 'by_name' -%}
+            UPDATE BY NAME
+            {%- elif when_matched.get('mode') == 'by_position' -%}
+            UPDATE BY POSITION
+            {%- elif when_matched.get('mode') == 'star' -%}
+            UPDATE SET *
+            {%- elif when_matched.get('mode') == 'explicit' -%}
+                {%- set include_columns = when_matched.get('update', {}).get('include', []) -%}
+                {%- set exclude_columns = when_matched.get('update', {}).get('exclude', []) -%}
+                {%- set set_expressions = when_matched.get('update', {}).get('set_expressions', {}) -%}
 
-        {%- if merge_matched_action == 'update' %}
-    when matched then
-            {%- if merge_update_all %}
-        update set *
-            {%- elif merge_update_by_name %}
-        update by name
-            {%- elif merge_update_by_position %}
-        update by position
-            {%- else %}
-        update set
-        {% for column_name in update_columns -%}
-            {{ column_name }} = DBT_INTERNAL_SOURCE.{{ column_name }}
-            {%- if not loop.last %}, {%- endif %}
-        {%- endfor %}
-            {%- endif %}
-        {%- elif merge_matched_action == 'delete' %}
-    when matched then delete
-        {%- elif merge_matched_action == 'do_nothing' %}
-    when matched then do nothing
+                {%- set update_columns = get_merge_update_columns(include_columns, exclude_columns, dest_columns) -%}
+
+                {%- set update_columns_after_overrides = [] -%}
+                {%- for column in update_columns -%}
+                    {%- set unquoted_column = column.replace('"', '').replace("'", "") -%}
+                    {%- if unquoted_column not in set_expressions -%}
+                    {%- do update_columns_after_overrides.append(column) -%}
+                    {%- endif -%}
+                {%- endfor -%}
+
+            UPDATE SET
+                {% for column, expression in set_expressions.items() -%}
+                {{ column }} = {{ expression }}{% if not loop.last or update_columns_after_overrides|length > 0 %}, {% endif %}
+                {%- endfor %}
+                {%- for column in update_columns_after_overrides -%}
+                {{ column }} = DBT_INTERNAL_SOURCE.{{ column }}{% if not loop.last %}, {% endif %}
+                {%- endfor %}
+            {%- endif -%}
+
+        {%- elif when_matched.get('action') == 'delete' %}
+            DELETE
+        {%- elif when_matched.get('action') == 'do_nothing' %}
+            DO NOTHING
+        {%- elif when_matched.get('action') == 'error' %}
+            {%- set error_message = (when_matched.get('error_message', '') or '') | replace("'", "''") -%}
+            ERROR{% if when_matched.get('error_message') %} '{{ error_message }}'{% endif %}
         {%- endif %}
-    {% endif %}
+    {%- endfor %}
 
-    {% if when_not_matched_by_source %}
-        {%- if merge_error_on_not_matched_by_source %}
-    when not matched by source {% if merge_error_on_not_matched_by_source.condition %}and {{ merge_error_on_not_matched_by_source.condition }}{% endif %} then error {% if merge_error_on_not_matched_by_source.message %}'{{ merge_error_on_not_matched_by_source.message }}'{% endif %}
+    {%- for when_not_matched in when_not_matched_clauses %}
+    WHEN NOT MATCHED
+        {% if when_not_matched.get('by') %}BY {{ when_not_matched.get('by') | upper }} {% endif %}
+        {%- if when_not_matched.get('condition') -%}
+            {%- if when_not_matched.get('condition') is string %} AND {{ when_not_matched.get('condition') }}
+            {%- else %} AND ({{ when_not_matched.get('condition') | join(') AND (') }})
+            {%- endif -%}
         {%- endif %}
+    THEN
+        {% if when_not_matched.get('action') == 'update' %}
+            {%- set set_expressions = when_not_matched.get('set_expressions', {}) -%}
 
-        {%- if when_not_matched_by_source == 'delete' %}
-    when not matched by source then delete
-        {%- elif when_not_matched_by_source == 'update' %}
-            {%- if merge_update_all %}
-    when not matched by source then update set *
-            {%- elif merge_update_by_name %}
-    when not matched by source then update by name
-            {%- elif merge_update_by_position %}
-    when not matched by source then update by position
-            {%- elif when_not_matched_by_source is mapping and when_not_matched_by_source.update_columns %}
-    when not matched by source then update set
-        {% for column_name in when_not_matched_by_source.update_columns -%}
-            {{ column_name }} = {{ when_not_matched_by_source.update_values[column_name] | default('NULL') }}
-            {%- if not loop.last %}, {%- endif %}
-        {%- endfor %}
-            {%- else %}
-    when not matched by source then update set
-        {% for column_name in update_columns -%}
-            {{ column_name }} = NULL
-            {%- if not loop.last %}, {%- endif %}
-        {%- endfor %}
-            {%- endif %}
-        {%- elif when_not_matched_by_source == 'do_nothing' %}
-    when not matched by source then do nothing
+            UPDATE SET
+            {% for column, expression in set_expressions.items() -%}
+            {{ column }} = {{ expression }}{% if not loop.last %}, {% endif %}
+            {%- endfor %}
+
+        {%- elif when_not_matched.get('action') == 'insert' %}
+            {%- if when_not_matched.get('mode') == 'by_name' -%}
+            INSERT BY NAME
+            {%- elif when_not_matched.get('mode') == 'by_position' -%}
+            INSERT BY POSITION
+            {%- elif when_not_matched.get('mode') == 'star' -%}
+            INSERT *
+            {%- elif when_not_matched.get('mode') == 'explicit' -%}
+            {%- set insert_columns = when_matched.get('insert', {}).get('columns', []) -%}
+            {%- set insert_values = when_matched.get('insert', {}).get('values', []) -%}
+
+            INSERT
+                ({{ insert_columns | join(', ') }})
+                VALUES ({{ insert_values  | join(', ') }})
+            {%- endif -%}
+        {%- elif when_not_matched.get('action') == 'delete' %}
+            DELETE
+        {%- elif when_not_matched.get('action') == 'do_nothing' %}
+            DO NOTHING
+        {%- elif when_not_matched.get('action') == 'error' %}
+            {%- set error_message = (when_not_matched.get('error_message', '') or '') | replace("'", "''") -%}
+            ERROR{% if when_not_matched.get('error_message') %} '{{ error_message }}'{% endif %}
         {%- endif %}
-    {% endif %}
+    {%- endfor %}
 
-    {%- if merge_error_on_not_matched %}
-    when not matched {% if merge_error_on_not_matched.condition %}and {{ merge_error_on_not_matched.condition }}{% endif %} then error {% if merge_error_on_not_matched.message %}'{{ merge_error_on_not_matched.message }}'{% endif %}
+    {%- if merge_returning_columns %}
+    RETURNING {{ merge_returning_columns if merge_returning_columns is string else merge_returning_columns | join(', ') }}
     {%- endif %}
-
-    {%- if merge_not_matched_action == 'insert' %}
-        {%- if when_not_matched_by_target == false %}
-        {%- elif merge_insert_all %}
-    when not matched then insert *
-        {%- elif merge_insert_by_name %}
-    when not matched then insert by name
-        {%- elif merge_insert_by_position %}
-    when not matched then insert by position
-        {%- else %}
-    when not matched then insert
-        ({{ dest_cols_csv }})
-    values
-        ({% for column in dest_columns %}DBT_INTERNAL_SOURCE.{{ column.name | as_text }}{% if not loop.last %}, {% endif %}{% endfor %})
-        {%- endif %}
-    {%- elif merge_not_matched_action == 'do_nothing' %}
-    when not matched then do nothing
-    {%- endif %}
-
 {% endmacro %}
