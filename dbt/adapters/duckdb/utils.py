@@ -1,9 +1,7 @@
-import re
 from dataclasses import dataclass
 from typing import Any
 from typing import Dict
 from typing import List
-from typing import NamedTuple
 from typing import Optional
 from typing import Sequence
 
@@ -12,32 +10,6 @@ from dbt.adapters.base.relation import BaseRelation
 from dbt.adapters.contracts.relation import RelationConfig
 # TODO
 # from dbt.context.providers import RuntimeConfigObject
-
-
-class DuckDBVersion(NamedTuple):
-    """Represents a semantic version with major, minor, and patch components."""
-
-    major: int
-    minor: int
-    patch: int
-
-    def __str__(self) -> str:
-        return f"{self.major}.{self.minor}.{self.patch}"
-
-    @classmethod
-    def from_string(cls, version_string: str) -> "DuckDBVersion":
-        """Parse a version string into a DuckDbVersion object."""
-        match = re.compile(r"^v?(\d+)\.(\d+)\.(\d+)").match(version_string)
-        if not match:
-            raise ValueError(f"Invalid version string: '{version_string}'")
-
-        try:
-            major = int(match.group(1))
-            minor = int(match.group(2))
-            patch = int(match.group(3))
-            return cls(major, minor, patch)
-        except (TypeError, ValueError) as e:
-            raise ValueError(f"Invalid version numbers: {match.groups()}") from e
 
 
 @dataclass
