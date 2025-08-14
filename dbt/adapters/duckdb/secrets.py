@@ -40,6 +40,24 @@ class Secret(dbtClassMixin):
             secret_kwargs=kwargs,
         )
 
+    def _format_value(self, key: str, value: Any) -> str:
+        """Format a value for DuckDB SQL based on its type and key."""
+        # Keys that should not be quoted
+        unquoted_keys = ["type", "provider", "extra_http_headers"]
+
+        if isinstance(value, dict):
+            # Format as DuckDB map: map {'key1': 'value1', 'key2': 'value2'}
+            items = [f"'{k}': '{v}'" for k, v in value.items()]
+            return f"{key} map {{{', '.join(items)}}}"
+        elif isinstance(value, list):
+            # Format as DuckDB array: array ['item1', 'item2']
+            items = [f"'{item}'" for item in value]
+            return f"{key} array [{', '.join(items)}]"
+        elif key in unquoted_keys:
+            return f"{key} {value}"
+        else:
+            return f"{key} '{value}'"
+
     def to_sql(self) -> str:
         name = f" {self.name}" if self.name else ""
         or_replace = " OR REPLACE" if name else ""
@@ -60,19 +78,14 @@ class Secret(dbtClassMixin):
             params_sql: List[str] = []
             for key, value in params.items():
                 if value is not None and key not in ["name", "persistent"]:
-                    if key not in ["type", "provider", "extra_http_headers"]:
-                        params_sql.append(f"{key} '{value}'")
-                    else:
-                        params_sql.append(f"{key} {value}")
+                    params_sql.append(self._format_value(key, value))
             for s in scope_value:
                 params_sql.append(f"scope '{s}'")
 
             params_sql_str = f",\n{tab}".join(params_sql)
         else:
             params_sql_list = [
-                f"{key} '{value}'"
-                if key not in ["type", "provider", "extra_http_headers"]
-                else f"{key} {value}"
+                self._format_value(key, value)
                 for key, value in params.items()
                 if value is not None and key not in ["name", "persistent"]
             ]
