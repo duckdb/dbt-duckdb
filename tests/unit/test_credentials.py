@@ -381,3 +381,47 @@ def test_database_matches_attach_alias_no_alias():
     with pytest.raises(DbtRuntimeError) as exc:
         DuckDBCredentials.from_dict(payload)
     assert "Inconsistency detected between 'path' and 'database' fields" in str(exc.value)
+
+
+def test_add_ducklake_secret_with_map():
+    """Test ducklake secret with metadata_parameters as a map."""
+    creds = DuckDBCredentials(
+        secrets=[
+            dict(
+                type="ducklake",
+                name="sdp_catalog",
+                metadata_path="",
+                metadata_schema="oxy_main",
+                metadata_parameters={"TYPE": "postgres", "SECRET": "sdp_metadata"}
+            )
+        ]
+    )
+    
+    sql = creds.secrets_sql()[0]
+    expected = """CREATE OR REPLACE SECRET sdp_catalog (
+    type ducklake,
+    metadata_path '',
+    metadata_schema 'oxy_main',
+    metadata_parameters map {'TYPE': 'postgres', 'SECRET': 'sdp_metadata'}
+)"""
+    assert sql == expected
+
+
+def test_add_secret_with_list():
+    """Test secret with list parameter."""
+    creds = DuckDBCredentials(
+        secrets=[
+            dict(
+                type="custom",
+                name="test_secret",
+                allowed_hosts=["host1", "host2", "host3"]
+            )
+        ]
+    )
+    
+    sql = creds.secrets_sql()[0]
+    expected = """CREATE OR REPLACE SECRET test_secret (
+    type custom,
+    allowed_hosts array ['host1', 'host2', 'host3']
+)"""
+    assert sql == expected
