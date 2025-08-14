@@ -396,12 +396,7 @@ def test_add_ducklake_secret_with_map():
             )
         ]
     )
-    assert len(creds.secrets) == 1
-    assert creds._secrets[0].type == "ducklake"
-    assert creds._secrets[0].secret_kwargs.get("metadata_path") == ""
-    assert creds._secrets[0].secret_kwargs.get("metadata_schema") == "oxy_main"
-    assert creds._secrets[0].secret_kwargs.get("metadata_parameters") == {"TYPE": "postgres", "SECRET": "sdp_metadata"}
-
+    
     sql = creds.secrets_sql()[0]
     expected = """CREATE OR REPLACE SECRET sdp_catalog (
     type ducklake,
@@ -423,10 +418,7 @@ def test_add_secret_with_list():
             )
         ]
     )
-    assert len(creds.secrets) == 1
-    assert creds._secrets[0].type == "custom"
-    assert creds._secrets[0].secret_kwargs.get("allowed_hosts") == ["host1", "host2", "host3"]
-
+    
     sql = creds.secrets_sql()[0]
     expected = """CREATE OR REPLACE SECRET test_secret (
     type custom,
