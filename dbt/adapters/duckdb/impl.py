@@ -1,4 +1,5 @@
 import os
+import traceback
 from collections import defaultdict
 from typing import Any
 from typing import List
@@ -193,7 +194,7 @@ class DuckDBAdapter(SQLAdapter):
             self.connections.commit_if_has_connection()
         except DbtInternalError as e:
             # Log commit errors instead of silently swallowing them to aid debugging
-            logger.exception(f"Commit failed with DbtInternalError: {e}")
+            logger.warning(f"Commit failed with DbtInternalError: {e}\n{traceback.format_exc()}")
             # Still pass to maintain backward compatibility, but now with visibility
             pass
 
