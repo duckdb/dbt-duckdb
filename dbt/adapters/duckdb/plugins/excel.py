@@ -76,6 +76,7 @@ class Plugin(BasePlugin):
             target_output_config["sheet_name"] = sheet_name
 
         df = pd_utils.target_to_df(target_config)
+        df = df[df.notna().any(axis=1)]
         if target_output_config.get("skip_empty_sheet", False) and df.shape[0] == 0:
             return
         try:
