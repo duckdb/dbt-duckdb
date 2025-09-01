@@ -167,13 +167,21 @@ def _add_partition(
     table_def: "TableInputTypeDef",
     partition_columns: List[Dict[str, str]],
 ) -> None:
+
     if partition_columns != []:
-        partition_input, _ = _parse_partition_columns(partition_columns, table_def)
+        partition_input, partition_values = _parse_partition_columns(partition_columns, table_def)
 
-        client.create_partition(
-            DatabaseName=database, TableName=table_def["Name"], PartitionInput=partition_input
-        )
-
+        try:
+            client.create_partition(
+                DatabaseName=database, TableName=table_def["Name"], PartitionInput=partition_input
+            )
+        except client.exceptions.AlreadyExistsException:
+            client.update_partition(
+                DatabaseName=database,
+                TableName=table_def["Name"],
+                PartitionValueList=partition_values,
+                PartitionInput=partition_input,
+            )
 
 def _update_table(
     client: "GlueClient",
@@ -192,6 +200,7 @@ def _update_table(
                 TableName=table_def["Name"],
                 PartitionValues=partition_values,
             )
+
             client.update_partition(
                 DatabaseName=database,
                 TableName=table_def["Name"],
