@@ -2,12 +2,7 @@ import pytest
 from unittest.mock import MagicMock
 from unittest.mock import patch
 
-import duckdb
-try:
-    IOException = duckdb.IOException
-except AttributeError:
-    # Fallback for older DuckDB wheels
-    from duckdb.duckdb import IOException
+from duckdb import IOException
 
 from dbt.adapters.duckdb.credentials import Retries
 from dbt.adapters.duckdb.environments import RetryableCursor
