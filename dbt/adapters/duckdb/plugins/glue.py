@@ -34,6 +34,12 @@ class UndetectedType(Exception):
 
 def _dbt2glue(dtype: str, ignore_null: bool = False) -> str:  # pragma: no cover
     """DuckDB to Glue data types conversion."""
+    # Check if it's an array type
+    if dtype.strip().endswith("[]"):
+        base_type = dtype.strip()[:-2]  # Remove the [] suffix
+        base_glue_type = _dbt2glue(base_type, ignore_null)
+        return f"array<{base_glue_type}>"
+    
     data_type = dtype.split("(")[0]
     if data_type.lower() in ["int1", "tinyint"]:
         return "tinyint"
