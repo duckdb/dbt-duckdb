@@ -3,6 +3,11 @@ from unittest.mock import MagicMock
 from unittest.mock import patch
 
 import duckdb
+try:
+    IOException = duckdb.IOException
+except AttributeError:
+    # Fallback for older DuckDB wheels
+    from duckdb.duckdb import IOException
 
 from dbt.adapters.duckdb.credentials import Retries
 from dbt.adapters.duckdb.environments import RetryableCursor
@@ -32,7 +37,7 @@ class TestRetryableCursor:
 
     def test_retry_on_failure(self, mock_cursor, retry_cursor):
         """ Test that execute retries the SQL query on failure. """
-        mock_cursor.execute.side_effect = [duckdb.duckdb.IOException, None]
+        mock_cursor.execute.side_effect = [IOException, None]
         sql_query = "SELECT * FROM table"
         retry_cursor.execute(sql_query)
         assert mock_cursor.execute.call_count == 2
@@ -47,7 +52,7 @@ class TestRetryableCursor:
 
     def test_exponential_backoff(self, mock_cursor, retry_cursor):
         """ Test that exponential backoff is applied between retries. """
-        mock_cursor.execute.side_effect = [duckdb.duckdb.IOException, duckdb.duckdb.IOException, None]
+        mock_cursor.execute.side_effect = [IOException, IOException, None]
         sql_query = "SELECT * FROM table"
 
         with patch("time.sleep") as mock_sleep:

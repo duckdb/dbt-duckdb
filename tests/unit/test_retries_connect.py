@@ -1,7 +1,11 @@
 import pytest
 from unittest.mock import patch
 
-from duckdb.duckdb import IOException
+# Backward/forward-compatible import for DuckDB IOException
+try:
+    from duckdb import IOException
+except Exception:  # Fallback for older wheels where it's under duckdb.duckdb
+    from duckdb.duckdb import IOException
 
 from dbt.adapters.duckdb.credentials import DuckDBCredentials
 from dbt.adapters.duckdb.credentials import Retries
