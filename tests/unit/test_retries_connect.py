@@ -1,7 +1,7 @@
 import pytest
 from unittest.mock import patch
 
-from duckdb.duckdb import IOException
+from duckdb import IOException
 
 from dbt.adapters.duckdb.credentials import DuckDBCredentials
 from dbt.adapters.duckdb.credentials import Retries
