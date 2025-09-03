@@ -42,30 +42,18 @@ class TestMotherduckDucklakeDetection(unittest.TestCase):
         config = config_from_parts_or_dicts(self.project_cfg, profile_cfg, cli_vars={})
         return DuckDBAdapter(config, self.mock_mp_context)
 
-    def test_is_ducklake_with_type_ducklake(self):
+    def test_is_ducklake_with_managed_list(self):
         profile_cfg = self.base_profile_cfg.copy()
-        profile_cfg["outputs"]["test"]["attach"] = [
-            {
-                "alias": "lk_db",
-                "path": "/path/to/regular.db",
-                "type": "ducklake",
-            }
-        ]
+        profile_cfg["outputs"]["test"]["ducklake_managed_dbs"] = ["lk_db"]
 
         adapter = self._get_adapter(profile_cfg)
         relation = DuckDBRelation.create(database="lk_db", schema="main", identifier="t")
 
         assert adapter.is_ducklake(relation) is True
 
-    def test_is_ducklake_with_type_ducklake_case_insensitive(self):
+    def test_is_ducklake_with_managed_list_multiple(self):
         profile_cfg = self.base_profile_cfg.copy()
-        profile_cfg["outputs"]["test"]["attach"] = [
-            {
-                "alias": "lk_db2",
-                "path": "/path/to/regular2.db",
-                "type": "DuckLake",
-            }
-        ]
+        profile_cfg["outputs"]["test"]["ducklake_managed_dbs"] = ["lk_db2", "another_db"]
 
         adapter = self._get_adapter(profile_cfg)
         relation = DuckDBRelation.create(database="lk_db2", schema="main", identifier="t2")

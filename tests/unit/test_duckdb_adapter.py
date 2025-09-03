@@ -304,16 +304,10 @@ class TestDuckDBAdapterIsDucklake(unittest.TestCase):
         
         self.assertFalse(result)
 
-    def test_is_ducklake_with_type_ducklake(self):
-        """Test is_ducklake returns True when attachment type is ducklake even without ducklake: path."""
+    def test_is_ducklake_with_managed_list(self):
+        """Test is_ducklake returns True when database is listed in ducklake_managed_dbs."""
         profile_cfg = self.base_profile_cfg.copy()
-        profile_cfg["outputs"]["test"]["attach"] = [
-            {
-                "alias": "lk_db",
-                "path": "/path/to/regular.db",
-                "type": "ducklake",
-            }
-        ]
+        profile_cfg["outputs"]["test"]["ducklake_managed_dbs"] = ["lk_db"]
 
         adapter = self._get_adapter(profile_cfg)
         relation = DuckDBRelation.create(database="lk_db", schema="test_schema", identifier="test_table")
@@ -322,16 +316,10 @@ class TestDuckDBAdapterIsDucklake(unittest.TestCase):
 
         self.assertTrue(result)
 
-    def test_is_ducklake_with_type_ducklake_case_insensitive(self):
-        """Test is_ducklake handles mixed-case attachment type for ducklake."""
+    def test_is_ducklake_with_managed_list_multiple(self):
+        """Test is_ducklake returns True when database is one of multiple managed entries."""
         profile_cfg = self.base_profile_cfg.copy()
-        profile_cfg["outputs"]["test"]["attach"] = [
-            {
-                "alias": "lk_db2",
-                "path": "/path/to/another.db",
-                "type": "DuckLake",
-            }
-        ]
+        profile_cfg["outputs"]["test"]["ducklake_managed_dbs"] = ["lk_db2", "another_db"]
 
         adapter = self._get_adapter(profile_cfg)
         relation = DuckDBRelation.create(database="lk_db2", schema="test_schema", identifier="test_table")
