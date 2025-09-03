@@ -70,7 +70,7 @@
 
     create {% if temporary: -%}temporary{%- endif %} table
       {{ relation.include(database=(not temporary), schema=(not temporary)) }}
-  {% if contract_config.enforced and not temporary %}
+  {% if contract_config.enforced and not temporary and not adapter.is_ducklake(relation) %}
     {#-- DuckDB doesnt support constraints on temp tables --#}
     {{ get_table_columns_and_constraints() }} ;
     insert into {{ relation }} {{ get_column_names() }} (
