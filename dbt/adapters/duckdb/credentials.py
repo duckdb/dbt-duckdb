@@ -229,14 +229,19 @@ class DuckDBCredentials(Credentials):
         self._ducklake_dbs = set()
         if self.attach:
             for attachment in self.attach:
-                if (
-                    hasattr(attachment, "alias")
-                    and attachment.alias
-                    and hasattr(attachment, "path")
-                    and attachment.path
-                    and "ducklake:" in attachment.path
-                ):
-                    self._ducklake_dbs.add(attachment.alias)
+                alias = getattr(attachment, "alias", None)
+                path = getattr(attachment, "path", None)
+                atype = getattr(attachment, "type", None)
+
+                # Detect ducklake by explicit type, or by path scheme. Be lenient on case.
+                is_ducklake = False
+                if isinstance(atype, str) and atype.lower() == "ducklake":
+                    is_ducklake = True
+                elif isinstance(path, str) and "ducklake:" in path.lower():
+                    is_ducklake = True
+
+                if alias and is_ducklake:
+                    self._ducklake_dbs.add(alias)
 
         # Add MotherDuck plugin if the path is a MotherDuck database
         # and plugin was not specified in profile.yml
