@@ -277,7 +277,7 @@ def materialize(df, con):
     {% set index_name = row[0] %}
     {{ log("Dropping index: " ~ index_name, info=true) }}
     {% call statement('drop_index_' + loop.index|string, auto_begin=false) %}
-      DROP INDEX "{{ index_name }}"
+      DROP INDEX "{{ relation.schema }}"."{{ index_name }}"
     {% endcall %}
     {{ log("Index " ~ index_name ~ " drop statement executed", info=true) }}
   {% endfor %}
