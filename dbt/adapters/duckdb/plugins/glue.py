@@ -55,7 +55,9 @@ def _dbt2glue(dtype: str, ignore_null: bool = False) -> str:  # pragma: no cover
         )
     if data_type.lower() in ["float4", "float", "real"]:
         return "float"
-    if data_type.lower() in ["float8", "numeric", "decimal", "double"]:
+    if data_type.lower() in ["decimal"]:
+        return "decimal"
+    if data_type.lower() in ["float8", "numeric", "double"]:
         return "double"
     if data_type.lower() in ["boolean", "bool", "logical"]:
         return "boolean"
