@@ -220,6 +220,12 @@ class DuckDBCredentials(Credentials):
     # by networking issues)
     retries: Optional[Retries] = None
 
+    # A list of catalog names that should be treated as managed DuckLake
+    # (primarily for MotherDuck workspace mode). These names will be used
+    # to control behavior (e.g., disabling CASCADE on drops) without
+    # requiring TYPE ducklake or alias-based detection.
+    ducklake_managed_dbs: Optional[List[str]] = None
+
     def __post_init__(self):
         self.settings = self.settings or {}
         self.secrets = self.secrets or []
@@ -231,17 +237,18 @@ class DuckDBCredentials(Credentials):
             for attachment in self.attach:
                 alias = getattr(attachment, "alias", None)
                 path = getattr(attachment, "path", None)
-                atype = getattr(attachment, "type", None)
 
-                # Detect ducklake by explicit type, or by path scheme. Be lenient on case.
-                is_ducklake = False
-                if isinstance(atype, str) and atype.lower() == "ducklake":
-                    is_ducklake = True
-                elif isinstance(path, str) and "ducklake:" in path.lower():
-                    is_ducklake = True
+                # Detect ducklake by path scheme only (local ducklake attachments)
+                is_ducklake = isinstance(path, str) and "ducklake:" in path.lower()
 
                 if alias and is_ducklake:
                     self._ducklake_dbs.add(alias)
+
+        # Also honor explicit managed DuckLake catalogs from the profile
+        if self.ducklake_managed_dbs:
+            for dbname in self.ducklake_managed_dbs:
+                if isinstance(dbname, str) and dbname:
+                    self._ducklake_dbs.add(dbname)
 
         # Add MotherDuck plugin if the path is a MotherDuck database
         # and plugin was not specified in profile.yml
@@ -322,11 +329,22 @@ class DuckDBCredentials(Credentials):
         database_from_data = data.get("database")
         database_matches_attach_alias = database_from_data in attach_aliases
 
+        # Also allow mismatch if database matches an explicitly managed DuckLake catalog
+        managed_ducklake_dbs = []
+        if isinstance(data.get("ducklake_managed_dbs"), list):
+            managed_ducklake_dbs = [v for v in data["ducklake_managed_dbs"] if isinstance(v, str)]
+        database_matches_managed_ducklake = database_from_data in managed_ducklake_dbs
+
         if path_db and "database" not in data:
             data["database"] = path_db
         elif path_db and data["database"] != path_db:
             # Allow database name to differ from path_db if it matches an attach alias
-            if not data.get("remote") and not database_matches_attach_alias:
+            # or if it's explicitly listed as a managed DuckLake catalog
+            if (
+                not data.get("remote")
+                and not database_matches_attach_alias
+                and not database_matches_managed_ducklake
+            ):
                 raise DbtRuntimeError(
                     "Inconsistency detected between 'path' and 'database' fields in profile; "
                     f"the 'database' property must be set to '{path_db}' to match the 'path'"
@@ -364,6 +382,7 @@ class DuckDBCredentials(Credentials):
             "external_root",
             "use_credential_provider",
             "attach",
+            "ducklake_managed_dbs",
             "filesystems",
             "remote",
             "plugins",
