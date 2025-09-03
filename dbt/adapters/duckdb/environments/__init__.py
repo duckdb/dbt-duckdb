@@ -288,7 +288,9 @@ class Environment(abc.ABC):
                 cur = cls.initialize_cursor(creds, con.cursor())
                 module.materialize(df, cur)
         except Exception as err:
-            raise DbtRuntimeError(f"Python model failed:\n" f"{"".join(traceback.format_exception(err))}")
+            raise DbtRuntimeError(
+                f"Python model failed:\n" f"{"".join(traceback.format_exception(err))}"
+            )
         finally:
             os.unlink(mod_file.name)
 
