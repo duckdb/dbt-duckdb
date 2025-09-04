@@ -103,7 +103,10 @@
   {% do adapter.commit() %}
 
   {% for rel in to_drop %}
-      {% do drop_indexes_on_relation(rel) %}
+      {# On MotherDuck the temp relation is a real table; dropping it cascades indexes. Avoid extra ALTERs. #}
+      {% if not adapter.is_motherduck() %}
+        {% do drop_indexes_on_relation(rel) %}
+      {% endif %}
       {% do adapter.drop_relation(rel) %}
   {% endfor %}
 
