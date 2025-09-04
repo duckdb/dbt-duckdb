@@ -90,11 +90,12 @@
   {% set should_revoke = should_revoke(existing_relation, full_refresh_mode) %}
   {% do apply_grants(target_relation, grant_config, should_revoke=should_revoke) %}
 
-  {% do persist_docs(target_relation, model) %}
-
+  {# Align order with table materialization to avoid MotherDuck alter conflicts #}
   {% if existing_relation is none or existing_relation.is_view or should_full_refresh() %}
     {% do create_indexes(target_relation) %}
   {% endif %}
+
+  {% do persist_docs(target_relation, model) %}
 
   {{ run_hooks(post_hooks, inside_transaction=True) }}
 
