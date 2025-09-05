@@ -315,10 +315,10 @@ class DuckDBCredentials(Credentials):
         return scheme in {"md", "motherduck"}
 
     @staticmethod
-    def path_derived_database_name(path: str) -> str:
+    def path_derived_database_name(path: Any | None) -> str:
         if path is None or path == ":memory:":
             return "memory"
-        parsed = urlparse(path)
+        parsed = urlparse(str(path))
         base_file = os.path.basename(parsed.path)
         inferred_db_name = os.path.splitext(base_file)[0]
         if DuckDBCredentials._is_motherduck(parsed.scheme):
