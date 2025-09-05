@@ -47,7 +47,7 @@ class Attachment(dbtClassMixin):
         # remove query parameters (not supported in ATTACH)
         parsed = urlparse(self.path)
         path = self.path.replace(f"?{parsed.query}", "")
-        base = f"ATTACH '{path}'"
+        base = f"ATTACH IF NOT EXISTS '{path}'"
         if self.alias:
             base += f" AS {self.alias}"
 
@@ -315,7 +315,7 @@ class DuckDBCredentials(Credentials):
         return scheme in {"md", "motherduck"}
 
     @staticmethod
-    def path_derived_database_name(path: Any | None) -> str:
+    def path_derived_database_name(path: Optional[Any]) -> str:
         if path is None or path == ":memory:":
             return "memory"
         parsed = urlparse(str(path))
