@@ -38,7 +38,7 @@ class Attachment(dbtClassMixin):
 
     # An optional flag to indicate whether the database is a ducklake database,
     # so that the adapter can generate queries that work for ducklake.
-    # This is not always necessary when using a ducklake database, but 
+    # This is not always necessary when using a ducklake database, but
     # serves more as a hint for cases where the path does not use the ducklake: scheme,
     # which is the case in fully managed ducklake in MotherDuck.
     is_ducklake: Optional[bool] = None
@@ -229,7 +229,7 @@ class DuckDBCredentials(Credentials):
 
     # An optional flag to indicate whether the database is a ducklake database,
     # so that the adapter can generate queries that work for ducklake.
-    # This is not always necessary when using a ducklake database, but 
+    # This is not always necessary when using a ducklake database, but
     # serves more as a hint for cases where the path does not use the ducklake: scheme,
     # which is the case in fully managed ducklake in MotherDuck.
     is_ducklake: Optional[bool] = None
@@ -252,7 +252,9 @@ class DuckDBCredentials(Credentials):
                 alias = getattr(attachment, "alias", None)
 
                 # Detect ducklake by explicit type, or by path scheme. Be lenient on case.
-                if (isinstance(is_ducklake_flag, bool) and is_ducklake_flag) or (isinstance(path, str) and "ducklake:" in path.lower()):
+                if (isinstance(is_ducklake_flag, bool) and is_ducklake_flag) or (
+                    isinstance(path, str) and "ducklake:" in path.lower()
+                ):
                     if alias:
                         self._ducklake_dbs.add(alias)
                     else:
