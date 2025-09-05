@@ -311,7 +311,8 @@ class TestDuckDBAdapterIsDucklake(unittest.TestCase):
             {
                 "alias": "lk_db",
                 "path": "/path/to/regular.db",
-                "type": "ducklake",
+                "type": "duckdb",
+                "is_ducklake": True
             }
         ]
 
@@ -328,8 +329,8 @@ class TestDuckDBAdapterIsDucklake(unittest.TestCase):
         profile_cfg["outputs"]["test"]["attach"] = [
             {
                 "alias": "lk_db2",
-                "path": "/path/to/another.db",
-                "type": "DuckLake",
+                "path": "ducklake:",
+                "type": "duckdb",
             }
         ]
 
@@ -337,5 +338,5 @@ class TestDuckDBAdapterIsDucklake(unittest.TestCase):
         relation = DuckDBRelation.create(database="lk_db2", schema="test_schema", identifier="test_table")
 
         result = adapter.is_ducklake(relation)
-
         self.assertTrue(result)
+
