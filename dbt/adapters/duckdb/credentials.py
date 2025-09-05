@@ -47,7 +47,7 @@ class Attachment(dbtClassMixin):
         # remove query parameters (not supported in ATTACH)
         parsed = urlparse(self.path)
         path = self.path.replace(f"?{parsed.query}", "")
-        base = f"ATTACH '{path}'"
+        base = f"ATTACH IF NOT EXISTS '{path}'"
         if self.alias:
             base += f" AS {self.alias}"
 

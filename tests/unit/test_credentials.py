@@ -225,11 +225,11 @@ def test_attachments():
     ]
 
     expected_sql = [
-        "ATTACH '/tmp/f1234.db'",
-        "ATTACH '/tmp/g1234.db' AS g",
-        "ATTACH '/tmp/h5678.db' (READ_ONLY)",
-        "ATTACH '/tmp/i9101.db' (TYPE sqlite)",
-        "ATTACH '/tmp/jklm.db' AS jk (TYPE sqlite, READ_ONLY)",
+        "ATTACH IF NOT EXISTS '/tmp/f1234.db'",
+        "ATTACH IF NOT EXISTS '/tmp/g1234.db' AS g",
+        "ATTACH IF NOT EXISTS '/tmp/h5678.db' (READ_ONLY)",
+        "ATTACH IF NOT EXISTS '/tmp/i9101.db' (TYPE sqlite)",
+        "ATTACH IF NOT EXISTS '/tmp/jklm.db' AS jk (TYPE sqlite, READ_ONLY)",
     ]
 
     for i, a in enumerate(creds.attach):
@@ -250,7 +250,7 @@ def test_attachments_with_options():
         }
     )
     sql = attachment.to_sql()
-    assert "ATTACH '/tmp/test.db' AS test_db (CACHE_SIZE '1GB', THREADS 4, ENABLE_FSST)" == sql
+    assert "ATTACH IF NOT EXISTS '/tmp/test.db' AS test_db (CACHE_SIZE '1GB', THREADS 4, ENABLE_FSST)" == sql
 
     # Test options dict with legacy options (no conflicts)
     attachment = Attachment(
@@ -258,7 +258,7 @@ def test_attachments_with_options():
         options={"type": "sqlite", "secret": "my_secret", "read_only": True}
     )
     sql = attachment.to_sql()
-    assert "ATTACH '/tmp/test.db' (TYPE sqlite, SECRET my_secret, READ_ONLY)" == sql
+    assert "ATTACH IF NOT EXISTS '/tmp/test.db' (TYPE sqlite, SECRET my_secret, READ_ONLY)" == sql
 
     # Test mixed legacy and options dict (no conflicts)
     attachment = Attachment(
@@ -267,7 +267,7 @@ def test_attachments_with_options():
         options={"cache_size": "512MB", "enable_fsst": True}
     )
     sql = attachment.to_sql()
-    assert "ATTACH '/tmp/test.db' (TYPE sqlite, CACHE_SIZE '512MB', ENABLE_FSST)" == sql
+    assert "ATTACH IF NOT EXISTS '/tmp/test.db' (TYPE sqlite, CACHE_SIZE '512MB', ENABLE_FSST)" == sql
 
 
 def test_attachment_option_conflicts():
