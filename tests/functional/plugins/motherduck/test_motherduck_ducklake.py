@@ -42,34 +42,36 @@ class TestMotherduckDucklakeDetection(unittest.TestCase):
         config = config_from_parts_or_dicts(self.project_cfg, profile_cfg, cli_vars={})
         return DuckDBAdapter(config, self.mock_mp_context)
 
-    def test_is_ducklake_with_type_ducklake(self):
+
+    def test_is_ducklake_primary_database(self):
+        profile_cfg = self.base_profile_cfg.copy()
+        profile_cfg["outputs"]["test"]["is_ducklake"] = True
+        
+        adapter = self._get_adapter(profile_cfg)
+        relation = DuckDBRelation.create(database="my_db", schema="main", identifier="t2")
+
+        assert adapter.is_ducklake(relation) is True
+
+
+    def test_is_not_ducklake(self):
+        profile_cfg = self.base_profile_cfg.copy()
+        adapter = self._get_adapter(profile_cfg)
+        relation = DuckDBRelation.create(database="my_db", schema="main", identifier="t2")
+        assert adapter.is_ducklake(relation) is False
+
+
+    def test_is_ducklake_in_attachment(self):
         profile_cfg = self.base_profile_cfg.copy()
         profile_cfg["outputs"]["test"]["attach"] = [
             {
-                "alias": "lk_db",
-                "path": "/path/to/regular.db",
-                "type": "ducklake",
+                "path": "md:some_db",
+                "type": "duckdb",
+                "is_ducklake": True
             }
         ]
 
         adapter = self._get_adapter(profile_cfg)
-        relation = DuckDBRelation.create(database="lk_db", schema="main", identifier="t")
+        relation = DuckDBRelation.create(database="some_db", schema="main", identifier="t")
 
         assert adapter.is_ducklake(relation) is True
-
-    def test_is_ducklake_with_type_ducklake_case_insensitive(self):
-        profile_cfg = self.base_profile_cfg.copy()
-        profile_cfg["outputs"]["test"]["attach"] = [
-            {
-                "alias": "lk_db2",
-                "path": "/path/to/regular2.db",
-                "type": "DuckLake",
-            }
-        ]
-
-        adapter = self._get_adapter(profile_cfg)
-        relation = DuckDBRelation.create(database="lk_db2", schema="main", identifier="t2")
-
-        assert adapter.is_ducklake(relation) is True
-
 

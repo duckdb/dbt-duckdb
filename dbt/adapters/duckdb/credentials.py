@@ -36,6 +36,13 @@ class Attachment(dbtClassMixin):
     # Arbitrary key-value pairs for additional ATTACH options
     options: Optional[Dict[str, Any]] = None
 
+    # An optional flag to indicate whether the database is a ducklake database,
+    # so that the adapter can generate queries that work for ducklake.
+    # This is not always necessary when using a ducklake database, but
+    # serves more as a hint for cases where the path does not use the ducklake: scheme,
+    # which is the case in fully managed ducklake in MotherDuck.
+    is_ducklake: Optional[bool] = None
+
     def to_sql(self) -> str:
         # remove query parameters (not supported in ATTACH)
         parsed = urlparse(self.path)
@@ -220,6 +227,13 @@ class DuckDBCredentials(Credentials):
     # by networking issues)
     retries: Optional[Retries] = None
 
+    # An optional flag to indicate whether the database is a ducklake database,
+    # so that the adapter can generate queries that work for ducklake.
+    # This is not always necessary when using a ducklake database, but
+    # serves more as a hint for cases where the path does not use the ducklake: scheme,
+    # which is the case in fully managed ducklake in MotherDuck.
+    is_ducklake: Optional[bool] = None
+
     def __post_init__(self):
         self.settings = self.settings or {}
         self.secrets = self.secrets or []
@@ -227,21 +241,24 @@ class DuckDBCredentials(Credentials):
 
         # Build set of ducklake database names for efficient lookup
         self._ducklake_dbs = set()
+
+        if self.is_ducklake or "ducklake:" in self.path.lower():
+            self._ducklake_dbs.add(self.path_derived_database_name(self.path))
+
         if self.attach:
             for attachment in self.attach:
-                alias = getattr(attachment, "alias", None)
+                is_ducklake_flag = getattr(attachment, "is_ducklake", None)
                 path = getattr(attachment, "path", None)
-                atype = getattr(attachment, "type", None)
+                alias = getattr(attachment, "alias", None)
 
                 # Detect ducklake by explicit type, or by path scheme. Be lenient on case.
-                is_ducklake = False
-                if isinstance(atype, str) and atype.lower() == "ducklake":
-                    is_ducklake = True
-                elif isinstance(path, str) and "ducklake:" in path.lower():
-                    is_ducklake = True
-
-                if alias and is_ducklake:
-                    self._ducklake_dbs.add(alias)
+                if (isinstance(is_ducklake_flag, bool) and is_ducklake_flag) or (
+                    isinstance(path, str) and "ducklake:" in path.lower()
+                ):
+                    if alias:
+                        self._ducklake_dbs.add(alias)
+                    else:
+                        self._ducklake_dbs.add(self.path_derived_database_name(path))
 
         # Add MotherDuck plugin if the path is a MotherDuck database
         # and plugin was not specified in profile.yml
@@ -297,20 +314,27 @@ class DuckDBCredentials(Credentials):
     def _is_motherduck(scheme: str) -> bool:
         return scheme in {"md", "motherduck"}
 
+    @staticmethod
+    def path_derived_database_name(path: Optional[Any]) -> str:
+        if path is None or path == ":memory:":
+            return "memory"
+        parsed = urlparse(str(path))
+        base_file = os.path.basename(parsed.path)
+        inferred_db_name = os.path.splitext(base_file)[0]
+        if DuckDBCredentials._is_motherduck(parsed.scheme):
+            if inferred_db_name == "":
+                inferred_db_name = "my_db"
+        elif parsed.scheme.lower() == "ducklake":
+            parsed_ducklake = urlparse(inferred_db_name)
+            inferred_db_name = parsed_ducklake.path
+
+        return inferred_db_name
+
     @classmethod
     def __pre_deserialize__(cls, data: Dict[Any, Any]) -> Dict[Any, Any]:
         data = super().__pre_deserialize__(data)
         path = data.get("path")
-        path_db = None
-        if path is None or path == ":memory:":
-            path_db = "memory"
-        else:
-            parsed = urlparse(path)
-            base_file = os.path.basename(parsed.path)
-            path_db = os.path.splitext(base_file)[0]
-            if cls._is_motherduck(parsed.scheme):
-                if path_db == "":
-                    path_db = "my_db"
+        path_db_name = cls.path_derived_database_name(path)
 
         # Check if the database field matches any attach alias
         attach_aliases = []
@@ -322,16 +346,16 @@ class DuckDBCredentials(Credentials):
         database_from_data = data.get("database")
         database_matches_attach_alias = database_from_data in attach_aliases
 
-        if path_db and "database" not in data:
-            data["database"] = path_db
-        elif path_db and data["database"] != path_db:
+        if path_db_name and "database" not in data:
+            data["database"] = path_db_name
+        elif path_db_name and data["database"] != path_db_name:
             # Allow database name to differ from path_db if it matches an attach alias
             if not data.get("remote") and not database_matches_attach_alias:
                 raise DbtRuntimeError(
                     "Inconsistency detected between 'path' and 'database' fields in profile; "
-                    f"the 'database' property must be set to '{path_db}' to match the 'path'"
+                    f"the 'database' property must be set to '{path_db_name}' to match the 'path'"
                 )
-        elif not path_db:
+        elif not path_db_name:
             raise DbtRuntimeError(
                 "Unable to determine target database name from 'path' field in profile"
             )
