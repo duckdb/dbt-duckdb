@@ -80,6 +80,8 @@
   {% endcall %}
 
   {% if need_swap %}
+      {#-- Drop indexes on target relation before renaming to backup to avoid dependency errors --#}
+      {% do drop_indexes_on_relation(target_relation) %}
       {% do adapter.rename_relation(target_relation, backup_relation) %}
       {% do adapter.rename_relation(intermediate_relation, target_relation) %}
       {% do to_drop.append(backup_relation) %}
@@ -88,11 +90,12 @@
   {% set should_revoke = should_revoke(existing_relation, full_refresh_mode) %}
   {% do apply_grants(target_relation, grant_config, should_revoke=should_revoke) %}
 
-  {% do persist_docs(target_relation, model) %}
-
+  {# Align order with table materialization to avoid MotherDuck alter conflicts #}
   {% if existing_relation is none or existing_relation.is_view or should_full_refresh() %}
     {% do create_indexes(target_relation) %}
   {% endif %}
+
+  {% do persist_docs(target_relation, model) %}
 
   {{ run_hooks(post_hooks, inside_transaction=True) }}
 
@@ -100,6 +103,10 @@
   {% do adapter.commit() %}
 
   {% for rel in to_drop %}
+      {# On MotherDuck the temp relation is a real table; dropping it cascades indexes. Avoid extra ALTERs. #}
+      {% if not adapter.is_motherduck() %}
+        {% do drop_indexes_on_relation(rel) %}
+      {% endif %}
       {% do adapter.drop_relation(rel) %}
   {% endfor %}
 

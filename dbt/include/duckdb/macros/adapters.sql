@@ -248,3 +248,47 @@ def materialize(df, con):
       {{ adapter.warn_once('Grants for relations are not supported by DuckDB') }}
     {% endif %}
 {% endmacro %}
+
+{% macro duckdb__get_create_index_sql(relation, index_dict) -%}
+  {%- set index_config = adapter.parse_index(index_dict) -%}
+  {%- set comma_separated_columns = ", ".join(index_config.columns) -%}
+  {%- set index_name = index_config.render(relation) -%}
+
+  create {% if index_config.unique -%}
+    unique
+  {%- endif %} index
+  "{{ index_name }}"
+  on {{ relation }}
+  ({{ comma_separated_columns }});
+{%- endmacro %}
+
+{% macro drop_indexes_on_relation(relation) -%}
+  {{ log("Dropping indexes on relation " ~ relation, info=true) }}
+  {% call statement('get_indexes_on_relation', fetch_result=True) %}
+    SELECT index_name
+    FROM duckdb_indexes()
+    WHERE schema_name = '{{ relation.schema }}'
+      AND table_name = '{{ relation.identifier }}'
+  {% endcall %}
+
+  {% set results = load_result('get_indexes_on_relation').table %}
+  {{ log("Found " ~ results | length ~ " indexes to drop", info=true) }}
+  {% for row in results %}
+    {% set index_name = row[0] %}
+    {{ log("Dropping index: " ~ index_name, info=true) }}
+    {% call statement('drop_index_' + loop.index|string, auto_begin=false) %}
+      DROP INDEX "{{ relation.schema }}"."{{ index_name }}"
+    {% endcall %}
+    {{ log("Index " ~ index_name ~ " drop statement executed", info=true) }}
+  {% endfor %}
+
+  {#-- Verify indexes were dropped --#}
+  {% call statement('verify_indexes_dropped', fetch_result=True) %}
+    SELECT COUNT(*) as remaining_indexes
+    FROM duckdb_indexes()
+    WHERE schema_name = '{{ relation.schema }}'
+      AND table_name = '{{ relation.identifier }}'
+  {% endcall %}
+  {% set verify_results = load_result('verify_indexes_dropped').table %}
+  {{ log("Remaining indexes after drop: " ~ verify_results[0][0], info=true) }}
+{%- endmacro %}
