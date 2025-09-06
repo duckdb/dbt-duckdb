@@ -35,6 +35,8 @@
 
   -- cleanup
   {% if existing_relation is not none %}
+      {#-- Drop indexes before renaming to avoid dependency errors --#}
+      {% do drop_indexes_on_relation(existing_relation) %}
       {{ adapter.rename_relation(existing_relation, backup_relation) }}
   {% endif %}
 

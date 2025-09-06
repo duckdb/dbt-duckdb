@@ -48,18 +48,19 @@ class TestIndex:
         }
 
     def test_table(self, project, unique_schema):
-        results = run_dbt(["run", "--models", "table"])
-        assert len(results) == 1
+        for _ in range(2):
+            results = run_dbt(["run", "--models", "table"])
+            assert len(results) == 1
 
-        indexes = self.get_indexes("table", project, unique_schema)
-        expected = [
-            {"columns": "column_a", "unique": False},
-            {"columns": "column_b", "unique": False},
-            {"columns": "column_a, column_b", "unique": False},
-            {"columns": "column_b, column_a", "unique": True},
-            {"columns": "column_a", "unique": False},
-        ]
-        assert len(indexes) == len(expected)
+            indexes = self.get_indexes("table", project, unique_schema)
+            expected = [
+                {"columns": "column_a", "unique": False},
+                {"columns": "column_b", "unique": False},
+                {"columns": "column_a, column_b", "unique": False},
+                {"columns": "column_b, column_a", "unique": True},
+                {"columns": "column_a", "unique": False},
+            ]
+            assert len(indexes) == len(expected)
 
     def test_incremental(self, project, unique_schema):
         for additional_argument in [[], [], ["--full-refresh"]]:
@@ -121,5 +122,4 @@ class TestIndex:
             "unique": is_unique,
         }
 
-    def assertCountEqual(self, a, b):
-        assert len(a) == len(b)
+    
