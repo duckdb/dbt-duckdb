@@ -373,8 +373,11 @@ def create_or_update_table(
         # Filter out dicts in model_columns that have a 'Name' in partition_names
         columns = [col for col in columns if col["Name"] not in partition_names]
 
-        # Create new version only if columns are changed
-        if glue_columns != columns:
+        # Convert both column lists to lowercase for case-insensitive comparison
+        glue_columns_lower = [{k: v.lower() if isinstance(v, str) else v for k, v in col.items()} for col in glue_columns] if glue_columns else []
+        columns_lower = [{k: v.lower() if isinstance(v, str) else v for k, v in col.items()} for col in columns]
+
+        if glue_columns_lower != columns_lower:
             _update_table(
                 client=client,
                 database=database,

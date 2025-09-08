@@ -1,6 +1,7 @@
 CHANGES
 =======
 
+* added decimal
 * added check if arrary type to dbt2glue
 * fixed test: >       cursor.execute("CREATE TABLE tt1 (id int, name text)") E       sqlite3.OperationalError: table tt1 already exists
 * fixed CreatePartition operation: Partition already exists
