@@ -4,6 +4,7 @@ import tempfile
 import duckdb
 import pytest
 
+from dbt.adapters.duckdb import DuckDBConnectionManager
 from dbt.tests.util import run_dbt
 
 sources_schema_yml = """
@@ -74,6 +75,8 @@ class TestAttachedDatabase:
 
         test_results = run_dbt(["test"])
         assert len(test_results) == 2
+
+        DuckDBConnectionManager.close_all_connections()
 
         # check that the model is created in the attached db
         db = duckdb.connect(attach_test_db)
