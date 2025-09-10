@@ -53,11 +53,11 @@ there are a [few differences to be aware of](https://motherduck.com/docs/archite
 1. MotherDuck is compatible with client DuckDB versions 0.10.2 and older.
 1. MotherDuck preloads a set of the most common DuckDB extensions for you, but does not support loading custom extensions or user-defined functions.
 
-As of `dbt-duckdb` 1.9.6, you can also connect to a DuckDB instance running [hosted DuckLake on MotherDuck](https://motherduck.com/blog/ducklake-motherduck/) by creating a DuckLake on MotherDuck and then setting `is_ducklake: true` in your `profiles.yml`. 
+As of `dbt-duckdb` 1.9.6, you can also connect to a DuckDB instance running [hosted DuckLake on MotherDuck](https://motherduck.com/blog/ducklake-motherduck/) by creating a DuckLake on MotherDuck and then setting `is_ducklake: true` in your `profiles.yml`.
 
 ```sql
 -- to use create your own database in MotherDuck first
-CREATE DATABASE my_ducklake 
+CREATE DATABASE my_ducklake
   (TYPE ducklake, DATA_PATH 's3://...')
 ```
 
