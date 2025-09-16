@@ -25,7 +25,7 @@
   {%- do validate_ducklake_restrictions(config, target_relation, errors) -%}
 
   {%- do validate_merge_clauses(config, base_configuration_fields, errors) -%}
-    
+
   {%- if errors -%}
     {{ exceptions.raise_compiler_error("MERGE configuration errors:\n" ~ errors|join('\n')) }}
   {%- endif -%}
@@ -39,20 +39,20 @@
     {%- else -%}
       {%- set merge_clauses = config.get('merge_clauses') -%}
       {%- set clause_types = ['when_matched', 'when_not_matched'] -%}
-      
+
       {%- set has_when_matched = 'when_matched' in merge_clauses -%}
       {%- set has_when_not_matched = 'when_not_matched' in merge_clauses -%}
-      
+
       {%- if not has_when_matched and not has_when_not_matched -%}
         {%- do errors.append("merge_clauses must contain at least one of 'when_matched' or 'when_not_matched' keys") -%}
       {%- endif -%}
-      
+
       {%- for clause_type in clause_types -%}
         {%- if clause_type in merge_clauses -%}
           {%- do validate_merge_clause_list(merge_clauses, clause_type, errors) -%}
         {%- endif -%}
       {%- endfor -%}
-      
+
       {%- set conflicting_configs = [] -%}
       {%- for config_name, config_type in base_configuration_fields.items() -%}
         {%- if config_name not in ['merge_on_using_columns', 'merge_returning_columns'] -%}
@@ -72,7 +72,7 @@
           {%- endif -%}
         {%- endif -%}
       {%- endfor -%}
-      
+
       {%- if conflicting_configs|length > 0 -%}
         {%- do errors.append("When merge_clauses is specified, the following basic merge configurations will be ignored and should be removed: " ~ conflicting_configs|join(', ') ~ ". Define your merge behavior within merge_clauses instead.") -%}
       {%- endif -%}
@@ -100,13 +100,13 @@
     {%- if merge_clauses and 'when_matched' in merge_clauses -%}
       {%- set when_matched_clauses = merge_clauses.get('when_matched', []) -%}
       {%- set update_delete_count = 0 -%}
-      
+
       {%- for clause in when_matched_clauses -%}
         {%- if clause is mapping and clause.get('action') in ['update', 'delete'] -%}
           {%- set update_delete_count = update_delete_count + 1 -%}
         {%- endif -%}
       {%- endfor -%}
-      
+
       {%- if update_delete_count > 1 -%}
         {%- do errors.append("DuckLake MERGE restrictions: when_matched clauses can contain only a single UPDATE or DELETE action. Found " ~ update_delete_count ~ " UPDATE/DELETE actions. DuckLake currently supports only one UPDATE or DELETE operation per MERGE statement.") -%}
       {%- endif -%}
