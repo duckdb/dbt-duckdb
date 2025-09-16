@@ -4,6 +4,7 @@ import os
 import sys
 import tempfile
 import time
+import traceback
 from typing import Dict
 from typing import List
 from typing import Optional
@@ -287,7 +288,9 @@ class Environment(abc.ABC):
                 cur = cls.initialize_cursor(creds, con.cursor())
                 module.materialize(df, cur)
         except Exception as err:
-            raise DbtRuntimeError(f"Python model failed:\n" f"{err}")
+            raise DbtRuntimeError(
+                f"Python model failed:\n" f"{''.join(traceback.format_exception(err))}"
+            )
         finally:
             os.unlink(mod_file.name)
 

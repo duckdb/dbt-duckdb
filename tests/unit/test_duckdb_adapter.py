@@ -303,3 +303,40 @@ class TestDuckDBAdapterIsDucklake(unittest.TestCase):
         result = adapter.is_ducklake(relation)
         
         self.assertFalse(result)
+
+    def test_is_ducklake_with_type_ducklake(self):
+        """Test is_ducklake returns True when attachment type is ducklake even without ducklake: path."""
+        profile_cfg = self.base_profile_cfg.copy()
+        profile_cfg["outputs"]["test"]["attach"] = [
+            {
+                "alias": "lk_db",
+                "path": "/path/to/regular.db",
+                "type": "duckdb",
+                "is_ducklake": True
+            }
+        ]
+
+        adapter = self._get_adapter(profile_cfg)
+        relation = DuckDBRelation.create(database="lk_db", schema="test_schema", identifier="test_table")
+
+        result = adapter.is_ducklake(relation)
+
+        self.assertTrue(result)
+
+    def test_is_ducklake_with_type_ducklake_case_insensitive(self):
+        """Test is_ducklake handles mixed-case attachment type for ducklake."""
+        profile_cfg = self.base_profile_cfg.copy()
+        profile_cfg["outputs"]["test"]["attach"] = [
+            {
+                "alias": "lk_db2",
+                "path": "ducklake:",
+                "type": "duckdb",
+            }
+        ]
+
+        adapter = self._get_adapter(profile_cfg)
+        relation = DuckDBRelation.create(database="lk_db2", schema="test_schema", identifier="test_table")
+
+        result = adapter.is_ducklake(relation)
+        self.assertTrue(result)
+

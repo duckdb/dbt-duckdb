@@ -225,11 +225,11 @@ def test_attachments():
     ]
 
     expected_sql = [
-        "ATTACH '/tmp/f1234.db'",
-        "ATTACH '/tmp/g1234.db' AS g",
-        "ATTACH '/tmp/h5678.db' (READ_ONLY)",
-        "ATTACH '/tmp/i9101.db' (TYPE sqlite)",
-        "ATTACH '/tmp/jklm.db' AS jk (TYPE sqlite, READ_ONLY)",
+        "ATTACH IF NOT EXISTS '/tmp/f1234.db'",
+        "ATTACH IF NOT EXISTS '/tmp/g1234.db' AS g",
+        "ATTACH IF NOT EXISTS '/tmp/h5678.db' (READ_ONLY)",
+        "ATTACH IF NOT EXISTS '/tmp/i9101.db' (TYPE sqlite)",
+        "ATTACH IF NOT EXISTS '/tmp/jklm.db' AS jk (TYPE sqlite, READ_ONLY)",
     ]
 
     for i, a in enumerate(creds.attach):
@@ -250,7 +250,7 @@ def test_attachments_with_options():
         }
     )
     sql = attachment.to_sql()
-    assert "ATTACH '/tmp/test.db' AS test_db (CACHE_SIZE '1GB', THREADS 4, ENABLE_FSST)" == sql
+    assert "ATTACH IF NOT EXISTS '/tmp/test.db' AS test_db (CACHE_SIZE '1GB', THREADS 4, ENABLE_FSST)" == sql
 
     # Test options dict with legacy options (no conflicts)
     attachment = Attachment(
@@ -258,7 +258,7 @@ def test_attachments_with_options():
         options={"type": "sqlite", "secret": "my_secret", "read_only": True}
     )
     sql = attachment.to_sql()
-    assert "ATTACH '/tmp/test.db' (TYPE sqlite, SECRET my_secret, READ_ONLY)" == sql
+    assert "ATTACH IF NOT EXISTS '/tmp/test.db' (TYPE sqlite, SECRET my_secret, READ_ONLY)" == sql
 
     # Test mixed legacy and options dict (no conflicts)
     attachment = Attachment(
@@ -267,7 +267,7 @@ def test_attachments_with_options():
         options={"cache_size": "512MB", "enable_fsst": True}
     )
     sql = attachment.to_sql()
-    assert "ATTACH '/tmp/test.db' (TYPE sqlite, CACHE_SIZE '512MB', ENABLE_FSST)" == sql
+    assert "ATTACH IF NOT EXISTS '/tmp/test.db' (TYPE sqlite, CACHE_SIZE '512MB', ENABLE_FSST)" == sql
 
 
 def test_attachment_option_conflicts():
@@ -381,3 +381,47 @@ def test_database_matches_attach_alias_no_alias():
     with pytest.raises(DbtRuntimeError) as exc:
         DuckDBCredentials.from_dict(payload)
     assert "Inconsistency detected between 'path' and 'database' fields" in str(exc.value)
+
+
+def test_add_ducklake_secret_with_map():
+    """Test ducklake secret with metadata_parameters as a map."""
+    creds = DuckDBCredentials(
+        secrets=[
+            dict(
+                type="ducklake",
+                name="sdp_catalog",
+                metadata_path="",
+                metadata_schema="oxy_main",
+                metadata_parameters={"TYPE": "postgres", "SECRET": "sdp_metadata"}
+            )
+        ]
+    )
+    
+    sql = creds.secrets_sql()[0]
+    expected = """CREATE OR REPLACE SECRET sdp_catalog (
+    type ducklake,
+    metadata_path '',
+    metadata_schema 'oxy_main',
+    metadata_parameters map {'TYPE': 'postgres', 'SECRET': 'sdp_metadata'}
+)"""
+    assert sql == expected
+
+
+def test_add_secret_with_list():
+    """Test secret with list parameter."""
+    creds = DuckDBCredentials(
+        secrets=[
+            dict(
+                type="custom",
+                name="test_secret",
+                allowed_hosts=["host1", "host2", "host3"]
+            )
+        ]
+    )
+    
+    sql = creds.secrets_sql()[0]
+    expected = """CREATE OR REPLACE SECRET test_secret (
+    type custom,
+    allowed_hosts array ['host1', 'host2', 'host3']
+)"""
+    assert sql == expected

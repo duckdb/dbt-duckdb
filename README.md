@@ -53,6 +53,16 @@ there are a [few differences to be aware of](https://motherduck.com/docs/archite
 1. MotherDuck is compatible with client DuckDB versions 0.10.2 and older.
 1. MotherDuck preloads a set of the most common DuckDB extensions for you, but does not support loading custom extensions or user-defined functions.
 
+As of `dbt-duckdb` 1.9.6, you can also connect to a DuckDB instance running [hosted DuckLake on MotherDuck](https://motherduck.com/blog/ducklake-motherduck/) by creating a DuckLake on MotherDuck and then setting `is_ducklake: true` in your `profiles.yml`.
+
+```sql
+-- to use create your own database in MotherDuck first
+CREATE DATABASE my_ducklake
+  (TYPE ducklake, DATA_PATH 's3://...')
+```
+
+An example profile is show below under "Attaching Additional Databases". DuckLake must be identified so that safe DDL operations are applied by dbt.
+
 #### DuckDB Extensions, Settings, and Filesystems
 
 You can install and load any core [DuckDB extensions](https://duckdb.org/docs/extensions/overview) by listing them in
@@ -195,6 +205,16 @@ default:
             threads: 4
             enable_fsst: true
 ```
+
+For DuckLake, use `ducklake:` for local; for MotherDuck-managed DuckLake use `md:` with `is_ducklake: true`.
+
+```yaml
+attach:
+  - path: "ducklake:my_ducklake.ddb"
+  - path: "md:my_other_ducklake"
+    is_ducklake: true
+```
+
 
 The attached databases may be referred to in your dbt sources and models by either the basename of the database file minus its suffix (e.g., `/tmp/other.duckdb` is the `other` database
 and `s3://yep/even/this/works.duckdb` is the `works` database) or by an alias that you specify (so the `./yet/another.duckdb` database in the above configuration is referred to
