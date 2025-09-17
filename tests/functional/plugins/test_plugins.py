@@ -46,6 +46,8 @@ class TestPlugins:
     @pytest.fixture(scope="class")
     def sqlite_test_db(self):
         path = "/tmp/satest.db"
+        if os.path.exists(path):
+            os.unlink(path)
         db = sqlite3.connect(path)
         cursor = db.cursor()
         cursor.execute("CREATE TABLE tt1 (id int, name text)")
