@@ -76,9 +76,21 @@ class Plugin(BasePlugin):
             target_output_config["sheet_name"] = sheet_name
 
         df = pd_utils.target_to_df(target_config)
-        df = df[df.notna().any(axis=1)]
-        if target_output_config.get("skip_empty_sheet", False) and df.shape[0] == 0:
-            return
+        if target_output_config.get("skip_empty_sheet", False):
+            # This option instructs this plugin to avoid creating a sheet which would contain
+            # no data. To perform said check for no data, we need to generate a DF with data
+            # only. If the output path contains partitions, those partitions will be treated as
+            # columns within the DF, skewing our check. Therefore we parse the target location
+            # to detect these columns and drop them. Given a location like,
+            # s3://example/datasets/model/_version=1758152450.367933/data_0.parquet,
+            # this would drop the _version column.
+            target_location = target_config.location.path
+            partitions = [t for t in target_location.split("/") if "=" in t]
+            partition_columns = [p.split("=")[0] for p in partitions]
+            data_df = df.drop(columns=partition_columns)
+            data_df = data_df[data_df.notna().any(axis=1)]
+            if data_df.shape[0] == 0:
+                return
         try:
             df.to_excel(
                 self._excel_writer,
