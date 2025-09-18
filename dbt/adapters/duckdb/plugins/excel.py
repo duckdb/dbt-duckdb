@@ -76,7 +76,11 @@ class Plugin(BasePlugin):
             target_output_config["sheet_name"] = sheet_name
 
         df = pd_utils.target_to_df(target_config)
-        if target_output_config.get("skip_empty_sheet", False) and target_config.location and target_config.location.path:
+        if (
+            target_output_config.get("skip_empty_sheet", False)
+            and target_config.location
+            and target_config.location.path
+        ):
             # This option instructs this plugin to avoid creating a sheet which would contain
             # no data. To perform said check for no data, we need to generate a DF with data
             # only. If the output path contains partitions, those partitions will be treated as
