@@ -279,7 +279,7 @@ class Environment(abc.ABC):
             # Do the actual work to run the code here
             dbt = module.dbtObj(load_df_function)
             df = module.model(dbt, con)
-            if isinstance(df, duckdb.DuckDBPyRelation) or (creds.is_motherduck and not creds.disable_transactions):
+            if isinstance(df, duckdb.DuckDBPyRelation):
                 # a duckdb relation might contain references to temporary tables
                 # that cannot cross cursor boundaries
                 module.materialize(df, con)

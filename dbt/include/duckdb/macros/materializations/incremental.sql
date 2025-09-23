@@ -28,12 +28,21 @@
   {{ drop_relation_if_exists(preexisting_intermediate_relation) }}
   {{ drop_relation_if_exists(preexisting_backup_relation) }}
 
-  {{ run_hooks(pre_hooks, inside_transaction=False) }}
+  {% set to_drop = [] %}
+  {% if not temporary %}
+    -- if not using a temporary table we will update the temp relation to use a different temp schema ("dbt_temp" by default)
+    {% set temp_relation = temp_relation.incorporate(path=adapter.get_temp_relation_path(this)) %}
+    {% do run_query(create_schema(temp_relation)) %}
+    {% if not adapter.disable_transactions() %}
+      {% do adapter.commit() %}
+    {% endif %}
+    -- then drop the temp relation after we insert the incremental data into the target relation
+    {% do to_drop.append(temp_relation) %}
+  {% endif %}
 
+  {{ run_hooks(pre_hooks, inside_transaction=False) }}
   -- `BEGIN` happens here:
   {{ run_hooks(pre_hooks, inside_transaction=True) }}
-
-  {% set to_drop = [] %}
 
   {% if existing_relation is none %}
     {% set build_sql = create_table_as(False, target_relation, compiled_code, language) %}
@@ -41,13 +50,6 @@
     {% set build_sql = create_table_as(False, intermediate_relation, compiled_code, language) %}
     {% set need_swap = true %}
   {% else %}
-    {% if not temporary %}
-      -- if not using a temporary table we will update the temp relation to use a different temp schema ("dbt_temp" by default)
-      {% set temp_relation = temp_relation.incorporate(path=adapter.get_temp_relation_path(this)) %}
-      {% do run_query(create_schema(temp_relation)) %}
-      -- then drop the temp relation after we insert the incremental data into the target relation
-      {% do to_drop.append(temp_relation) %}
-    {% endif %}
     {% if language == 'python' %}
       {% set build_python = create_table_as(temporary, temp_relation, compiled_code, language) %}
       {% call statement("pre", language=language) %}

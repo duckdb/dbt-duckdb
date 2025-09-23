@@ -69,6 +69,11 @@ class TestBasePythonIncremental(BasePythonIncrementalTests):
     def models(self):
         return {"m_1.sql": m_1, "incremental.py": incremental_python}
 
+    def test_incremental(self, project):
+        # Run dbt twice to test incremental behavior
+        run_dbt(["run"])
+        run_dbt(["run"])
+
 
 empty_upstream_model_python = """
 def model(dbt, con):
