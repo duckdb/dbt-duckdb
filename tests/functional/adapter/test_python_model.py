@@ -23,27 +23,6 @@ def model(dbt, _):
     return df{extension}
 """
 
-# incremental_python_template =  """
-# import pandas as pd
-
-# def model(dbt, session):
-#     dbt.config(materialized="incremental")
-
-#     df = pd.DataFrame({{
-#         'id': [1, 2, 5],
-#         'value': ['A', 'B', 'C']
-#     }})
-
-#     if dbt.is_incremental:
-#         existing_query = f"SELECT id FROM {{dbt.this}}"
-#         existing_ids = session.sql(existing_query).df()
-        
-#         if not existing_ids.empty:
-#             df = df[~df['id'].isin(existing_ids['id'])]
-
-#     return df{extension}
-# """
-
 class TestBasePythonModelDuckDBPyRelation(BasePythonModelTests):
     @pytest.fixture(scope="class")
     def models(self):
