@@ -124,8 +124,6 @@ class DuckDBAdapter(SQLAdapter):
     def disable_transactions(self):
         return self.config.credentials.disable_transactions
 
-
-
     @available
     def is_ducklake(self, relation: DuckDBRelation) -> bool:
         """Check if a relation's database is backed by a ducklake attachment."""
