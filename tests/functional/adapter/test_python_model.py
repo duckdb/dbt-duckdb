@@ -94,48 +94,42 @@ class TestBasePythonIncremental(BasePythonIncrementalTests):
                 "incremental.py": incremental_python_template.format(extension=""),  }  
 
 
-    def test_incremental_all(self, project):
+    @pytest.mark.parametrize("model_to_test", ["incremental", "incremental_pandas"])
+    def test_incremental(self, project, model_to_test):
         # create m_1 and run incremental model the first time
         run_dbt(["run"])
         test_schema_relation = project.adapter.Relation.create(
             database=project.database, schema=project.test_schema
         )
-        for model in ["incremental", "incremental_pandas"]:
-            assert (
-                project.run_sql(
-                    f"select count(*) from {test_schema_relation}.{model}",
-                    fetch="one",
-                )[0]
-                == 5
-            )
+        assert (
+            project.run_sql(
+                f"select count(*) from {test_schema_relation}.{model_to_test}",
+                fetch="one",
+            )[0]
+            == 5
+        )
         # running incremental model again will not cause any changes in the result model
-        run_dbt(["run"])
-        for model in ["incremental", "incremental_pandas"]:
-            assert (
-                project.run_sql(
-                    f"select count(*) from {test_schema_relation}.{model}",
-                    fetch="one",
-                )[0]
-                == 5
-            )
+        run_dbt(["run", "-s", model_to_test])
+        assert (
+            project.run_sql(
+                f"select count(*) from {test_schema_relation}.{model_to_test}",
+                fetch="one",
+            )[0]
+            == 5
+        )
 
         # add 3 records with one supposed to be filtered out
         project.run_sql(f"insert into {test_schema_relation}.m_1(id) values (0), (6), (7)")
+
+        run_dbt(["run", "-s", model_to_test])
         # validate that incremental model would correctly add 2 valid records to result model
-        for model in ["incremental", "incremental_pandas"]:
-            assert (
-                project.run_sql(
-                    f"select count(*) from {test_schema_relation}.{model}",
-                    fetch="one",
-                )[0]
-                == 7
-            )
-
-
-    def test_incremental(self, project):
-        # Run dbt twice to test incremental behavior
-        run_dbt(["run"])
-        run_dbt(["run"])
+        assert (
+            project.run_sql(
+                f"select count(*) from {test_schema_relation}.{model_to_test}",
+                fetch="one",
+            )[0]
+            == 7
+        )
 
 
 empty_upstream_model_python = """
