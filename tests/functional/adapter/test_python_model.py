@@ -23,7 +23,6 @@ def model(dbt, _):
     return df{extension}
 """
 
-
 class TestBasePythonModelDuckDBPyRelation(BasePythonModelTests):
     @pytest.fixture(scope="class")
     def models(self):
@@ -48,14 +47,14 @@ class TestBasePythonModelPandasDF(BasePythonModelTests):
         }
 
 
-incremental_python = """
+incremental_python_template = """
 def model(dbt, session):
     dbt.config(materialized="incremental", unique_key='id')
     df = dbt.ref("m_1")
     if dbt.is_incremental:
         # incremental runs should only apply to part of the data
         df = df.filter("id > 5")
-    return df.df()
+    return df{extension}
 """
 
 # TODO(jwills): figure out why this one doesn't work; I think it's a test utils issue
@@ -67,7 +66,49 @@ class TestBasePythonIncremental(BasePythonIncrementalTests):
 
     @pytest.fixture(scope="class")
     def models(self):
-        return {"m_1.sql": m_1, "incremental.py": incremental_python}
+        return {"m_1.sql": m_1, 
+                # model returns a Pandas dataframe
+                "incremental_pandas.py": incremental_python_template.format(extension=".df()"),
+                # model returns a DuckDBPyRelation, which is handled slightly differently, see Environment.run_python_job
+                "incremental.py": incremental_python_template.format(extension=""),  }  
+
+
+    @pytest.mark.parametrize("model_to_test", ["incremental", "incremental_pandas"])
+    def test_incremental(self, project, model_to_test):
+        # create m_1 and run incremental model the first time
+        run_dbt(["run"])
+        test_schema_relation = project.adapter.Relation.create(
+            database=project.database, schema=project.test_schema
+        )
+        assert (
+            project.run_sql(
+                f"select count(*) from {test_schema_relation}.{model_to_test}",
+                fetch="one",
+            )[0]
+            == 5
+        )
+        # running incremental model again will not cause any changes in the result model
+        run_dbt(["run", "-s", model_to_test])
+        assert (
+            project.run_sql(
+                f"select count(*) from {test_schema_relation}.{model_to_test}",
+                fetch="one",
+            )[0]
+            == 5
+        )
+
+        # add 3 records with one supposed to be filtered out
+        project.run_sql(f"insert into {test_schema_relation}.m_1(id) values (0), (6), (7)")
+
+        run_dbt(["run", "-s", model_to_test])
+        # validate that incremental model would correctly add 2 valid records to result model
+        assert (
+            project.run_sql(
+                f"select count(*) from {test_schema_relation}.{model_to_test}",
+                fetch="one",
+            )[0]
+            == 7
+        )
 
 
 empty_upstream_model_python = """
