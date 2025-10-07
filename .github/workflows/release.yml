@@ -95,3 +95,18 @@ jobs:
         gh release upload
         '${{ github.ref_name }}' dist/**
         --repo '${{ github.repository }}'
+
+  notify-failure:
+    name: Send Slack notification on failure
+    if: failure()
+    needs: [build, publish-to-pypi, github-release]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Send Slack notification
+        uses: slackapi/slack-github-action@v2.0.0
+        with:
+          webhook-url: ${{ secrets.MOTHERDUCK_CI_NOTIFICATION_WEBHOOK }}
+          payload: |
+            {
+              "text": "dbt-duckdb release workflow failed: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+            }
