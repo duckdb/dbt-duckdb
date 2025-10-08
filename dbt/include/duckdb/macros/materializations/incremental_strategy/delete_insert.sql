@@ -40,16 +40,3 @@
     )
 
 {%- endmacro %}
-
-
-{% macro duckdb__get_incremental_microbatch_sql(arg_dict) -%}
-    {#-- Microbatch strategy uses delete+insert for DuckDB --#}
-    {#-- This works efficiently for time-based batch processing --#}
-    {% do return(duckdb__get_delete_insert_merge_sql(
-        arg_dict["target_relation"],
-        arg_dict["temp_relation"],
-        arg_dict["unique_key"],
-        arg_dict["dest_columns"],
-        arg_dict["incremental_predicates"]
-    )) %}
-{%- endmacro %}
