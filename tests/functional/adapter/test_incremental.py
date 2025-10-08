@@ -12,6 +12,16 @@ from dbt.artifacts.schemas.results import RunStatus
 from dbt.tests.util import run_dbt
 import pytest
 
+try:
+    from dbt.tests.adapter.incremental.test_incremental_microbatch import (
+        BaseMicrobatch,
+    )
+    MICROBATCH_AVAILABLE = True
+except ImportError:
+    # Microbatch tests not available in older dbt versions
+    BaseMicrobatch = None
+    MICROBATCH_AVAILABLE = False
+
 
 class TestIncrementalUniqueKey(BaseIncrementalUniqueKey):
     def test__bad_unique_key_list(self, project):
@@ -134,11 +144,20 @@ class TestIncrementalOnSchemaChangeQuotingTrue(BaseIncrementalOnSchemaChangeSetu
         return {"quoting": {"identifier": True}}
         
     
-    def test__handle_identifier_quoting_config_false(self, project):        
+    def test__handle_identifier_quoting_config_false(self, project):
         # it should fail if quoting is set to false
         (status, exc) = self.run_twice_and_return_status(
             select="model_a incremental_append_new_columns_with_space",
             expect_pass_2nd_run=True
         )
         assert status == RunStatus.Success
-    
+
+
+@pytest.mark.skipif(not MICROBATCH_AVAILABLE, reason="Microbatch tests require dbt-core >= 1.9")
+class TestMicrobatch(BaseMicrobatch):
+    """Test microbatch incremental strategy for DuckDB.
+
+    Microbatch is supported on DuckDB 1.4.0+ when MERGE is available,
+    but falls back to delete+insert for earlier versions.
+    """
+    pass

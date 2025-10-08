@@ -239,9 +239,53 @@ class DuckDBAdapter(SQLAdapter):
         """Post a warning message once per dbt execution."""
         DuckDBConnectionManager.warn_once(msg)
 
+    @property
+    def _supports_merge(self) -> bool:
+        """Check if the current DuckDB version supports MERGE statements (>= 1.4.0).
+        
+        This method caches the result to avoid repeated version checks.
+        Returns False if version cannot be determined.
+        """
+        if not hasattr(self, '_cached_merge_support'):
+            try:
+                # Get a connection and query the DuckDB version
+                conn = self.connections.get_thread_connection()
+                cursor = conn.handle.cursor()
+                cursor.execute("SELECT version()")
+                result = cursor.fetchone()
+                
+                if result:
+                    version_str = result[0]  # e.g., "v1.4.1" or "1.4.1"
+                    
+                    # Parse version (strip 'v' prefix if present)
+                    from packaging import version
+                    db_version = version.parse(version_str.lstrip('v').split()[0])
+                    
+                    # MERGE support was added in DuckDB 1.4.0
+                    self._cached_merge_support = db_version >= version.parse("1.4.0")
+                else:
+                    self._cached_merge_support = False
+                    
+            except Exception as e:
+                # If we can't determine version, assume no MERGE support for safety
+                logger.debug(f"Could not determine DuckDB version, assuming no MERGE support: {e}")
+                self._cached_merge_support = False
+                
+        return self._cached_merge_support
+
     def valid_incremental_strategies(self) -> Sequence[str]:
-        """DuckDB does not currently support MERGE statement."""
-        return ["append", "delete+insert"]
+        """Return valid incremental strategies based on DuckDB version.
+        
+        DuckDB 1.4.0+ supports MERGE statements, enabling merge and microbatch strategies.
+        Earlier versions support append and delete+insert only.
+        """
+        strategies = ["append", "delete+insert"]
+        
+        # Add MERGE-based strategies if DuckDB version supports it
+        if self._supports_merge:
+            strategies.extend(["merge", "microbatch"])
+        
+        return strategies
 
     def commit_if_has_connection(self) -> None:
         """This is just a quick-fix. Python models do not execute begin function so the transaction_open is always false."""
