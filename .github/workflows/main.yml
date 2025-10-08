@@ -486,3 +486,18 @@ jobs:
       - name: Check source distributions
         run: |
           dbt --version
+
+  notify-failure:
+    name: Send Slack notification on failure
+    if: failure() && github.ref == 'refs/heads/master'
+    needs: [code-quality, unit, functional, filebased, motherduck, buenavista, fsspec, plugins, build, test-build]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Send Slack notification
+        uses: slackapi/slack-github-action@v2.0.0
+        with:
+          webhook-url: ${{ secrets.MOTHERDUCK_CI_NOTIFICATION_WEBHOOK }}
+          payload: |
+            {
+              "text": "dbt-duckdb main workflow failed: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+            }
