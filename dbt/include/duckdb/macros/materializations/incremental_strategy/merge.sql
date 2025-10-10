@@ -139,8 +139,8 @@
             {%- elif when_not_matched.get('mode') == 'star' -%}
             INSERT *
             {%- elif when_not_matched.get('mode') == 'explicit' -%}
-            {%- set insert_columns = when_matched.get('insert', {}).get('columns', []) -%}
-            {%- set insert_values = when_matched.get('insert', {}).get('values', []) -%}
+            {%- set insert_columns = when_not_matched.get('insert', {}).get('columns', []) -%}
+            {%- set insert_values = when_not_matched.get('insert', {}).get('values', []) -%}
 
             INSERT
                 ({{ insert_columns | join(', ') }})
