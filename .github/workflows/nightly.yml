@@ -69,3 +69,18 @@ jobs:
         with:
           name: unit_results_${{ matrix.python-version }}-${{ steps.date.outputs.date }}.csv
           path: unit_results.csv
+
+  notify-failure:
+    name: Send Slack notification on failure
+    if: failure()
+    needs: [nightly]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Send Slack notification
+        uses: slackapi/slack-github-action@v2.0.0
+        with:
+          webhook-url: ${{ secrets.MOTHERDUCK_CI_NOTIFICATION_WEBHOOK }}
+          payload: |
+            {
+              "text": "dbt-duckdb nightly workflow failed: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+            }
