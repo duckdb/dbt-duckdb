@@ -159,8 +159,40 @@ class TestMicrobatch(BaseMicrobatch):
 
     Microbatch is supported on DuckDB 1.4.0+ when MERGE is available,
     but falls back to delete+insert for earlier versions.
+
+    Note: This class overrides timestamp fixtures from BaseMicrobatch to use
+    DuckDB-compatible timestamp format. DuckDB 1.4.0+ has stricter timestamp
+    validation and rejects the TIMESTAMP '...-0' format used in the base test,
+    requiring explicit casting with PostgreSQL-style '...'::timestamp syntax.
     """
-    pass
+
+    @pytest.fixture(scope="class")
+    def input_model_sql(self) -> str:
+        """Override input model to use DuckDB-compatible timestamp format.
+
+        Changes TIMESTAMP '2020-01-01 00:00:00-0' to '2020-01-01 00:00:00'::timestamp
+        to avoid DuckDB's "timestamp is not UTC" error.
+        """
+        return """
+{{ config(materialized='table', event_time='event_time') }}
+select 1 as id, '2020-01-01 00:00:00'::timestamp as event_time
+union all
+select 2 as id, '2020-01-02 00:00:00'::timestamp as event_time
+union all
+select 3 as id, '2020-01-03 00:00:00'::timestamp as event_time
+"""
+
+    @pytest.fixture(scope="class")
+    def insert_two_rows_sql(self, project) -> str:
+        """Override insert SQL to use DuckDB-compatible timestamp format.
+
+        Changes TIMESTAMP '2020-01-04 00:00:00-0' to '2020-01-04 00:00:00'::timestamp
+        to avoid DuckDB's "timestamp is not UTC" error.
+        """
+        test_schema_relation = project.adapter.Relation.create(
+            database=project.database, schema=project.test_schema
+        )
+        return f"insert into {test_schema_relation}.input_model (id, event_time) values (4, '2020-01-04 00:00:00'::timestamp), (5, '2020-01-05 00:00:00'::timestamp)"
 
 
 # Test models for merge strategy testing

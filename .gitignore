@@ -82,3 +82,4 @@ target/
 .env
 
 .venv
+.serena
