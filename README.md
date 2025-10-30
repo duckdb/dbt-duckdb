@@ -435,7 +435,178 @@ with an extension that matches the `format` argument (`parquet`, `csv`, or `json
 relative to the current working directory, but you can change the default directory (or S3 bucket/prefix) by specifying the
 `external_root` setting in your DuckDB profile.
 
-dbt-duckdb supports the `delete+insert` and `append` strategies for incremental `table` models, but unfortunately it does not yet support incremental materialization strategies for `external` models.
+Unfortunately incremental materialization strategies are not yet supported for `external` models.
+
+
+#### Incremental Strategy Configuration
+
+dbt-duckdb supports the `delete+insert`, `append`, and `merge` strategies for incremental `table` models. The `merge` strategy requires DuckDB >= 1.4.0 and provides access to DuckDB's native MERGE statement.
+
+**Append Strategy:**
+
+| Configuration | Type | Default | Description |
+|---------------|------|---------|-------------|
+| `incremental_predicates` | list | null | SQL conditions to filter which records get appended |
+
+Example:
+```yaml
+models:
+  - name: my_incremental_model
+    config:
+      materialized: incremental
+      incremental_strategy: append
+      incremental_predicates: ["created_at > (select max(created_at) from {{ this }})"]
+```
+
+**Delete+Insert Strategy:**
+
+| Configuration | Type | Default | Description |
+|---------------|------|---------|-------------|
+| `unique_key` | string/list | required | Column(s) used to identify records for deletion |
+| `incremental_predicates` | list | null | SQL conditions to filter the delete and insert operations |
+
+Example:
+```yaml
+models:
+  - name: my_incremental_model
+    config:
+      materialized: incremental
+      incremental_strategy: delete+insert
+      unique_key: id  # or ['id', 'date'] for composite keys
+      incremental_predicates: ["updated_at >= '2023-01-01'"]
+```
+
+**Merge Strategy (DuckDB >= 1.4.0):**
+
+The merge strategy leverages DuckDB's native MERGE statement to efficiently synchronize data between your incremental model and the target table. This strategy offers three configuration approaches: basic configuration (using simple options), enhanced configuration with explicit column control, and fully custom merge clauses.
+
+**Basic Configuration (Default Behavior):**
+
+When you specify only `unique_key`, dbt-duckdb uses DuckDB's `UPDATE BY NAME` and `INSERT BY NAME` operations, which automatically match columns by name between source and target tables.
+
+```yaml
+models:
+  - name: my_incremental_model
+    config:
+      materialized: incremental
+      incremental_strategy: merge
+      unique_key: id  # or ['id', 'date'] for composite keys
+```
+
+This generates SQL equivalent to:
+```sql
+MERGE INTO target AS DBT_INTERNAL_DEST
+USING source AS DBT_INTERNAL_SOURCE
+ON (DBT_INTERNAL_SOURCE.id = DBT_INTERNAL_DEST.id)
+WHEN MATCHED THEN UPDATE BY NAME
+WHEN NOT MATCHED THEN INSERT BY NAME
+```
+
+**Enhanced Configuration:**
+
+These options extend the basic merge behavior with additional control over which records get updated or inserted, which columns are affected, and how values are set.
+
+| Configuration | Type | Default | Description |
+|---------------|------|---------|-------------|
+| `unique_key` | string/list | required | Column(s) used for the MERGE join condition |
+| `incremental_predicates` | list | null | Additional SQL conditions to filter the MERGE operation |
+| `merge_on_using_columns` | list | null | Columns for USING clause syntax instead of ON for the join condition |
+| `merge_update_condition` | string | null | SQL condition to control when matched records are updated |
+| `merge_insert_condition` | string | null | SQL condition to control when unmatched records are inserted |
+| `merge_update_columns` | list | null | Specific columns to update |
+| `merge_exclude_columns` | list | null | Columns to exclude from updates |
+| `merge_update_set_expressions` | dict | null | Custom expressions for column updates |
+| `merge_returning_columns` | list | null | Columns to return from the MERGE operation |
+
+**Example with Enhanced Options:**
+```yaml
+models:
+  - name: my_incremental_model
+    config:
+      materialized: incremental
+      incremental_strategy: merge
+      unique_key: id
+      merge_update_condition: "DBT_INTERNAL_DEST.age < DBT_INTERNAL_SOURCE.age"
+      merge_insert_condition: "DBT_INTERNAL_SOURCE.status != 'inactive'"
+      merge_update_columns: ['name', 'age', 'status']
+      merge_exclude_columns: ['created_at']
+      merge_update_set_expressions:
+        updated_at: "CURRENT_TIMESTAMP"
+        version: "COALESCE(DBT_INTERNAL_DEST.version, 0) + 1"
+```
+
+**Custom Merge Clauses:**
+
+For maximum flexibility, use `merge_clauses` to define custom `when_matched` and `when_not_matched` behaviors.  This is especially helpful in more complex scenarios where you have more than one action, multiple conditions, or error handling within a `when_matched` or `when_not_matched` clause.
+
+*Supported When Matched Actions and Modes:*
+- `update`: Update the matched record
+  - `mode: by_name`: Use `UPDATE BY NAME` (default)
+  - `mode: by_position`: Use `UPDATE BY POSITION`
+  - `mode: star`: Use `UPDATE SET *`
+  - `mode: explicit`: Use explicit column list with custom expressions
+    - `update.include`: List of columns to include in the update
+    - `update.exclude`: List of columns to exclude from the update
+    - `update.set_expressions`: Dictionary of column-to-expression mappings for custom update values
+- `delete`: Delete the matched record
+- `do_nothing`: Skip the matched record
+- `error`: Raise an error for matched records
+  - `error_message`: Optional custom error message
+
+*Supported When Not Matched Actions and Modes:*
+- `insert`: Insert the unmatched record
+  - `mode: by_name`: Use `INSERT BY NAME` (default)
+  - `mode: by_position`: Use `INSERT BY POSITION`
+  - `mode: star`: Use `INSERT *`
+  - `mode: explicit`: Use explicit column and value lists
+    - `insert.columns`: List of column names for the INSERT statement
+    - `insert.values`: List of values/expressions corresponding to the columns
+- `update`: Update unmatched records (for WHEN NOT MATCHED BY SOURCE scenarios)
+  - `set_expressions`: Dictionary of column-to-expression mappings
+- `delete`: Delete unmatched records
+- `do_nothing`: Skip the unmatched record
+- `error`: Raise an error for unmatched records
+  - `error_message`: Optional custom error message
+
+**Example with Custom Merge Clauses:**
+
+```yaml
+models:
+  - name: my_incremental_model
+    config:
+      materialized: incremental
+      incremental_strategy: merge
+      unique_key: id
+      merge_clauses:
+        when_matched:
+          - action: update
+            mode: explicit
+            condition: "DBT_INTERNAL_SOURCE.status = 'active'"
+            update:
+              include: ['name', 'email', 'status']
+              exclude: ['created_at']
+              set_expressions:
+                updated_at: "CURRENT_TIMESTAMP"
+                version: "COALESCE(DBT_INTERNAL_DEST.version, 0) + 1"
+          - action: delete
+            condition: "DBT_INTERNAL_SOURCE.status = 'deleted'"
+        when_not_matched:
+          - action: insert
+            mode: explicit
+            insert:
+              columns: ['id', 'name', 'email', 'created_at']
+              values: ['DBT_INTERNAL_SOURCE.id', 'DBT_INTERNAL_SOURCE.name', 'DBT_INTERNAL_SOURCE.email', 'CURRENT_TIMESTAMP']
+```
+
+**DuckLake Restrictions:**
+
+When using DuckLake (attached DuckLake databases), MERGE statements are limited to a single UPDATE or DELETE action in `when_matched` clauses due to DuckLake's current MERGE implementation constraints.
+
+**Table Aliases:**
+
+In conditions and expressions, use these table aliases:
+- `DBT_INTERNAL_SOURCE`: References the incoming data (your model's SELECT)
+- `DBT_INTERNAL_DEST`: References the existing target table
 
 #### Re-running external models with an in-memory version of dbt-duckdb
 When using `:memory:` as the DuckDB database, subsequent dbt runs can fail when selecting a subset of models that depend on external tables. This is because external files are only registered as  DuckDB views when they are created, not when they are referenced. To overcome this issue we have provided the `register_upstream_external_models` macro that can be triggered at the beginning of a run. To enable this automatic registration, place the following in your `dbt_project.yml` file:
