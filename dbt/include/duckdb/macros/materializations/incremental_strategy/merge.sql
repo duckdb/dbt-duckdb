@@ -1,3 +1,32 @@
+{% macro duckdb__merge_join_clause(unique_key, merge_on_using_columns, incremental_predicates) -%}
+    {%- set incremental_filters = [] if incremental_predicates is none else [] + incremental_predicates -%}
+    {%- set join_predicates = [] -%}
+    {%- set using_clause_requested = merge_on_using_columns and merge_on_using_columns | length > 0 -%}
+
+    {%- if not using_clause_requested -%}
+        {% if unique_key %}
+            {% if unique_key is sequence and unique_key is not mapping and unique_key is not string %}
+                {% for key in unique_key %}
+                    {% do join_predicates.append("DBT_INTERNAL_SOURCE." ~ key ~ " = DBT_INTERNAL_DEST." ~ key) %}
+                {% endfor %}
+            {% else %}
+                {% do join_predicates.append("DBT_INTERNAL_SOURCE." ~ unique_key ~ " = DBT_INTERNAL_DEST." ~ unique_key) %}
+            {% endif %}
+        {% else %}
+            {% do join_predicates.append('FALSE') %}
+        {% endif %}
+    {%- endif -%}
+
+    {% if using_clause_requested %}
+        USING ({{ merge_on_using_columns | join(', ') }})
+        {%- if incremental_filters | length > 0 %}
+        ON ({{ incremental_filters | join(") AND (") }})
+        {%- endif %}
+    {% else %}
+        ON ({{ (join_predicates + incremental_filters) | join(") AND (") }})
+    {% endif %}
+{%- endmacro %}
+
 {% macro duckdb__get_incremental_merge_sql(args_dict) %}
   {%- set target_relation = args_dict['target_relation'] -%}
   {%- set temp_relation = args_dict['temp_relation'] -%}
@@ -59,11 +88,7 @@
 
     MERGE INTO {{ target }} AS DBT_INTERNAL_DEST
         USING {{ source }} AS DBT_INTERNAL_SOURCE
-        {%- if merge_on_using_columns %}
-            USING ({{ merge_on_using_columns | join(', ') }})
-        {%- else %}
-            ON ({{ predicates | join(") AND (") }})
-        {%- endif %}
+        {{ duckdb__merge_join_clause(unique_key, merge_on_using_columns, incremental_predicates) }}
 
     {%- for when_matched in when_matched_clauses %}
     WHEN MATCHED
@@ -139,8 +164,8 @@
             {%- elif when_not_matched.get('mode') == 'star' -%}
             INSERT *
             {%- elif when_not_matched.get('mode') == 'explicit' -%}
-            {%- set insert_columns = when_matched.get('insert', {}).get('columns', []) -%}
-            {%- set insert_values = when_matched.get('insert', {}).get('values', []) -%}
+            {%- set insert_columns = when_not_matched.get('insert', {}).get('columns', []) -%}
+            {%- set insert_values = when_not_matched.get('insert', {}).get('values', []) -%}
 
             INSERT
                 ({{ insert_columns | join(', ') }})

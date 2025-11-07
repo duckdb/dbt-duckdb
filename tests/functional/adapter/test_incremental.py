@@ -22,7 +22,6 @@ except ImportError:
     BaseMicrobatch = None
     MICROBATCH_AVAILABLE = False
 
-
 class doUniqueKey(BaseIncrementalUniqueKey):
     def test__bad_unique_key_list(self, project):
         """expect compilation error from unique key not being a column"""
