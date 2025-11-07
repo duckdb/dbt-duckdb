@@ -24,6 +24,7 @@ psycopg[binary]
 pyiceberg
 pytest
 pytest-dotenv
+logbook<1.9  # pytest-logbook still imports logbook.compat
 pytest-logbook
 pytest-csv
 pytest-xdist
