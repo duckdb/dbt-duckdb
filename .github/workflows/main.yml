@@ -490,7 +490,7 @@ jobs:
   notify-failure:
     name: Send Slack notification on failure
 #    if: failure() && github.ref == 'refs/heads/master'
-    needs: [code-quality, unit, functional, filebased, motherduck, buenavista, fsspec, plugins, build, test-build]
+#    needs: [code-quality, unit, functional, filebased, motherduck, buenavista, fsspec, plugins, build, test-build]
     runs-on: ubuntu-latest
     steps:
       - name: Send Slack notification
