@@ -105,7 +105,8 @@ jobs:
       - name: Send Slack notification
         uses: slackapi/slack-github-action@v2.1.1
         with:
-          webhook-url: ${{ secrets.MOTHERDUCK_CI_NOTIFICATION_WEBHOOK }}
+          webhook: ${{ secrets.MOTHERDUCK_CI_NOTIFICATION_WEBHOOK }}
+          webhook-type: webhook-trigger
           payload: |
             {
               "text": "dbt-duckdb release workflow failed: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
