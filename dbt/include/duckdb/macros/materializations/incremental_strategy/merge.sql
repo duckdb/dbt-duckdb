@@ -40,6 +40,8 @@
 {% endmacro %}
 
 {% macro duckdb__get_merge_sql(target, source, unique_key, dest_columns, incremental_predicates=none) -%}
+    {%- set predicates = [] if incremental_predicates is none else [] + incremental_predicates -%}
+
     {{ validate_merge_config(config, target) }}
 
     {%- set sql_header = config.get('sql_header', none) -%}
@@ -69,6 +71,18 @@
     {%- set when_not_matched_clauses = merge_clauses.get('when_not_matched', [
         merge_clause_defaults.when_not_matched_insert_by_name
     ]) -%}
+
+    {% if unique_key %}
+        {% if unique_key is sequence and unique_key is not mapping and unique_key is not string %}
+            {% for key in unique_key %}
+                {% do predicates.append("DBT_INTERNAL_SOURCE." ~ key ~ " = DBT_INTERNAL_DEST." ~ key) %}
+            {% endfor %}
+        {% else %}
+            {% do predicates.append("DBT_INTERNAL_SOURCE." ~ unique_key ~ " = DBT_INTERNAL_DEST." ~ unique_key) %}
+        {% endif %}
+    {% else %}
+        {% do predicates.append('FALSE') %}
+    {% endif %}
 
     {{ sql_header if sql_header is not none }}
 
