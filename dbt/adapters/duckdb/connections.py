@@ -101,6 +101,7 @@ class DuckDBConnectionManager(SQLConnectionManager):
             # Preserve original RuntimeError with full context instead of swallowing
             raise dbt.exceptions.DbtRuntimeError(str(e)) from e
         except Exception as exc:
+            logger.debug("duckdb error: {}".format(str(exc)))
             logger.debug("Error running SQL: {}".format(sql))
             logger.debug("Rolling back transaction.")
             raise dbt.exceptions.DbtRuntimeError(str(exc)) from exc
