@@ -1,10 +1,4 @@
 {% macro duckdb__get_incremental_microbatch_sql(arg_dict) -%}
-    {#--
-        Microbatch strategy for time-based batch processing.
-        Uses MERGE when available (DuckDB >= 1.4.0) for better performance,
-        otherwise falls back to delete+insert.
-    --#}
-
     {%- set target = arg_dict["target_relation"] -%}
     {%- set source = arg_dict["temp_relation"] -%}
     {%- set dest_columns = arg_dict["dest_columns"] -%}
