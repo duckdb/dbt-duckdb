@@ -23,3 +23,16 @@
     {%- do errors.append(field_name ~ " must be a dictionary, found: " ~ field_value) -%}
   {%- endif -%}
 {%- endmacro -%}
+
+{%- macro validate_incremental_predicates(incremental_predicates) -%}
+  {%- if incremental_predicates is none -%}
+        {%- set incremental_predicates = [] -%}
+    {%- elif incremental_predicates is string -%}
+        {%- set incremental_predicates = [incremental_predicates] -%}
+    {%- elif incremental_predicates is sequence -%}
+        {%- set incremental_predicates = incremental_predicates | list -%}
+    {%- else -%}
+        {{ exceptions.raise_compiler_error("incremental_predicates must be a list of strings or a string") }}
+    {%- endif -%}
+    {{ return(incremental_predicates) }}
+{%- endmacro -%}
