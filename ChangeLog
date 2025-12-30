@@ -1,0 +1,924 @@
+CHANGES
+=======
+
+1.10.1
+------
+
+* Add AWS S3 Tables (Iceberg) support with automatic schema evolution
+  - Implement S3 Tables detection via endpoint_type='s3_tables' configuration
+  - Add DROP + CREATE pattern for table materialization (no CREATE OR REPLACE support)
+  - Add DELETE + INSERT pattern for incremental models (no MERGE support)
+  - Integrate PyIceberg for automatic schema evolution via dbt.adapters.duckdb.iceberg_utils
+  - Schema evolution: automatically add new columns, preserve removed columns with NULL values
+  - Support iceberg_properties configuration for table creation
+  - Support watermark_column for deduplication in incremental models
+  - Use DESCRIBE instead of information_schema for Iceberg metadata queries
+  - Add transaction commits after DROP and schema evolution for metadata refresh
+  - Add is_s3_tables_catalog(), get_s3_tables_catalog_config(), and evolve_s3_tables_schema() methods to adapter
+* Fix DuckDB Iceberg limitations documentation - clarify these are DuckDB's Iceberg implementation limitations, not S3 Tables specific
+* Add comprehensive AWS S3 Tables documentation to README with configuration examples, authentication details, and example project structure
+* Add PyIceberg as optional dependency in extras_require (s3tables extra: pip install dbt-duckdb[s3tables])
+* Clean up code comments and remove excessive debug logging
+
+* pin duckdb version for motherduck tests (#671)
+* Bump sigstore/gh-action-sigstore-python from 3.1.0 to 3.2.0 (#669)
+* Bump dbt-tests-adapter from 1.19.3 to 1.19.4 (#665)
+* Bump actions/checkout from 5 to 6 (#664)
+* Bump md duckdb to 1.4.2 (#666)
+* use a unique database for each pytest run (#662)
+* chore: fix and/or test slack notification (#661)
+* Bump pyarrow from 21.0.0 to 22.0.0 (#652)
+* Bump dbt-tests-adapter from 1.19.1 to 1.19.3 (#659)
+* Drop support for Python 3.8 and 3.9 (#654)
+* pin logbook below 1.9 b/c pytest-logbook still relies on the compat module which was removed in logbook 1.9.x (#656)
+
+1.10.0
+------
+
+* Update MotherDuck duckdb pin to 1.4.1 (#653)
+* Add MERGE incremental strategy with DuckDB extensions support (#605)
+* Bump actions/download-artifact from 5 to 6 (#650)
+* Bump sigstore/gh-action-sigstore-python from 3.0.1 to 3.1.0 (#651)
+* Bump actions/upload-artifact from 4 to 5 (#649)
+* Bump slackapi/slack-github-action from 2.0.0 to 2.1.1 (#645)
+* add slack notification to md eco ci channel on failure (#643)
+* Bump dbt-tests-adapter from 1.18.0 to 1.19.1 (#642)
+* Bump mypy from 1.18.1 to 1.18.2 (#637)
+* Break out create temp schema into its own transaction (#638)
+* Add Python 3.13 support in CI and metadata (#634)
+* Fix excel plugin skip\_empty\_sheets (#635)
+* Bump mypy from 1.17.1 to 1.18.1 (#633)
+* DuckLake connection instructions (#632)
+* Fix for attach test failures in nightly (#631)
+
+1.9.6
+-----
+
+* Remove extraneous log() lines for index-related operations (#630)
+
+1.9.5
+-----
+
+* bump duckdb to 1.3.2 (#629)
+* Bump actions/setup-python from 5 to 6 (#628)
+* An updated version of the code to add support for indexes to dbt-duckdb (#522)
+* do ATTACH IF NOT EXISTS for attachments (#626)
+* Support ducklake database in primary database and add is\_ducklake flag to identify motherduck managed ducklake (#625)
+* duckdb: fix dateadd interval syntax for newer DuckDB versions (#624)
+* Display traceback when Python model raises exception (#621)
+* add is\_ducklake flag + tests (#620)
+* tests: support DuckDB nightly IOException import (#618)
+* Bump dbt-tests-adapter from 1.17.0 to 1.18.0 (#613)
+* Update excel plugin to filter all null rows (#615)
+* Change logger.exception to logger.warning to fix orchestrator compatibility (#612)
+* Bump actions/checkout from 4 to 5 (#610)
+* Fix secrets map/list type handling in DuckDB SQL generation (#609)
+* Bump freezegun from 1.5.3 to 1.5.5 (#607)
+* Bump actions/download-artifact from 4 to 5 (#606)
+* Bump mypy from 1.17.0 to 1.17.1 (#604)
+* Bump dbt-tests-adapter from 1.16.0 to 1.17.0 (#602)
+* Bump mypy from 1.16.1 to 1.17.0 (#597)
+* Add struct column support with flatten functionality (#594)
+* Bump pyarrow from 18.1.0 to 21.0.0 (#598)
+* Bump freezegun from 1.5.2 to 1.5.3 (#595)
+* Update incremental.sql (#591)
+* Make the adapter.commit call inside of upstream.sql dependent on the existence of upstream\_nodes (#588)
+* Bump mypy from 1.16.0 to 1.16.1 (#582)
+* Bump sigstore/gh-action-sigstore-python from 3.0.0 to 3.0.1 (#583)
+
+1.9.4
+-----
+
+* fix write conflict when first creating dbt\_temp schema (#584)
+* bump duckdb to 1.3.1 (#585)
+* Fix error swallowing that hides DuckDB exception details (#579)
+* Fix bug where schema's database not specified (#577)
+* Assume native comment support in DuckDB catalog queries (#571)
+* Bump dbt-tests-adapter from 1.15.1 to 1.16.0 (#570)
+* Fix attachment option quoting to prevent SQL errors with path-like values (#566)
+* FIX: Fixes issue caused by external materializations with column name contains spaces (#563)
+* Bump mypy from 1.15.0 to 1.16.0 (#561)
+* Bump dbt-tests-adapter from 1.15.0 to 1.15.1 (#562)
+* Update macros for dropping schema and relations when using ducklake (#557)
+* Support using attached database aliases as primary database name
+* lint stuff
+* Add support for arbitrary key-value pairs in Attachment ATTACH options
+* Bump freezegun from 1.5.1 to 1.5.2
+* See if this is related to the mysterious doc test failures that popped up all of a sudden
+* Read .duckdbrc file on DuckDBT CLI startup
+* Add named secret parameter to attachment class
+* Bump dbt-tests-adapter from 1.11.0 to 1.15.0
+* add tests and quoting - reset to single commit
+
+1.9.3
+-----
+
+* Add info on the interactive shell for the DuckDB UI
+* bump duckdb version, patch test (#542)
+* remove duckdbt entrypoint for now
+* Fix: turn transactions back on by default for MotherDuck (#540)
+* Fix: override \`run\_hooks\` macro so we can run a post hook outside a txn without dangling \`commit;\` (#539)
+* - trailing whitespace
+* Update README.md to clarify DuckDB file path behavior and automatic database creation
+* Add support for scoped secrets/credentials by storage prefix (#530)
+* Update test\_basic.py
+* Support dbt\_valid\_to\_current for snapshots
+* Test alter table add column works without recreate
+* formatting fixes
+* rename to table\_function from parameterized\_view
+* Formatting fixes. Missed the pre-commit hook!
+* parameterized\_view custom materialization to avoid view recreation on schema change
+* Tweak this impl a bit
+* Add model completion with fzf integration
+* Add manifest tracking to duckdbt shell
+* linting etc
+* Vibe-claudeing a duckdbt CLI
+* remove print statement, use empty string instead (#517)
+
+1.9.2
+-----
+
+* Bump dbt-tests-adapter from 1.10.4 to 1.11.0 (#509)
+* Bump mypy from 1.14.1 to 1.15.0 (#508)
+* skip s3 tests if the secrets are not available (#511)
+* [Fix] External materialization to S3 does not work if table is empty (#510)
+* Update deprecated v3 -> v4 for upload-artifact and download-artifact (#507)
+* Make keep\_open: true the default setting for dbt-duckdb going forward (#502)
+* remove package build/test build steps (#498)
+* run on schedule
+* add nightly tox env that installs duckdb nightly release, add github action for nightly tests
+* Bump mypy from 1.13.0 to 1.14.1
+* add support for per\_thread\_output in external materialization
+* Fix out of date README comment about version support for dbt-core and duckdb (#487)
+* Drop 3.8 support, add 3.12 (#490)
+* download-artifact should also be bumped to v4 (#489)
+* bump github actions versions (#486)
+* use session scoped fixture
+* use tmp\_path instead of tmp\_dir\_factory.getbasetemp
+
+1.9.1
+-----
+
+* Add unique UUID to temp table name (#482)
+* fix(postgres-plugin #478): Correct attribute access, plugin initialization, and test assertions; gitignore for a wsl development workflow
+* autodiscovery for pytest unit tests
+* adding default open dir to the dev container
+* Bump dbt-tests-adapter from 1.10.3 to 1.10.4
+* Bump mypy from 1.11.2 to 1.13.0
+* Update README.md to reflect postgres attachments
+* Bump dbt-tests-adapter from 1.10.2 to 1.10.3
+* Add safety check for node in graph
+* Remove mention of outdated MotherDuck constraints
+* fix
+* Move the secret creation to a connection-level operation instead of a cursor-level (aka per-thread) operation
+* resolved indentation & format issues
+* infer type from location, default to parquet if not set
+* added glue client fix (local variable 'client' referenced before assignment)
+* removed empty line
+* auto\_detect=true default values for json and csv
+* set default values for csv/json/parquet read options
+* adding transaction support in md
+* removed double inport
+* fixed ruff issues
+* added parquet & json read options + added struct field support for glue
+* Update to Buena Vista 0.5.0
+* Move this message to a one-time warning function
+* Just send this to the dbt.log instead of to stdout to make it less noisy
+* Include the relation in question in the log message for the grant no-op
+* Linting fixes for PR #456
+* Make grant configs a no-op for DuckDB
+* Support HTTP secret extra\_http\_headers
+
+1.9.0
+-----
+
+* Bump dbt-tests-adapter from 1.9.2 to 1.10.2 (#454)
+* (fix) generate\_database\_name macro should be case insensitive (#453)
+* Add support for configuring community/nightly extensions in the profile directly
+* check if config has model attr (#451)
+* Test with dbt-core prereleases
+
+1.8.4
+-----
+
+* Put the dev-requirements back the way they were
+* Try out this hack
+* Update the versions of Python we run tests against from 3.9 through 3.12
+* (fix): MotherDuck config should set SaaS mode at the end (#446)
+* (fix) Add support for attaching a MotherDuck database with token in settings or config (#444)
+* A version-independent fix for the datediff week handling in duckdb
+* Add explicit register/unregister operations for python models
+* remove deprecated functions
+* consistently use kwargs
+* support preleases
+* formatting
+* not never, never
+* add type hint for secrets
+* formatting
+* pass credentials to Glue plugin constructor, secrets should always have a value
+* Disable Python models on MotherDuck when SaaS mode is on (#435)
+* Bump mypy from 1.11.1 to 1.11.2
+* author-email -> author\_email (#428)
+
+1.8.3
+-----
+
+* (chore) Use pbr for packaging for automated versioning with git tag, move to setup.cfg (#427)
+* Bump mypy from 1.11.0 to 1.11.1
+* fix(secrets): value should be enclosed in quotes (#421)
+
+1.8.2
+-----
+
+* Prep for 1.8.2 release (#418)
+* Bump DuckDB version to 1.0.0
+* Bump mypy from 1.10.1 to 1.11.0
+* formatting and typing
+* dataclasses don't like extra kwargs so let's move List[Secret] to a private attribute
+* Let duckdb handle the validation logic
+* add scope to test
+* Bump dbt-tests-adapter from 1.9.1 to 1.9.2
+* Fixes #412 by not requiring aliases for limit 0 clauses in dbt-duckdb
+* Bump mypy from 1.10.0 to 1.10.1
+* type fixes
+* Formatting and types
+* Bump dbt-tests-adapter from 1.8.0 to 1.9.1
+* pass credentials to plugin, get creds in glue plugin
+* formatting, mypy fix
+* Deprecate using settings for secrets, bump duckdb version requirement to 0.10.0
+* clean up code, add docstrings
+* add HF secret
+* add scope
+* fix typo
+* add Azure secret
+* make test more useful
+* fix typo in test
+* Update readme
+* prepared statements doesn't work for secrets
+* mypy fixes
+* pre-commit
+* remove add\_secret method
+* create or replace secret if a name is specified
+* run create secret on cursor init
+* convert secrets dict to secrets in post constructor
+* rename test\_connections to test\_credentials
+* add .env to gitignore
+* put secrets stuff in own module
+* need this for Python 3.12
+* Add add\_secret method to creds
+* Bump duckdb from 0.10.2 to 1.0.0
+
+1.8.1
+-----
+
+* Prep for 1.8.1
+* Fix version constraints
+* Skip duckdb v0.10.3
+* Bump freezegun from 1.5.0 to 1.5.1
+
+1.8.0
+-----
+
+* Adjust this since we won't need to change it going forward anymore
+* Prep for 1.8.0
+
+1.7.5
+-----
+
+* Prep for the 1.7.5 release
+* Update the README with examples of using either meta or config for setting up external sources
+* Bump dbt-tests-adapter from 1.7.11 to 1.7.14
+* Use duckdb 0.10.2
+* Use different MD token
+* Bump freezegun from 1.4.0 to 1.5.0
+* Bump mypy from 1.9.0 to 1.10.0
+* Setup python dep as well
+* Update the devcontainer/pre-commit to use Python 3.11
+* May just have to skip it in memory cause I think maybe it works in file-mode
+* Try whistling this
+* Make this test not flaky
+* precommit etc
+* Skip BV for TestUnitTestingTypesDuckDB
+* address comments
+* query cancellation
+* Added profile\_name to boto3 Session
+
+1.7.4
+-----
+
+* Prepare a 1.7.4 release
+* Skip this test in BV for the moment
+* Readd dbt-core to setup.py for install back-compat
+* Check if token exists before running MotherDuck CI/CD job
+* run tests on master not main
+* Add pre-model hook for cleaning up remote temporary table (MotherDuck)
+* Readd dbt-tests-adapter
+* Revert dev-requirements
+* Bump dbt-tests-adapter from 1.7.10 to 1.7.11
+* Skip persist\_docs for MD
+* Fix unit tests
+* Fix semver comparison logic
+* run ruff
+* lazy load agate
+* fix newline
+* Add support for persist\_docs-related functionality now that comments are fully supported in DuckDB 0.10.1
+* formatting + initial mypy fixes
+* Bump dbt-tests-adapter from 1.7.9 to 1.7.10
+* use RelationConfig attributes in create\_from\_source
+* Bump sigstore/gh-action-sigstore-python from 1.2.3 to 2.1.1
+* Bump actions/setup-python from 4 to 5
+* Bump mypy from 1.8.0 to 1.9.0
+
+1.7.3
+-----
+
+* fix that too
+* Fix module field reference on PluginConfig for MD
+* Prepare a 1.7.3 release
+* Update release.yml
+* use --generate-notes in gh release
+* only run release pipeline on semver tag pushes
+* reorder imports
+* fix: custom\_user\_agent does not work if motherduck plugin is not specified, add dbt-duckdb version
+* add release pipeline
+* Bump dbt-tests-adapter from 1.7.8 to 1.7.9
+* implement DuckDbRelation.create\_from, fix TestExternalSources::test\_external\_sources
+* bump dbt-common and dbt-adapters to 1.0.0b1
+* mypy fix
+* mypy fix
+* mypy fix
+* pop custom\_user\_agent from settings, add unit test
+* Add test for date\_spine use case
+* Update dateadd to work with new datediff
+
+1.7.2
+-----
+
+* README updates
+* Prep for 1.7.2 release
+* Fixing this b/c it bothers me
+* Bonus: functional tests for dbt unit testing
+* Fix unit tests
+* Try different install reqs
+* Migrate to dbt-common + dbt-adapters
+* Bump dbt-tests-adapter from 1.7.7 to 1.7.8
+* Clarify docstring
+* move token\_from\_config to plugin
+* missed one
+* use Dict instead of dict to be backward compatible with older Python versions
+* Move config update logic into MotherDuck Plugin
+* Rename motherduck\_token property to token\_from\_config and add docstr
+* add md to extras\_require and constrain duckdb version, update in tox.ini
+* address mypy issues
+* fix: both lower and upper caps not defined
+* address mypy error
+* MD also supports lowercase for config options
+* formatting
+* set upper limit for duckdb version
+* pass plugin config token via duckdb connect config
+* Switch to using DuckDB's built-in date\_diff function for the datediff utils macro
+* fixed p\_column error
+* partition\_column type info & parse function
+* reorder lines in UT
+* remove redundant test, use creds.is\_motherduck to determine if user agent should have been passed or not
+* add trailign whitespace
+* Add test that shows no user agent when connecting to non-md path
+* remove redundant fixture, use \_\_version\_\_ instead of hardcoded
+* Add custom\_user\_agent to config, add UT
+* Bump dbt-tests-adapter from 1.7.6 to 1.7.7
+* remove superfluous need\_drop\_temp variable and add temp\_relation to to\_drop within if-statement
+* Update dbt/adapters/duckdb/impl.py
+* Add plugin test to MotherDuck tox environment
+* update docstring
+* add \_temp\_schema\_name attribute to adapter
+* address mypy issues
+* Add test for temp schema name config
+* formatting
+* make temp schema name configurable, fix bugs for local in-memory tests
+* Reverse change to tox.ini for CI
+* use credentials.is\_motherduck in LocalEnvironment
+* Set md profile path back to md:test, make database\_name fixture
+* use adapter.is\_motherduck
+* Don't drop temp schema after test ends
+* Don't use MD\_CONNECT, instead use SET motherduck\_token
+* Create remote temporary tables in a separate schema dbt\_temp
+* create temp schema if needed
+* add more cleanup to UT, add schema temp to target database for temp table workaround
+* add some helpful inline comments
+* clean up temp tables for incrementals, add db creation and cleanup for md tests
+* use py311 for md tox env
+* clarify docstring
+* clarify docstsring
+* consolidate MotherDuck plugin tests
+* Add UT to test incremental model on MotherDuck
+* add is\_motherduck property to credentials
+* added support to dynamically registering/adding partitions (not just specifying the partition columns in the glue table but for each external s3 write,we want to register those partitions and their s3 locations in glue too)
+* clarify inline comment
+* add workaround for temporary tables in remote databases
+* Bump dbt-tests-adapter from 1.7.5 to 1.7.6
+* passed the typekey test
+* fixed partition\_columns hint
+* Fixed parameter hint for partition\_columns
+* set s3\_parent path to original if partitioning is used
+* fixed assertion, won't add partitionkeys if no partition\_columns are present
+* removed old argument
+* added partition support for Glue
+* Bump dbt-tests-adapter from 1.7.4 to 1.7.5
+* Add note about incremental materialization strategies
+
+1.7.1
+-----
+
+* Bump mypy from 1.7.1 to 1.8.0
+* Bump freezegun from 1.3.1 to 1.4.0
+* Testing other types of exceptions being retryable
+* Revert "Provide support for Postgres-specific ATTACH options"
+* Test updates for the new retry settings/config
+* Make the query tests pass again
+* generalize this for connect retries as well as query retries
+* Generalize this a bit while we figure out what exactly is getting thrown
+* Add support for retrying certain types of exceptions we see when running models in dbt-duckdb
+* Bump dbt-tests-adapter from 1.7.3 to 1.7.4
+* Provide support for Postgres-specific ATTACH options
+* point to duckdb supported version doc for motherduck
+* bump version supported by MotherDuck
+* Bump actions/setup-python from 4 to 5
+* Bump freezegun from 1.3.0 to 1.3.1
+* That turned out to be more work than I thought
+* why are you like this
+* Fixes #304
+* Adjust line lengths everywhere
+* Move from black/flake to ruff and fix the stuff ruff found
+* Bump dbt-tests-adapter from 1.7.2 to 1.7.3
+* Bump freezegun from 1.2.2 to 1.3.0
+* sqlite write issue fixed
+* tests reproduce the issue
+* Bump mypy from 1.7.0 to 1.7.1
+* Bump dbt-tests-adapter from 1.7.1 to 1.7.2
+* Bump dbt-tests-adapter from 1.7.0 to 1.7.1
+* Bump black from 23.10.1 to 23.11.0
+* Bump mypy from 1.6.1 to 1.7.0
+* Update sqlalchemy.py
+* Update sqlalchemy.py
+* Add support for providing additional kwargs for sqlalchemy connection
+* Update README.md
+
+1.7.0
+-----
+
+* Update deps for the real dbt-core 1.7.0 stuff
+* Remove unused hologram-dependent unit tests
+* Working test adapter version
+* Add in all of the seed delimiter tests
+* Support delimiter options inside of the dbt-duckdb fast seed loader
+* Mark these tests as skipped for the moment
+* Placeholders for the not-yet-working date spine tests
+* Version bumps for 1.7.0
+* Bump black from 23.10.0 to 23.10.1
+
+1.6.2
+-----
+
+* Prep and cut a 1.6.2 release
+* update delta readme
+* format fixes
+* adapt readme; add default materialization config
+* Bump mypy from 1.6.0 to 1.6.1
+* Bump black from 23.9.1 to 23.10.0
+* Nit
+* Bump MotherDuck's version requirement
+* See if that makes the precommit checks happier
+* With linting enabled and fixes for it
+* refactor df registration for more general approach
+* Update README with latest target DuckDB version
+* Update Excel plugin with output support
+* Bump dbt-tests-adapter from 1.6.5 to 1.6.6
+* Bump mypy from 1.5.1 to 1.6.0
+* use tempfile
+* change pyarrow\_table to pyarrow\_dataset; use tempfile
+* re-enable ability to return a DuckDbPyRelation that holds a reference to temp tables in a dbt python model
+
+1.6.1
+-----
+
+* Prep for 1.6.1 release
+* fix readme
+* update readme
+* add delta\_table3\_expected in test
+* addapt test; add create schema; fix storage
+* delete redudant configure call
+* delete test delta
+* refactor registered df; delete launch
+* add df registration
+* try to register df to localsession
+* simplify test\_delta
+* make duplicate connection example simple
+* add notebook with delta+conn testing
+* add simple test showcase
+* add time travel; remote storage (should test)
+* add delta read plugin
+* Fix cursor isolation on Python model
+* Add creds as arg
+* Initialize new cursor
+* Add batch example
+* Add separate cursor for batch reads/writes
+* Bump dbt-tests-adapter from 1.6.4 to 1.6.5
+* Bump dbt-tests-adapter from 1.6.3 to 1.6.4
+* put the threads settings in there too
+* Add a sample\_profiles.yml file for dbt-duckdb to make an initial 'dbt init' even more seamless
+* pydoc'ing some things and relaxing the Pandas dev requirement now that DuckDB 0.9.0 is out the door
+* Bump dbt-tests-adapter from 1.6.2 to 1.6.3
+* Allow access to the RuntimeConfigObject from the TargetConfig used by the store method of plugins
+* Refactor render\_write\_options for direct option rendering
+* Fix typos and formatting issues in dbt-duckdb README documentation
+* Add a more helpful error message in the case that the options argument to an external materialization is not a dictionary
+* Add a maxfail arg to the MD pytest runs so they fail quickly
+* Re-enable all of the core tests for MD
+* need to adjust the workflow too
+* Require the MOTHERDUCK\_TOKEN to be present in the environment; cut back on BV test runs to make things go faster
+* See if I can isolate whatever issue is springing up with the MotherDuck integration tests
+* Bump dbt-tests-adapter from 1.6.1 to 1.6.2
+* Bump black from 23.7.0 to 23.9.1
+* Pin pandas depenedency to 2.0.0 to get around dtypes error in integration tests
+* Bump actions/checkout from 3 to 4
+* Bump dbt-tests-adapter from 1.6.0 to 1.6.1
+* Bump mypy from 1.5.0 to 1.5.1
+* Update README.md
+* Bump mypy from 1.4.1 to 1.5.0
+* Add option to fetch Gsheet data using range
+* fix path
+* Update README.md
+* Update excel.py
+* fix: change quoting character
+* feat: add s3 support to excel plugin through env
+* separate out motherduck plugin test from the others, and skip when using a non-motherduck profile
+* fix skip\_by\_profile\_type fixture to apply to class-level tests and fixtures, especially since is only used at the class level
+* add source tags to SourceConfig
+
+1.6.0
+-----
+
+* Update README for 1.6.0
+* Update for mypy fixes
+* Simplify and fix bug in the split\_part utils macro
+* Prep for dbt 1.6.0 update
+* Add an option to the profile for specifying additional entries for sys.path and revamp how we lookup builtin plugin modules
+* Make fast seed loading the default
+* try whistling this
+* Fix that bit too
+* See if this makes the MD integration test stuff work properly
+* Bump dbt-tests-adapter from 1.5.2 to 1.5.4
+* Bump black from 23.3.0 to 23.7.0
+* fix: remove parenthesis from md\_connect call
+* Require duckdb >= 0.7.0 for dbt-duckdb going forward and remove some dead code
+* Add a keep\_open option to the profile
+* Some config args to make the updated plugins test run on GH
+* Add in plugins for the motherduck and postgres extensions so we can do a little bit of profile-safe initialization work
+* Updates to support the revamped dbt debug command
+* Simplify some setup stuff now that Python 3.7 is EOL'd
+* Make it nicer to run the functional adapter tests on OS X
+* picky picky
+* Check and reset the environment for a DuckDB connection if the credentials have changed
+* Disable these tests on MD and add a note to the README
+* Try to figure out what is going on with the MD integration tests
+* Bump dbt-tests-adapter from 1.5.1 to 1.5.2
+* Bump mypy from 1.3.0 to 1.4.1
+* Handle the remote case clean-er
+* Add more detailed checks to ensure consistent settings between the connection path and database name in the profile
+
+1.5.2
+-----
+
+* Document the Plugin.store functionality
+* Add in MotherDuck docs and do a version bump
+* Disable this test for now while DuckDB issue 7934 gets worked out
+* Support alternate string formatting strategies for external sources
+* ack don't need that now
+* Add an example of doing a write-side operation in the sqlalchemy plugin
+* Automatically disable transactions on motherduck paths
+* just ignore this typecheck'd bit then
+* Fix whitespace
+* Wire up MotherDuck CI tests
+* Some cleanup items
+* Version that has all tests passing with the md test profile except for the ones that can't pass b/c the functionality isn't supported
+* A more-working version
+* Keep any MD connections open in local mode, just like we do for the in-memory connections
+* Add an alias here for the update target to get around whatever is broken when running against MD
+* disable\_transactions test
+* Start working on a transaction-less mode for dbt-duckdb to see if I can get the db files to be smaller after dbt-duckdb runs
+* Prep for Python 3.7 EOL
+* add missing newline
+* Updates to support a broader class of incremental functionality
+* Simplify extension loading in dbt-duckdb
+* refrain from loading data in Relation.create\_from\_source unless we have an active environment
+* Some more tweaks to this interface
+* Bump dbt-tests-adapter from 1.5.0 to 1.5.1
+* Bump dbt-tests-adapter from 1.5.0 to 1.5.1
+* fix unit test
+* and now with a \*working\* glue test, hooray
+* A functional plugin test for the glue stuff
+* Add a write-side plugin hook and port the glue stuff over to be its first implementation
+* Step 1: Cleanup the SourceConfig class and make it more pythonic
+* Some fixes for catalog lookups in a multi-database, multi-schema world of DuckDB queries: ensure that we are always looking for the relations we need to find in as specific a way as possible (so ideally, database + schema + identifier whenever all 3 fields are available to use and supported by DuckDB)
+* Update README with details on plugin stuff
+* spec out plugin config and writing your own stuff
+* revamp the python support section
+* docstrings for the BasePlugin class
+* Add tests and the stuff I needed to add to actually make this thing work
+* Revamp the plugin structure and add in the ability to do some initialization of the DuckDB connection itself
+* put a pin in this
+* now with tests
+* Little bit more on this
+* Create a fast-loading mechanism for seed files using DuckDB's COPY command
+* Bump mypy from 1.2.0 to 1.3.0
+* For the remote.password stuff to work we need to actually pass it to psycopg2.connecct
+* Prepping the dbt-duckdb tests to pass under the next release of DuckDB
+
+1.5.1
+-----
+
+* Prep a 1.5.1 release to fix the myriad bugs in the 1.5.0 release
+* pyarrow should not be required to run dbt-duckdb python models
+* Have the local environment release the connection when it's not in use and not necessary for in-memory runs
+* Set a default value for the conn attribute in the case an exception is thrown during init
+* oh yep that also
+* more tests that need updating
+* update the attach test
+* Support profiles that are simply 'type: duckdb' by correctly configuring the in-memory database in dbt-duckdb
+* Use config info from the source.config and source.table.config entries as well in plugins and external location configuration
+
+1.5.0
+-----
+
+* yep that one is important too; I really should have a process for this
+* oh yeah that bit is important too
+* Do the 1.5.0 release
+* still kind of a thrill whenever the tests save my ass
+* fix newline
+* Handle URI-style paths correctly in dbt-duckdb
+* add in tz-aware timestamp test
+
+1.4.2
+-----
+
+* Doing a 1.4.2 release to pickup bug fixes ahead of the 1.5.0 cutover
+* simplify this back down
+* let's try whistling this
+* now with format fixes
+* Renaming/refactoring some things
+* Bump dbt-tests-adapter from 1.4.5 to 1.4.6
+* stopping here for the night; need to do most of the localenv stuff tmrw
+* fix that
+* Just trying to see where this leads me
+* First up: this is a bit nicer
+* Reorder logic, fix tests
+* Add back the test imports I foolishly removed
+* Fixup create\_table\_as logic
+* Add references alias for foreign\_key
+* Add support for model contracts in v1.5
+* Update the snapshot merge SQL to sync it up with the Postgres impl; re-enable the tests
+* Add in some of the new test functionality and restructure the directory a bit to prep for some extensions
+* Various updates so tests will work against 1.5.0
+* Version bumps
+* Enable additional iceberg config options + and add a Spark-style save mode argument for plugin-based sources
+* Add the option to materialize a plugin source as a view instead of a table
+* Add in iceberg tests and some additional functionality for scan filtering
+* Add in the sheet\_name parameter and some more test checks
+* Apparently you can't have multiple tests in a suite that both override profiles\_config\_update, or something
+* rm unused import
+* try to get some more detail on what is going wrong here since this works locally
+* really shouldn't ever let gpt3.5 write code, lesson learned
+* Add in sqlalchemy dev dep
+* this is why gpt3.5 isn't allowed to write code anymore
+* Add in a SQLAlchemy plugin
+* Fixing bugs and adding a test case (that only runs on my machine) for the gsheet plugin
+* Bump mypy from 1.1.1 to 1.2.0
+* Only install pyiceberg in the plugins test until we stop support for 3.7
+* Okay I think that's all of the basics
+* Simplify the sources test a bit
+* commit those bits too
+* WIP: source plugins
+* Conditional branching on self.remote
+* Set unique\_field in credentials.py
+* plugins WIP
+* Fix this bit up
+* only return non-empty creds to prevent code 400 when session token is empty
+* Bump black from 22.12.0 to 23.3.0
+* Wire up GH integration tests to run against a Buena Vista server
+* Ensure an event loop exists before we run a python module
+* Adding in a simple BV server for testing purposes
+* really looking forward to when gpt4 does this stuff for me
+* didn't do flake for some reason, huh
+* black etc
+* Adds a remote environment for DuckDB databases running in a Buena Vista server using the postgres protocol
+* Wire up GH Actions to always run file-based tests as well as in-memory tests
+* add format to fix glue registration bug
+* Change profile-type to 'file'
+* Inject any key-value pairs from the meta dictionary into the f-string context we use for rendering the location of an external source
+* Simplify environment and connection
+* Update .gitignore
+* Fix tests so they can run against a file db
+* Run every functional test in multithreaded mode by default
+* fix comma vs spaces causing empty test. Use the upstream config to generate the upstream options
+* pre-commit things
+* Refactor the code in the connections module into the credentials and environments modules
+
+1.4.1
+-----
+
+* More doc fixes and a version bump for the release
+* Test for the external json formatting
+* Oh yeah I think JSON works too now, yay
+* Okay have mostly got this together now
+* Some incremental progress here
+* update the historical changelog
+* Add a test that shows that pyarrow.dataset.Dataset is supported as a return type for Python models
+* Bump mypy from 1.0.1 to 1.1.1
+* Bump dbt-tests-adapter from 1.4.4 to 1.4.5
+* Bump dbt-tests-adapter from 1.4.3 to 1.4.4
+* fix: handle multithreaded writes of pyarrow models
+* fix: clear connections before tests
+* Some more targeted unit tests for the new adapter functions
+* case shouldn't matter here
+* Test some slightly different things here
+* loadbearing config change that
+* Fix mypy thingy
+* Expand the set of quoted chars here
+* fix some things the tests found
+* Refactor/generalize the external materialization's write options since there are a lot of them
+* WIP for this, add in the infra I need
+* Bump dbt-tests-adapter from 1.4.1 to 1.4.3
+* fix test dbt selection to run both models, not their empty intersection. Fix load\_upstream macro to commit the newly created views
+* Bump mypy from 1.0.0 to 1.0.1
+* ah tweaking this so as not to trigger GH rate limit issues
+* loadbearing whitespace
+* Try moving the filesystem tests into their own workflow given the extra deps
+* Add filesystems integration tests + fix up some of the other integration test fixtures
+* Update dbt/adapters/duckdb/connections.py
+* Update dbt/adapters/duckdb/connections.py
+* WIP: Add support for reading/writing with fsspec-compatible filesystems
+
+1.4.0
+-----
+
+* README updates for attaching databases
+* Create attach-specific functional tests
+* That's pretty much why we write tests
+* Start experimenting with ATTACH configs and full-namespace database references for DuckDB 0.7.0
+* Define the attachment configuration options on the DuckDBCredentials class
+* black
+* Getting the code ready for DuckDB 0.7.0 and dbt 1.4.0
+* Bump mypy from 0.991 to 1.0.0
+* remove extra import
+* cleanup test
+* use pyarrow instead of pandas where possible. Ensure import before isinstance checks. Add pyarrow as dev dependency
+* add usage of register\_upstream\_external\_models macro to README
+* replace model-level macro with an on-run-start hook that materializes all models upstream of the selected ones
+* Add in some lru\_cache to limit the hit from these creds lookups on small runs
+* fix bug
+* Use sts to verify the credentials are correct/work
+* fix that precommit error
+* Add in support for getting AWS creds using the AWS credentials chain
+* Bump tests
+* Keep at 3.8 for mypy
+* Move back to 3.10 for code quality check
+* Change main python version
+* Stringify Python versions
+* add new python versions to actiosn
+* Add 3.10 and 3.11 support
+* Match refactored class names from DBT 1.4.0
+* Register views for upstream external models
+* use the cursor with the stored credentials for python models rather than the bare connection
+* Bump dbt-tests-adapter from 1.3.1 to 1.3.2
+* fix that
+* Update/modernize the duckdb\_\_load\_csv\_rows macro impl
+* Also format the ext location string with the schema for further help with boilerplate
+* and that
+* see if this magically fixes things
+* Bump black from 22.10.0 to 22.12.0
+* Use better, non-regex based syntax for handling the limit case inside of the listagg macro
+* 1.3.3 release
+* Work around pandas dependency on parameter bindings that feature datetime instances
+* precommit stuff
+* Oops not what I meant
+* Use an importlib-based approach to loading and executing dbt Python models
+* Bump mypy from 0.990 to 0.991
+* Bump dbt-tests-adapter from 1.3.0 to 1.3.1
+* well thats just head-slappingly stupid of me
+* okay fine i'll default to pandas instead
+* make this CI friendly
+* Support DuckDBPyRelation as a return type from Python models
+* huh not sure how that got there
+* Allow dbt-duckdb to work with versions after 0.5.0, including the new 0.6.0
+* Bump mypy from 0.982 to 0.990
+* Add render support for all of the string config options for external materializations
+
+v1.3.1
+------
+
+* Bump to 1.3.1 and release that
+* fix: run external everytime (#51)
+* Fix upgrading pip (#53)
+* fix: disable upgrading pip in github action (#52)
+* bit more polish
+* typos and formatting
+* trailing ws
+* Docs update for the 1.3.0 release
+* Now with tests for sources with an external location
+* try whistling this
+* fix not in
+* import ordering
+* Another rev at this, adjusting things somewhat to allow for templating external locations at the source level
+* Redo this as a jinja templated var
+* checkpoint this for now
+* Minimal amount of effort required to make external locations work for dbt-duckdb sources
+* feat: add support for glue catalog (#47)
+* okay finally have my black settings right
+* Add an external\_root setting for the DuckDB profile as a location to write external files to when no location is specified explicitly
+* fix: default delimiter changed to comma
+* fix: remove unused macro create\_view\_loacation (#45)
+* Add external location macro (#44)
+* feat: add support for external materialization (#35)
+* Bump freezegun from 0.3.12 to 1.2.2 (#41)
+* Bump actions/download-artifact from 2 to 3 (#40)
+* fix: development env requirements
+* feat: add dependabot (#39)
+* patch the COLUMNS\_EQUAL\_SQL template to not use the same identifiers as the tested relations in the TestConcurrency test cases
+* style: fix missing import ordering (#36)
+* feat: add support for python models (#28)
+* feat: add new functional tests from 1.3.0 (#32)
+
+v1.2.3
+------
+
+* Black wit longer lines
+* Ensure that we always keep a connection open when we're running dbt-duckdb in-memory
+* fix: black formatting
+* fix: running action
+* fix: ignore type of \_\_path\_\_
+* feat: adapt to scaffolding template
+* Generalize the extensions/settings config for DuckDB and update the README to reflect
+* Reference count the open connections and close the parent connection when they are all closed
+* Move creds fetch outside of the lock
+* black + README updates
+* Make multiple threads work with dbt-duckdb
+* Update README
+* Update README
+* Update to 1.2.0 as the release version
+* Okay now S3 stuff works correctly, yay
+* Use the cursor (aka connection) associated with the connection.handle instead of the parent one from duckdb.connect
+* add in extension loading support
+* format the tests
+* Update to target real dbt 1.2.0
+* Add in support for the cross-db util impls for DuckDB and tests for the same
+* WIP for 1.2.0rc1; may be basis of dbt-duckdb 1.2.0
+* update CHANGELOG
+* Version bump to explicitly check that the profile is only using a single thread for dbt-duckdb
+* Enforce the single-threaded profile config for dbt-duckdb and note it in the README
+* Updated CHANGELOG
+* Fix a bunch of stuff and get ready for the next version
+* Remove old test spec
+* Now with adapter specific naming
+* Use the new dbt adapter test library
+* Prep version bump for 1.1.2 release
+* Update CHANGELOG
+* Exclude duckdb 0.4.0 from compatible versions
+* Align with minor version of dbt-core
+* and minor version bump
+* Fix that typo
+* Define a CHANGELOG
+* Upgrade to duckdb 0.3.2; refactor connections now that we can support dbt threads correctly
+* Be more explicit about erors in model queries/give more helpful debug info
+* Less code == good
+* tiny version bump
+* Fix this and that
+* Fix this so that duckdb shows up as a supported plugin when you run dbt --version
+* black all the things
+* Add Apache License; fixes #4
+* Simplify DuckDBConnectionWrapper logic
+* Support for dbt 0.20.1
+* Support for duckdb 0.2.8. Fixes #2
+* Update for PyPI usage with released version of duckdb 0.2.2. Fixes #1
+* now everything works, yay
+* enable snapshot tests now that update..from is supported
+* No longer need to worry about closing these cursors explicitly
+* how bad i am at stuff
+* Update README.md
+* Instructions for the creds config
+* Add default values for all of the credential fields so you don't usually have to specify anything besides the path
+* Give useful install instructions for local dev
+* \_\_init\_\_.py infra so pip install . will work
+* Re-order the operations in the snapshot\_merge impl
+* Enable more of the standard tests by default
+* hack in a version of snapshot merge that I can (eventually) make work with duckdb
+* Make the tests get a little bit further
+* Add a block to close any open cursors returned by the add\_query method
+* Some more macros we needed
+* acknowledge passed in schemas
+* first cut at the duckdb catalog macro
+* much less awful
+* Latest and greatest
+* Checkpointing some more work here
+* closer to working
+* Weaken version reqs for the time being
+* Initial commit of dbt-duckdb

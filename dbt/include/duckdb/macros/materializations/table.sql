@@ -1,6 +1,13 @@
 {% materialization table, adapter="duckdb", supported_languages=['sql', 'python'] %}
 
   {%- set language = model['language'] -%}
+  
+  {# Detect S3 Tables for Iceberg-specific SQL patterns #}
+  {%- set database = config.get('database') -%}
+  {%- set is_s3_tables = false -%}
+  {%- if database -%}
+    {%- set is_s3_tables = adapter.is_s3_tables_catalog(database) -%}
+  {%- endif -%}
 
   {%- set existing_relation = load_cached_relation(this) -%}
   {%- set target_relation = this.incorporate(type='table') %}
@@ -28,19 +35,52 @@
   -- `BEGIN` happens here:
   {{ run_hooks(pre_hooks, inside_transaction=True) }}
 
-  -- build model
-  {% call statement('main', language=language) -%}
-    {{- create_table_as(False, intermediate_relation, compiled_code, language) }}
-  {%- endcall %}
+  {% if is_s3_tables %}
+    {# S3 Tables: Use DROP + CREATE pattern (no CREATE OR REPLACE or DROP CASCADE support) #}
+    {% if existing_relation is not none %}
+      {% call statement('drop_existing_table') %}
+        DROP TABLE {{ target_relation }}
+      {% endcall %}
+      {# Commit the DROP to ensure it's persisted before CREATE #}
+      {% if not adapter.disable_transactions() %}
+        {% do adapter.commit() %}
+      {% endif %}
+    {% endif %}
+    
+    {# Get Iceberg table properties if provided #}
+    {%- set iceberg_properties = config.get('iceberg_properties', {}) -%}
+    
+    {# Build CREATE TABLE statement with optional Iceberg properties #}
+    {% call statement('main', language=language) -%}
+      CREATE TABLE {{ target_relation }} AS (
+        {{ compiled_code }}
+      )
+      {%- if iceberg_properties -%}
+        {%- for key, value in iceberg_properties.items() %}
+        {{ key }} = '{{ value }}'
+        {%- if not loop.last %},{% endif -%}
+        {%- endfor -%}
+      {%- endif %}
+    {%- endcall %}
+    
+    {% set need_swap = false %}
+  {% else %}
+    {# Standard DuckDB: Use intermediate relation and swap #}
+    -- build model
+    {% call statement('main', language=language) -%}
+      {{- create_table_as(False, intermediate_relation, compiled_code, language) }}
+    {%- endcall %}
 
-  -- cleanup
-  {% if existing_relation is not none %}
-      {#-- Drop indexes before renaming to avoid dependency errors --#}
-      {% do drop_indexes_on_relation(existing_relation) %}
-      {{ adapter.rename_relation(existing_relation, backup_relation) }}
+    -- cleanup
+    {% if existing_relation is not none %}
+        {#-- Drop indexes before renaming to avoid dependency errors --#}
+        {% do drop_indexes_on_relation(existing_relation) %}
+        {{ adapter.rename_relation(existing_relation, backup_relation) }}
+    {% endif %}
+
+    {{ adapter.rename_relation(intermediate_relation, target_relation) }}
+    {% set need_swap = true %}
   {% endif %}
-
-  {{ adapter.rename_relation(intermediate_relation, target_relation) }}
 
   {% do create_indexes(target_relation) %}
 
@@ -54,8 +94,10 @@
   -- `COMMIT` happens here
   {{ adapter.commit() }}
 
-  -- finally, drop the existing/backup relation after the commit
-  {{ drop_relation_if_exists(backup_relation) }}
+  {% if need_swap %}
+    -- finally, drop the existing/backup relation after the commit
+    {{ drop_relation_if_exists(backup_relation) }}
+  {% endif %}
 
   {{ run_hooks(post_hooks, inside_transaction=False) }}
 

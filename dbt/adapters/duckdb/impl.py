@@ -138,6 +138,119 @@ class DuckDBAdapter(SQLAdapter):
         return relation.database in self.config.credentials._ducklake_dbs
 
     @available
+    def is_s3_tables_catalog(self, database: str) -> bool:
+        """Check if a database is attached as an S3 Tables (Iceberg) catalog."""
+        if not database or not self.config.credentials.attach:
+            return False
+        
+        for attachment in self.config.credentials.attach:
+            if attachment.alias == database:
+                return attachment.endpoint_type == "s3_tables"
+        return False
+    
+    @available
+    def get_s3_tables_catalog_config(self, database: str) -> Optional[dict]:
+        """
+        Get PyIceberg catalog configuration for S3 Tables
+        
+        Args:
+            database: Database/catalog alias
+        
+        Returns:
+            Catalog configuration dict or None
+        """
+        if not database or not self.config.credentials.attach:
+            return None
+        
+        for attachment in self.config.credentials.attach:
+            if attachment.alias == database and attachment.endpoint_type == "s3_tables":
+                arn = attachment.path
+                
+                # Parse ARN: arn:aws:s3tables:region:account:bucket/bucket-name
+                parts = arn.split(":")
+                
+                if len(parts) < 6:
+                    logger.warning(f"Invalid S3 Tables ARN format: {arn}")
+                    return None
+                
+                region = parts[3]
+                account = parts[4]
+                bucket_path = parts[5]
+                
+                # Extract bucket name from bucket/bucket-name format
+                if "/" in bucket_path:
+                    bucket_name = bucket_path.split("/", 1)[1]
+                else:
+                    bucket_name = bucket_path
+                
+                # PyIceberg catalog configuration for S3 Tables via Glue
+                # Uses Glue's Iceberg REST endpoint with SigV4 authentication
+                config = {
+                    'type': 'rest',
+                    'uri': f'https://glue.{region}.amazonaws.com/iceberg',
+                    'warehouse': f'{account}:s3tablescatalog/{bucket_name}',
+                    'rest.sigv4-enabled': 'true',
+                    'rest.signing-name': 'glue',
+                    'rest.signing-region': region,
+                }
+                
+                return config
+        
+        return None
+    
+    @available
+    def evolve_s3_tables_schema(
+        self,
+        relation,
+        add_columns: Optional[List[dict]] = None,
+        drop_columns: Optional[List[str]] = None
+    ) -> bool:
+        """
+        Evolve S3 Tables schema using PyIceberg
+        
+        Args:
+            relation: dbt relation object
+            add_columns: Columns to add [{'name': 'col', 'type': 'VARCHAR'}]
+            drop_columns: Column names to drop (will be ignored - columns are preserved with NULL values)
+        
+        Returns:
+            True if successful
+        
+        Raises:
+            Exception if schema evolution fails
+        """
+        from dbt.adapters.duckdb.iceberg_utils import evolve_iceberg_schema
+        
+        catalog_config = self.get_s3_tables_catalog_config(relation.database)
+        if not catalog_config:
+            raise DbtRuntimeError(
+                f"Could not get PyIceberg catalog config for database '{relation.database}'. "
+                f"Ensure it's configured as an S3 Tables catalog with endpoint_type='s3_tables'."
+            )
+        
+        table_identifier = f"{relation.schema}.{relation.identifier}"
+        
+        logger.info(f"Evolving schema for {table_identifier}")
+        if add_columns:
+            logger.info(f"  Adding columns: {[c['name'] for c in add_columns]}")
+        
+        # Columns are never dropped - they are preserved with NULL values
+        if drop_columns:
+            logger.warning(f"  Columns removed from source will be preserved in target with NULL values: {drop_columns}")
+            drop_columns = None
+        
+        try:
+            return evolve_iceberg_schema(
+                catalog_config=catalog_config,
+                table_identifier=table_identifier,
+                add_columns=add_columns,
+                drop_columns=drop_columns
+            )
+        except Exception as e:
+            logger.error(f"Failed to evolve schema: {e}")
+            raise DbtRuntimeError(f"Schema evolution failed: {e}")
+
+    @available
     def convert_datetimes_to_strs(self, table: "agate.Table") -> "agate.Table":
         import agate
 

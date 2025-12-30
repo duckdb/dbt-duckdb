@@ -256,6 +256,171 @@ attach:
 
 Note: If you specify the same option in both a direct field (`type`, `secret`, `read_only`) and in the `options` dict, dbt-duckdb will raise an error to prevent conflicts.
 
+#### AWS S3 Tables (Iceberg) Support
+
+As of dbt-duckdb 1.10.1, you can work with [AWS S3 Tables](https://aws.amazon.com/s3/features/tables/) which use Apache Iceberg format. S3 Tables provide managed Iceberg tables with automatic schema evolution, ACID transactions, and optimized query performance.
+
+##### Configuring S3 Tables
+
+To use S3 Tables, attach them using the `iceberg` type and specify `endpoint_type: s3_tables`:
+
+```yaml
+default:
+  outputs:
+    dev:
+      type: duckdb
+      path: /tmp/dbt.duckdb
+      extensions:
+        - iceberg
+      attach:
+        - path: "arn:aws:s3tables:us-east-1:123456789012:bucket/my-bucket"
+          alias: "s3_tables"
+          type: "iceberg"
+          endpoint_type: "s3_tables"
+          read_only: false
+  target: dev
+```
+
+**Important**: You must install PyIceberg for schema evolution support:
+```bash
+pip install dbt-duckdb[s3tables]
+# or
+pip install pyiceberg>=0.5.0
+```
+
+##### S3 Tables Features
+
+**Automatic Schema Evolution**: When your dbt models add or remove columns, dbt-duckdb automatically evolves the Iceberg schema using PyIceberg. Columns removed from your model are preserved in the table with NULL values (no data loss).
+
+**Supported Materializations**:
+- `table`: Full refresh using DROP + CREATE pattern
+- `incremental`: DELETE + INSERT pattern with automatic schema evolution
+
+**Iceberg Table Properties**: You can specify Iceberg table properties when creating tables:
+
+```sql
+{{
+  config(
+    materialized='table',
+    database='s3_tables',
+    iceberg_properties={
+      'write.format.default': 'parquet',
+      'write.parquet.compression-codec': 'snappy'
+    }
+  )
+}}
+
+SELECT * FROM source_table
+```
+
+##### Incremental Models with Schema Evolution
+
+For incremental models, dbt-duckdb automatically handles schema changes:
+
+```sql
+{{
+  config(
+    materialized='incremental',
+    database='s3_tables',
+    unique_key='customer_id',
+    watermark_column='updated_at'  -- Optional: for deduplication
+  )
+}}
+
+SELECT 
+  customer_id,
+  name,
+  email,
+  new_column  -- Automatically added to target table
+FROM source_table
+WHERE updated_at > (SELECT MAX(updated_at) FROM {{ this }})
+```
+
+**Schema Evolution Behavior**:
+- **New columns**: Automatically added to target table via PyIceberg
+- **Removed columns**: Preserved in target table, receive NULL values for new rows
+- **No data loss**: Historical data with removed columns remains intact
+- **No breaking changes**: Downstream systems can still query removed columns
+
+##### S3 Tables Limitations
+
+Due to Iceberg/S3 Tables constraints, the following are NOT supported:
+- `CREATE OR REPLACE TABLE` (use DROP + CREATE instead)
+- `ALTER TABLE` via SQL (use PyIceberg for schema changes)
+- `UPDATE` or `MERGE INTO` statements
+- `DROP TABLE CASCADE`
+
+dbt-duckdb automatically handles these limitations by using appropriate patterns (DROP + CREATE for full refresh, DELETE + INSERT for incremental).
+
+##### Authentication
+
+S3 Tables use AWS credentials from your environment:
+- IAM role (recommended for EC2/ECS/Lambda)
+- AWS CLI configuration (`~/.aws/credentials`)
+- Environment variables (`AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`)
+
+Ensure your IAM role/user has permissions for:
+- `s3tables:GetTable`
+- `s3tables:PutTable`
+- `s3tables:DeleteTable`
+- `s3tables:GetTableMetadata`
+- `s3tables:PutTableMetadata`
+
+##### Example Project Structure
+
+```
+my_dbt_project/
+├── dbt_project.yml
+├── profiles.yml
+└── models/
+    ├── staging/
+    │   └── stg_customers.sql  -- incremental with schema evolution
+    └── marts/
+        └── dim_customers.sql  -- table materialization
+```
+
+**profiles.yml**:
+```yaml
+my_project:
+  outputs:
+    dev:
+      type: duckdb
+      path: /tmp/dbt.duckdb
+      extensions:
+        - iceberg
+      attach:
+        - path: "arn:aws:s3tables:us-east-1:123456789012:bucket/my-iceberg-bucket"
+          alias: "s3_tables"
+          type: "iceberg"
+          endpoint_type: "s3_tables"
+          read_only: false
+  target: dev
+```
+
+**models/staging/stg_customers.sql**:
+```sql
+{{
+  config(
+    materialized='incremental',
+    database='s3_tables',
+    unique_key='customer_id',
+    watermark_column='updated_at'
+  )
+}}
+
+SELECT 
+  customer_id,
+  name,
+  email,
+  updated_at
+FROM raw.customers
+{% if is_incremental() %}
+WHERE updated_at > (SELECT MAX(updated_at) FROM {{ this }})
+{% endif %}
+```
+
+For more details on S3 Tables, see the [AWS S3 Tables documentation](https://docs.aws.amazon.com/AmazonS3/latest/userguide/s3-tables.html).
+
 #### Configuring dbt-duckdb Plugins
 
 dbt-duckdb has its own [plugin](dbt/adapters/duckdb/plugins/__init__.py) system to enable advanced users to extend
