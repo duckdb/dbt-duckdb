@@ -47,21 +47,25 @@
       {% endif %}
     {% endif %}
     
-    {# Get Iceberg table properties if provided #}
-    {%- set iceberg_properties = config.get('iceberg_properties', {}) -%}
-    
-    {# Build CREATE TABLE statement with optional Iceberg properties #}
+    {# Build CREATE TABLE statement #}
     {% call statement('main', language=language) -%}
       CREATE TABLE {{ target_relation }} AS (
         {{ compiled_code }}
       )
-      {%- if iceberg_properties -%}
-        {%- for key, value in iceberg_properties.items() %}
-        {{ key }} = '{{ value }}'
-        {%- if not loop.last %},{% endif -%}
-        {%- endfor -%}
-      {%- endif %}
     {%- endcall %}
+    
+    {# Set Iceberg table properties if provided (DuckDB 1.4.2+) #}
+    {%- set iceberg_properties = config.get('iceberg_properties', {}) -%}
+    {%- if iceberg_properties -%}
+      {# Build properties dict for set_iceberg_table_properties #}
+      {%- set props_dict = [] -%}
+      {%- for key, value in iceberg_properties.items() -%}
+        {%- do props_dict.append("'" ~ key ~ "': '" ~ value ~ "'") -%}
+      {%- endfor -%}
+      {% call statement('set_iceberg_properties') %}
+        CALL set_iceberg_table_properties({{ target_relation }}, { {{ props_dict | join(', ') }} })
+      {% endcall %}
+    {%- endif -%}
     
     {% set need_swap = false %}
   {% else %}

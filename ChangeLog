@@ -10,14 +10,14 @@ CHANGES
   - Add DELETE + INSERT pattern for incremental models (no MERGE support)
   - Integrate PyIceberg for automatic schema evolution via dbt.adapters.duckdb.iceberg_utils
   - Schema evolution: automatically add new columns, preserve removed columns with NULL values
-  - Support iceberg_properties configuration for table creation
+  - Support iceberg_properties configuration using set_iceberg_table_properties() function (DuckDB 1.4.2+)
   - Support watermark_column for deduplication in incremental models
   - Use DESCRIBE instead of information_schema for Iceberg metadata queries
   - Add transaction commits after DROP and schema evolution for metadata refresh
   - Add is_s3_tables_catalog(), get_s3_tables_catalog_config(), and evolve_s3_tables_schema() methods to adapter
 * Fix DuckDB Iceberg limitations documentation - clarify these are DuckDB's Iceberg implementation limitations, not S3 Tables specific
 * Add comprehensive AWS S3 Tables documentation to README with configuration examples, authentication details, and example project structure
-* Add PyIceberg as optional dependency in extras_require (s3tables extra: pip install dbt-duckdb[s3tables])
+* Add s3tables extra with all required dependencies: pyiceberg>=0.5.0, pyarrow>=10.0.0, boto3>=1.26.0 (install with: pip install dbt-duckdb[s3tables])
 * Clean up code comments and remove excessive debug logging
 
 * pin duckdb version for motherduck tests (#671)
