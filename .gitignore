@@ -82,3 +82,6 @@ target/
 .env
 
 .venv
+
+# Kiro IDE folder
+.kiro/
