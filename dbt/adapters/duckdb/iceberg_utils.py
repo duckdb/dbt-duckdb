@@ -478,10 +478,50 @@ def pyiceberg_incremental_write(
             
             logger.info(f"Deleted {rows_deleted} existing rows")
         
-        # Step 7: Insert new data
-        logger.info(f"Inserting {new_data_arrow.num_rows} new rows")
-        append_result = table.append(new_data_arrow)
-        rows_inserted = new_data_arrow.num_rows
+        # Step 7: Align PyArrow schema with Iceberg schema before inserting
+        # PyIceberg requires exact schema match (column names, order, types)
+        logger.info(f"Aligning PyArrow schema with Iceberg schema")
+        
+        # Get Iceberg schema column names in order
+        iceberg_column_names = [field.name for field in schema.fields]
+        logger.info(f"Iceberg schema columns (in order): {iceberg_column_names}")
+        logger.info(f"PyArrow columns (in order): {new_data_arrow.column_names}")
+        
+        # Create a mapping from lowercase column names to actual PyArrow column names
+        arrow_column_map_lower = {col.lower(): col for col in new_data_arrow.column_names}
+        
+        # Reorder and rename PyArrow columns to match Iceberg schema
+        import pyarrow as pa
+        
+        aligned_columns = []
+        aligned_names = []
+        
+        for iceberg_col_name in iceberg_column_names:
+            iceberg_col_lower = iceberg_col_name.lower()
+            
+            if iceberg_col_lower in arrow_column_map_lower:
+                # Column exists in PyArrow data
+                arrow_col_name = arrow_column_map_lower[iceberg_col_lower]
+                column_data = new_data_arrow.column(arrow_col_name)
+                aligned_columns.append(column_data)
+                aligned_names.append(iceberg_col_name)  # Use Iceberg's column name
+                logger.debug(f"Mapped PyArrow column '{arrow_col_name}' to Iceberg column '{iceberg_col_name}'")
+            else:
+                # Column doesn't exist in PyArrow data - this shouldn't happen after schema evolution
+                # but handle it gracefully by adding NULL column
+                logger.warning(f"Column '{iceberg_col_name}' not found in PyArrow data, adding NULL column")
+                null_array = pa.array([None] * new_data_arrow.num_rows)
+                aligned_columns.append(null_array)
+                aligned_names.append(iceberg_col_name)
+        
+        # Create new PyArrow table with aligned schema
+        aligned_arrow_table = pa.table(aligned_columns, names=aligned_names)
+        logger.info(f"Aligned PyArrow table schema: {aligned_arrow_table.schema}")
+        
+        # Step 8: Insert new data
+        logger.info(f"Inserting {aligned_arrow_table.num_rows} new rows")
+        append_result = table.append(aligned_arrow_table)
+        rows_inserted = aligned_arrow_table.num_rows
         
         logger.info(f"DELETE + INSERT complete: {rows_deleted} deleted, {rows_inserted} inserted")
         
