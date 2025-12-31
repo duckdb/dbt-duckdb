@@ -268,26 +268,44 @@
         {%- endif -%}
       {% endif %}
       
-      {# Step 3: Atomic DELETE + INSERT (combined for transaction safety) #}
-      {# Use refreshed columns if schema changed, otherwise use original #}
-      {%- if new_columns or removed_columns -%}
-        {%- set insert_cols_str = target_cols_csv_str_refresh -%}
-        {%- set select_cols_final = select_cols_str -%}
-      {%- else -%}
-        {%- set insert_cols_str = target_cols_csv_str -%}
-        {%- set select_cols_final = target_cols_csv_str -%}
-      {%- endif -%}
+      {# Step 3: Check if we need to use PyIceberg for partitioned tables #}
+      {%- set partition_by = config.get('partition_by') -%}
+      {%- set use_pyiceberg = config.get('use_pyiceberg_writes', false) or partition_by -%}
       
-      {% set build_sql %}
-        DELETE FROM {{ target_relation }}
-        WHERE {{ unique_key }} IN (
-          SELECT DISTINCT {{ unique_key }} FROM {{ staged_relation }}
-        );
+      {%- if use_pyiceberg -%}
+        {# Use PyIceberg upsert path for partitioned tables #}
+        {# DuckDB doesn't support INSERT/DELETE on partitioned Iceberg tables #}
+        {{ log("Using PyIceberg upsert for partitioned table (DuckDB limitation)", info=True) }}
         
-        INSERT INTO {{ target_relation }} ({{ insert_cols_str }})
-        SELECT {{ select_cols_final }}
-        FROM {{ staged_relation }}
-      {% endset %}
+        {# Call adapter method to perform upsert #}
+        {%- set result = adapter.pyiceberg_incremental_write(target_relation, staged_relation, unique_key) -%}
+        {{ log("PyIceberg upsert complete: " ~ result.rows_updated ~ " updated, " ~ result.rows_inserted ~ " inserted", info=True) }}
+        
+        {# No SQL to execute - upsert already done via Python #}
+        {% set build_sql = "SELECT 1 as dummy_result" %}
+        
+      {%- else -%}
+        {# Use standard DuckDB DELETE + INSERT for non-partitioned tables #}
+        {# Use refreshed columns if schema changed, otherwise use original #}
+        {%- if new_columns or removed_columns -%}
+          {%- set insert_cols_str = target_cols_csv_str_refresh -%}
+          {%- set select_cols_final = select_cols_str -%}
+        {%- else -%}
+          {%- set insert_cols_str = target_cols_csv_str -%}
+          {%- set select_cols_final = target_cols_csv_str -%}
+        {%- endif -%}
+        
+        {% set build_sql %}
+          DELETE FROM {{ target_relation }}
+          WHERE {{ unique_key }} IN (
+            SELECT DISTINCT {{ unique_key }} FROM {{ staged_relation }}
+          );
+          
+          INSERT INTO {{ target_relation }} ({{ insert_cols_str }})
+          SELECT {{ select_cols_final }}
+          FROM {{ staged_relation }}
+        {% endset %}
+      {%- endif -%}
       
       {% set need_swap = false %}
       {% set language = "sql" %}

@@ -144,13 +144,19 @@ class IcebergSchemaEvolution:
         """
         Update partition spec for an Iceberg table
         
+        Note: This adds partition fields to an existing table. For best results,
+        the table should be empty or newly created.
+        
+        AWS S3 Tables Limitation: bucket and truncate transforms are not supported.
+        Other transforms (identity, day, month, year, hour) are supported.
+        
         Args:
             table_identifier: Full table identifier (e.g., 'namespace.table_name')
             partition_specs: List of partition specifications
                 Examples:
-                - ['day(inserted_timestamp)']
-                - ['year(order_date)', 'bucket(customer_id, 16)']
-                - ['region', 'month(event_time)']
+                - ['country', 'region']  # Identity partitions
+                - ['day(order_date)', 'country']  # Day transform + identity
+                - ['year(order_date)', 'month(order_date)']  # Year and month transforms
         
         Returns:
             True if successful
@@ -161,57 +167,82 @@ class IcebergSchemaEvolution:
                 BucketTransform, TruncateTransform, IdentityTransform
             )
             
+            logger.info(f"Loading table {table_identifier} from catalog")
             table = self.catalog.load_table(table_identifier)
+            logger.info(f"Table loaded successfully. Current schema: {table.schema()}")
             
             with table.update_spec() as update:
                 for spec in partition_specs:
                     spec = spec.strip()
+                    logger.info(f"Processing partition spec: {spec}")
                     
                     # Parse partition transform
                     if '(' in spec and ')' in spec:
-                        # Transform function: day(col), bucket(col, N), etc.
+                        # Transform function: day(col), month(col), year(col), etc.
                         transform_name = spec[:spec.index('(')].lower()
                         args_str = spec[spec.index('(')+1:spec.rindex(')')]
                         args = [arg.strip() for arg in args_str.split(',')]
                         
                         source_column = args[0]
                         
+                        # Validate column exists in schema
+                        schema_fields = {field.name.lower(): field.name for field in table.schema().fields}
+                        if source_column.lower() not in schema_fields:
+                            available_cols = ', '.join(schema_fields.values())
+                            raise ValueError(
+                                f"Column '{source_column}' not found in table schema. "
+                                f"Available columns: {available_cols}"
+                            )
+                        
+                        # Use the actual column name from schema (case-sensitive)
+                        actual_column_name = schema_fields[source_column.lower()]
+                        
                         if transform_name == 'day':
-                            logger.info(f"Adding day partition on {source_column}")
-                            update.add_field(source_column, DayTransform(), f"{source_column}_day")
+                            logger.info(f"Adding day partition on {actual_column_name}")
+                            update.add_field(actual_column_name, DayTransform(), f"{actual_column_name}_day")
                         elif transform_name == 'month':
-                            logger.info(f"Adding month partition on {source_column}")
-                            update.add_field(source_column, MonthTransform(), f"{source_column}_month")
+                            logger.info(f"Adding month partition on {actual_column_name}")
+                            update.add_field(actual_column_name, MonthTransform(), f"{actual_column_name}_month")
                         elif transform_name == 'year':
-                            logger.info(f"Adding year partition on {source_column}")
-                            update.add_field(source_column, YearTransform(), f"{source_column}_year")
+                            logger.info(f"Adding year partition on {actual_column_name}")
+                            update.add_field(actual_column_name, YearTransform(), f"{actual_column_name}_year")
                         elif transform_name == 'hour':
-                            logger.info(f"Adding hour partition on {source_column}")
-                            update.add_field(source_column, HourTransform(), f"{source_column}_hour")
+                            logger.info(f"Adding hour partition on {actual_column_name}")
+                            update.add_field(actual_column_name, HourTransform(), f"{actual_column_name}_hour")
                         elif transform_name == 'bucket':
                             if len(args) < 2:
                                 raise ValueError(f"bucket transform requires 2 arguments: bucket(column, N)")
                             num_buckets = int(args[1])
-                            logger.info(f"Adding bucket partition on {source_column} with {num_buckets} buckets")
-                            update.add_field(source_column, BucketTransform(num_buckets), f"{source_column}_bucket")
+                            logger.info(f"Adding bucket partition on {actual_column_name} with {num_buckets} buckets")
+                            update.add_field(actual_column_name, BucketTransform(num_buckets), f"{actual_column_name}_bucket")
                         elif transform_name == 'truncate':
                             if len(args) < 2:
                                 raise ValueError(f"truncate transform requires 2 arguments: truncate(column, width)")
                             width = int(args[1])
-                            logger.info(f"Adding truncate partition on {source_column} with width {width}")
-                            update.add_field(source_column, TruncateTransform(width), f"{source_column}_trunc")
+                            logger.info(f"Adding truncate partition on {actual_column_name} with width {width}")
+                            update.add_field(actual_column_name, TruncateTransform(width), f"{actual_column_name}_trunc")
                         else:
                             raise ValueError(f"Unsupported partition transform: {transform_name}")
                     else:
                         # Identity partition: just column name
-                        logger.info(f"Adding identity partition on {spec}")
-                        update.add_field(spec, IdentityTransform(), spec)
+                        # Validate column exists
+                        schema_fields = {field.name.lower(): field.name for field in table.schema().fields}
+                        if spec.lower() not in schema_fields:
+                            available_cols = ', '.join(schema_fields.values())
+                            raise ValueError(
+                                f"Column '{spec}' not found in table schema. "
+                                f"Available columns: {available_cols}"
+                            )
+                        actual_column_name = schema_fields[spec.lower()]
+                        logger.info(f"Adding identity partition on {actual_column_name}")
+                        update.add_field(actual_column_name, IdentityTransform(), actual_column_name)
             
             logger.info(f"Successfully updated partition spec for {table_identifier}")
             return True
             
         except Exception as e:
             logger.error(f"Failed to update partition spec for {table_identifier}: {e}")
+            logger.error(f"Partition specs provided: {partition_specs}")
             raise
 
 
@@ -264,8 +295,12 @@ def update_iceberg_partitioning(
         catalog_config: PyIceberg catalog configuration
         table_identifier: Full table identifier (namespace.table_name)
         partition_specs: Partition specification(s)
-            - Single: 'day(inserted_timestamp)'
-            - Multiple: ['year(order_date)', 'bucket(customer_id, 16)']
+            - Identity: 'country' or ['country', 'region']
+            - Day transform: 'day(order_date)' or ['day(order_date)', 'country']
+            - Month transform: 'month(order_date)'
+            - Year transform: 'year(order_date)'
+            - Hour transform: 'hour(timestamp_col)'
+            - Unsupported: bucket, truncate (will fail with AWS API error)
     
     Returns:
         True if successful
@@ -283,3 +318,84 @@ def update_iceberg_partitioning(
     evolver.update_partition_spec(table_identifier, partition_specs)
     
     return True
+
+
+def pyiceberg_incremental_write(
+    catalog_config: Dict[str, Any],
+    table_identifier: str,
+    new_data_query: str,
+    unique_key: Union[str, List[str]],
+    duckdb_connection
+) -> Dict[str, int]:
+    """
+    Perform incremental write using PyIceberg UPSERT
+    
+    This is used for partitioned tables where DuckDB's INSERT/DELETE don't work.
+    PyIceberg's upsert method handles row-level updates efficiently, even across partitions.
+    
+    Note: The table must be created with identifier_field_ids in the schema,
+    which maps to the unique_key configuration.
+    
+    Args:
+        catalog_config: PyIceberg catalog configuration
+        table_identifier: Full table identifier (namespace.table_name)
+        new_data_query: SQL query to get new data from DuckDB
+        unique_key: Column(s) to use for upsert matching
+        duckdb_connection: DuckDB connection object
+    
+    Returns:
+        Dict with 'rows_updated' and 'rows_inserted' counts
+    
+    Raises:
+        Exception if write fails
+    """
+    try:
+        from pyiceberg.catalog import load_catalog
+        
+        logger.info(f"Starting PyIceberg upsert for {table_identifier}")
+        
+        # Step 1: Load table
+        catalog = load_catalog('s3_tables', **catalog_config)
+        table = catalog.load_table(table_identifier)
+        
+        # Step 2: Read new data from DuckDB into PyArrow
+        logger.info(f"Reading new data from DuckDB: {new_data_query}")
+        new_data_arrow = duckdb_connection.execute(new_data_query).arrow()
+        logger.info(f"Read {new_data_arrow.num_rows} rows from DuckDB")
+        
+        if new_data_arrow.num_rows == 0:
+            logger.info("No new data to write")
+            return {'rows_updated': 0, 'rows_inserted': 0}
+        
+        # Step 3: Validate unique_key columns exist in data
+        if isinstance(unique_key, str):
+            unique_key_cols = [unique_key]
+        else:
+            unique_key_cols = unique_key
+        
+        for col in unique_key_cols:
+            if col not in new_data_arrow.column_names:
+                raise ValueError(f"Unique key column '{col}' not found in new data")
+        
+        # Step 4: Perform upsert
+        # PyIceberg's upsert method automatically:
+        # - Updates existing rows based on identifier_field_ids (unique_key)
+        # - Inserts new rows that don't match existing identifiers
+        # - Handles cross-partition lookups efficiently
+        logger.info(f"Performing upsert with unique_key: {unique_key_cols}")
+        result = table.upsert(new_data_arrow)
+        
+        # Extract results
+        rows_updated = getattr(result, 'rows_updated', 0)
+        rows_inserted = getattr(result, 'rows_inserted', 0)
+        
+        logger.info(f"Upsert complete: {rows_updated} updated, {rows_inserted} inserted")
+        
+        return {
+            'rows_updated': rows_updated,
+            'rows_inserted': rows_inserted
+        }
+        
+    except Exception as e:
+        logger.error(f"Failed to perform PyIceberg upsert: {e}")
+        raise

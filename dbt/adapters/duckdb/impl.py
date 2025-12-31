@@ -262,8 +262,12 @@ class DuckDBAdapter(SQLAdapter):
         Args:
             relation: dbt relation object
             partition_specs: Partition specification(s)
-                - Single: 'day(inserted_timestamp)'
-                - Multiple: ['year(order_date)', 'bucket(customer_id, 16)']
+                - Identity: ['country', 'region']
+                - Day transform: ['day(order_date)', 'country']
+                - Month transform: ['month(order_date)']
+                - Year transform: ['year(order_date)']
+                - Hour transform: ['hour(timestamp_col)']
+                - Unsupported: bucket, truncate (will fail with AWS API error)
         
         Returns:
             True if successful
@@ -294,7 +298,52 @@ class DuckDBAdapter(SQLAdapter):
         except Exception as e:
             logger.error(f"Failed to update partitioning: {e}")
             raise
-            raise DbtRuntimeError(f"Schema evolution failed: {e}")
+    
+    @available
+    def pyiceberg_incremental_write(self, relation, temp_relation, unique_key):
+        """
+        Wrapper to call PyIceberg upsert for partitioned tables
+        
+        This method is used when DuckDB's native INSERT/DELETE operations
+        don't work on partitioned Iceberg tables. PyIceberg's upsert handles
+        row-level updates efficiently across partitions.
+        
+        Args:
+            relation: Target relation (partitioned Iceberg table)
+            temp_relation: Temporary relation with new data
+            unique_key: Column(s) to use for upsert matching
+        
+        Returns:
+            Dict with 'rows_updated' and 'rows_inserted' counts
+        
+        Raises:
+            Exception if upsert fails
+        """
+        from dbt.adapters.duckdb.iceberg_utils import pyiceberg_incremental_write
+        
+        catalog_config = self.get_s3_tables_catalog_config(relation.database)
+        if not catalog_config:
+            raise DbtRuntimeError(
+                f"Could not get PyIceberg catalog config for database '{relation.database}'. "
+                f"Ensure it's configured as an S3 Tables catalog with endpoint_type='s3_tables'."
+            )
+        
+        table_identifier = f"{relation.schema}.{relation.identifier}"
+        new_data_query = f"SELECT * FROM {temp_relation}"
+        
+        logger.info(f"DuckDB adapter: Starting PyIceberg upsert for {table_identifier}")
+        
+        try:
+            return pyiceberg_incremental_write(
+                catalog_config=catalog_config,
+                table_identifier=table_identifier,
+                new_data_query=new_data_query,
+                unique_key=unique_key,
+                duckdb_connection=self.connections.get_thread_connection().handle
+            )
+        except Exception as e:
+            logger.error(f"DuckDB adapter: PyIceberg upsert failed: {e}")
+            raise DbtRuntimeError(f"PyIceberg upsert failed: {e}")
 
     @available
     def convert_datetimes_to_strs(self, table: "agate.Table") -> "agate.Table":
