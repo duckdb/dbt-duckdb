@@ -69,19 +69,11 @@
         {% endif %}
       {% endif %}
       
-      {# Build CREATE TABLE statement with optional partitioning #}
-      {%- set partition_by = config.get('partition_by') -%}
+      {# Build CREATE TABLE statement #}
       {% set build_sql %}
         CREATE TABLE {{ target_relation }} AS (
           {{ compiled_code }}
         )
-        {%- if partition_by -%}
-          {%- if partition_by is string %}
-        PARTITION BY ({{ partition_by }})
-          {%- elif partition_by is sequence and partition_by is not mapping %}
-        PARTITION BY ({{ partition_by | join(', ') }})
-          {%- endif -%}
-        {%- endif %}
       {% endset %}
       
       {% set need_swap = false %}
@@ -334,8 +326,23 @@
       {{- build_sql }}
   {% endcall %}
 
-  {# Set Iceberg table properties if provided (DuckDB 1.4.2+) - only for S3 Tables full refresh #}
+  {# Set up partitioning and properties for S3 Tables full refresh #}
   {%- if is_s3_tables and full_refresh_mode -%}
+    {# Set up partitioning if provided (DuckDB 1.4.2+) #}
+    {%- set partition_by = config.get('partition_by') -%}
+    {%- if partition_by -%}
+      {{ log("Setting up Iceberg table partitioning using PyIceberg", info=True) }}
+      {%- set partition_updated = adapter.update_s3_tables_partitioning(target_relation, partition_by) -%}
+      {%- if not partition_updated -%}
+        {{ exceptions.raise_compiler_error("Failed to set up table partitioning") }}
+      {%- endif -%}
+      {# Commit transaction to force DuckDB to refresh Iceberg metadata #}
+      {% if not adapter.disable_transactions() %}
+        {% do adapter.commit() %}
+      {% endif %}
+    {%- endif -%}
+    
+    {# Set Iceberg table properties if provided (DuckDB 1.4.2+) #}
     {%- set iceberg_properties = config.get('iceberg_properties', {}) -%}
     {%- if iceberg_properties -%}
       {# Build properties dict for set_iceberg_table_properties #}

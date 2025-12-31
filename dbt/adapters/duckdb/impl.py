@@ -248,6 +248,52 @@ class DuckDBAdapter(SQLAdapter):
             )
         except Exception as e:
             logger.error(f"Failed to evolve schema: {e}")
+            raise
+    
+    @available
+    def update_s3_tables_partitioning(
+        self,
+        relation,
+        partition_specs
+    ) -> bool:
+        """
+        Update S3 Tables partitioning using PyIceberg
+        
+        Args:
+            relation: dbt relation object
+            partition_specs: Partition specification(s)
+                - Single: 'day(inserted_timestamp)'
+                - Multiple: ['year(order_date)', 'bucket(customer_id, 16)']
+        
+        Returns:
+            True if successful
+        
+        Raises:
+            Exception if partition update fails
+        """
+        from dbt.adapters.duckdb.iceberg_utils import update_iceberg_partitioning
+        
+        catalog_config = self.get_s3_tables_catalog_config(relation.database)
+        if not catalog_config:
+            raise DbtRuntimeError(
+                f"Could not get PyIceberg catalog config for database '{relation.database}'. "
+                f"Ensure it's configured as an S3 Tables catalog with endpoint_type='s3_tables'."
+            )
+        
+        table_identifier = f"{relation.schema}.{relation.identifier}"
+        
+        logger.info(f"Updating partitioning for {table_identifier}")
+        logger.info(f"  Partition specs: {partition_specs}")
+        
+        try:
+            return update_iceberg_partitioning(
+                catalog_config=catalog_config,
+                table_identifier=table_identifier,
+                partition_specs=partition_specs
+            )
+        except Exception as e:
+            logger.error(f"Failed to update partitioning: {e}")
+            raise
             raise DbtRuntimeError(f"Schema evolution failed: {e}")
 
     @available

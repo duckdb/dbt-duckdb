@@ -1,7 +1,7 @@
 """
 Iceberg schema evolution utilities using PyIceberg for AWS S3 Tables
 """
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Union
 import logging
 
 logger = logging.getLogger(__name__)
@@ -139,6 +139,80 @@ class IcebergSchemaEvolution:
         mapped_type = type_mapping.get(type_upper, StringType())
         logger.debug(f"Mapped DuckDB type '{duckdb_type}' to PyIceberg type '{mapped_type}'")
         return mapped_type
+    
+    def update_partition_spec(self, table_identifier: str, partition_specs: List[str]) -> bool:
+        """
+        Update partition spec for an Iceberg table
+        
+        Args:
+            table_identifier: Full table identifier (e.g., 'namespace.table_name')
+            partition_specs: List of partition specifications
+                Examples:
+                - ['day(inserted_timestamp)']
+                - ['year(order_date)', 'bucket(customer_id, 16)']
+                - ['region', 'month(event_time)']
+        
+        Returns:
+            True if successful
+        """
+        try:
+            from pyiceberg.transforms import (
+                DayTransform, MonthTransform, YearTransform, HourTransform,
+                BucketTransform, TruncateTransform, IdentityTransform
+            )
+            
+            table = self.catalog.load_table(table_identifier)
+            
+            with table.update_spec() as update:
+                for spec in partition_specs:
+                    spec = spec.strip()
+                    
+                    # Parse partition transform
+                    if '(' in spec and ')' in spec:
+                        # Transform function: day(col), bucket(col, N), etc.
+                        transform_name = spec[:spec.index('(')].lower()
+                        args_str = spec[spec.index('(')+1:spec.rindex(')')]
+                        args = [arg.strip() for arg in args_str.split(',')]
+                        
+                        source_column = args[0]
+                        
+                        if transform_name == 'day':
+                            logger.info(f"Adding day partition on {source_column}")
+                            update.add_field(source_column, DayTransform(), f"{source_column}_day")
+                        elif transform_name == 'month':
+                            logger.info(f"Adding month partition on {source_column}")
+                            update.add_field(source_column, MonthTransform(), f"{source_column}_month")
+                        elif transform_name == 'year':
+                            logger.info(f"Adding year partition on {source_column}")
+                            update.add_field(source_column, YearTransform(), f"{source_column}_year")
+                        elif transform_name == 'hour':
+                            logger.info(f"Adding hour partition on {source_column}")
+                            update.add_field(source_column, HourTransform(), f"{source_column}_hour")
+                        elif transform_name == 'bucket':
+                            if len(args) < 2:
+                                raise ValueError(f"bucket transform requires 2 arguments: bucket(column, N)")
+                            num_buckets = int(args[1])
+                            logger.info(f"Adding bucket partition on {source_column} with {num_buckets} buckets")
+                            update.add_field(source_column, BucketTransform(num_buckets), f"{source_column}_bucket")
+                        elif transform_name == 'truncate':
+                            if len(args) < 2:
+                                raise ValueError(f"truncate transform requires 2 arguments: truncate(column, width)")
+                            width = int(args[1])
+                            logger.info(f"Adding truncate partition on {source_column} with width {width}")
+                            update.add_field(source_column, TruncateTransform(width), f"{source_column}_trunc")
+                        else:
+                            raise ValueError(f"Unsupported partition transform: {transform_name}")
+                    else:
+                        # Identity partition: just column name
+                        logger.info(f"Adding identity partition on {spec}")
+                        update.add_field(spec, IdentityTransform(), spec)
+            
+            logger.info(f"Successfully updated partition spec for {table_identifier}")
+            return True
+            
+        except Exception as e:
+            logger.error(f"Failed to update partition spec for {table_identifier}: {e}")
+            raise
 
 
 def evolve_iceberg_schema(
@@ -174,5 +248,38 @@ def evolve_iceberg_schema(
     if add_columns:
         logger.info(f"Adding {len(add_columns)} columns to {table_identifier}")
         evolver.add_columns(table_identifier, add_columns)
+    
+    return True
+
+
+def update_iceberg_partitioning(
+    catalog_config: Dict[str, Any],
+    table_identifier: str,
+    partition_specs: Union[str, List[str]]
+) -> bool:
+    """
+    Update partitioning for an Iceberg table
+    
+    Args:
+        catalog_config: PyIceberg catalog configuration
+        table_identifier: Full table identifier (namespace.table_name)
+        partition_specs: Partition specification(s)
+            - Single: 'day(inserted_timestamp)'
+            - Multiple: ['year(order_date)', 'bucket(customer_id, 16)']
+    
+    Returns:
+        True if successful
+    
+    Raises:
+        Exception if partition update fails
+    """
+    evolver = IcebergSchemaEvolution(catalog_config)
+    
+    # Convert single string to list
+    if isinstance(partition_specs, str):
+        partition_specs = [partition_specs]
+    
+    logger.info(f"Updating partition spec for {table_identifier} with {len(partition_specs)} partition(s)")
+    evolver.update_partition_spec(table_identifier, partition_specs)
     
     return True
