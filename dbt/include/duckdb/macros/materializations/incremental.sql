@@ -360,6 +360,19 @@
       {% endif %}
     {%- endif -%}
     
+    {# Set up identifier fields if unique_key is provided (for upsert support) #}
+    {%- if unique_key -%}
+      {{ log("Setting up Iceberg identifier fields for upsert support", info=True) }}
+      {%- set identifier_setup = adapter.setup_s3_tables_identifier_fields(target_relation, unique_key) -%}
+      {%- if not identifier_setup -%}
+        {{ exceptions.raise_compiler_error("Failed to set up identifier fields") }}
+      {%- endif -%}
+      {# Commit transaction to force DuckDB to refresh Iceberg metadata #}
+      {% if not adapter.disable_transactions() %}
+        {% do adapter.commit() %}
+      {% endif %}
+    {%- endif -%}
+    
     {# Set Iceberg table properties if provided (DuckDB 1.4.2+) #}
     {%- set iceberg_properties = config.get('iceberg_properties', {}) -%}
     {%- if iceberg_properties -%}

@@ -320,6 +320,79 @@ def update_iceberg_partitioning(
     return True
 
 
+def setup_iceberg_identifier_fields(
+    catalog_config: Dict[str, Any],
+    table_identifier: str,
+    unique_key: Union[str, List[str]]
+) -> bool:
+    """
+    Set up identifier fields for an Iceberg table (for upsert support)
+    
+    This should be called after table creation to enable upsert operations.
+    Identifier fields are the primary key columns used for row-level updates.
+    
+    Args:
+        catalog_config: PyIceberg catalog configuration
+        table_identifier: Full table identifier (namespace.table_name)
+        unique_key: Column(s) to use as identifier fields (primary key)
+    
+    Returns:
+        True if successful
+    
+    Raises:
+        Exception if setup fails
+    """
+    try:
+        from pyiceberg.catalog import load_catalog
+        
+        logger.info(f"Setting up identifier fields for {table_identifier}")
+        
+        # Load table
+        catalog = load_catalog('s3_tables', **catalog_config)
+        table = catalog.load_table(table_identifier)
+        schema = table.schema()
+        
+        # Check if already set
+        if schema.identifier_field_ids:
+            logger.info(f"Identifier fields already set: {schema.identifier_field_ids}")
+            return True
+        
+        # Convert unique_key to list
+        if isinstance(unique_key, str):
+            unique_key_cols = [unique_key]
+        else:
+            unique_key_cols = unique_key
+        
+        # Create case-insensitive mapping of Iceberg schema columns
+        schema_column_map = {field.name.lower(): field.name for field in schema.fields}
+        logger.info(f"Iceberg schema columns: {list(schema_column_map.values())}")
+        
+        # Map unique key columns to actual Iceberg schema column names
+        schema_column_names = []
+        for col in unique_key_cols:
+            col_lower = col.lower()
+            if col_lower not in schema_column_map:
+                available_cols = ', '.join(schema_column_map.values())
+                raise ValueError(
+                    f"Column '{col}' not found in table schema. "
+                    f"Available columns: {available_cols}"
+                )
+            schema_column_names.append(schema_column_map[col_lower])
+        
+        logger.info(f"Setting identifier fields to: {schema_column_names}")
+        
+        # Set identifier fields
+        with table.update_schema() as update:
+            update.set_identifier_fields(*schema_column_names)
+        
+        logger.info(f"Successfully set identifier fields for {table_identifier}")
+        return True
+        
+    except Exception as e:
+        logger.error(f"Failed to set up identifier fields for {table_identifier}: {e}")
+        raise
+
+
 def pyiceberg_incremental_write(
     catalog_config: Dict[str, Any],
     table_identifier: str,
@@ -401,7 +474,6 @@ def pyiceberg_incremental_write(
         
         # Step 4: Set identifier fields if not already set
         # PyIceberg upsert requires identifier_field_ids in the table schema
-        # IMPORTANT: Identifier fields MUST be required (NOT NULL) in Iceberg
         schema = table.schema()
         
         # Check if identifier fields are already set
@@ -413,9 +485,9 @@ def pyiceberg_incremental_write(
             schema_field_map = {field.name.lower(): field for field in schema.fields}
             logger.info(f"Iceberg schema columns: {list(schema_column_map.values())}")
             
-            # Map unique key columns to actual Iceberg schema column names
+            # Map unique key columns to actual Iceberg schema column names and get field IDs
             schema_column_names = []
-            fields_to_make_required = []
+            identifier_field_ids = []
             
             for col_name in actual_arrow_unique_key_cols:
                 col_lower = col_name.lower()
@@ -429,22 +501,16 @@ def pyiceberg_incremental_write(
                 actual_schema_col_name = schema_column_map[col_lower]
                 schema_column_names.append(actual_schema_col_name)
                 
-                # Check if field is required
+                # Get the field ID
                 field = schema_field_map[col_lower]
-                if not field.required:
-                    logger.info(f"Column '{actual_schema_col_name}' is not required, will make it required")
-                    fields_to_make_required.append(actual_schema_col_name)
-            
-            logger.info(f"Setting identifier fields to: {schema_column_names}")
-            
-            # Update the schema: first make fields required, then set as identifiers
-            with table.update_schema() as update:
-                # Make identifier fields required (NOT NULL)
-                for col_name in fields_to_make_required:
-                    logger.info(f"Making column '{col_name}' required")
-                    update.make_column_required(col_name)
+                identifier_field_ids.append(field.field_id)
                 
-                # Set identifier fields using actual schema column names
+                logger.info(f"Identifier field: {actual_schema_col_name} (field_id={field.field_id}, required={field.required})")
+            
+            logger.info(f"Setting identifier fields to: {schema_column_names} with IDs: {identifier_field_ids}")
+            
+            # Set identifier fields using actual schema column names
+            with table.update_schema() as update:
                 update.set_identifier_fields(*schema_column_names)
             
             # Reload table to get updated schema

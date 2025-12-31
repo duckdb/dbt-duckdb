@@ -300,6 +300,51 @@ class DuckDBAdapter(SQLAdapter):
             raise
     
     @available
+    def setup_s3_tables_identifier_fields(
+        self,
+        relation,
+        unique_key
+    ) -> bool:
+        """
+        Set up identifier fields for S3 Tables (for upsert support)
+        
+        This should be called after table creation to enable upsert operations.
+        
+        Args:
+            relation: dbt relation object
+            unique_key: Column(s) to use as identifier fields (primary key)
+        
+        Returns:
+            True if successful
+        
+        Raises:
+            Exception if setup fails
+        """
+        from dbt.adapters.duckdb.iceberg_utils import setup_iceberg_identifier_fields
+        
+        catalog_config = self.get_s3_tables_catalog_config(relation.database)
+        if not catalog_config:
+            raise DbtRuntimeError(
+                f"Could not get PyIceberg catalog config for database '{relation.database}'. "
+                f"Ensure it's configured as an S3 Tables catalog with endpoint_type='s3_tables'."
+            )
+        
+        table_identifier = f"{relation.schema}.{relation.identifier}"
+        
+        logger.info(f"Setting up identifier fields for {table_identifier}")
+        logger.info(f"  Unique key: {unique_key}")
+        
+        try:
+            return setup_iceberg_identifier_fields(
+                catalog_config=catalog_config,
+                table_identifier=table_identifier,
+                unique_key=unique_key
+            )
+        except Exception as e:
+            logger.error(f"Failed to set up identifier fields: {e}")
+            raise
+    
+    @available
     def pyiceberg_incremental_write(self, relation, temp_relation, unique_key):
         """
         Wrapper to call PyIceberg upsert for partitioned tables
