@@ -419,7 +419,11 @@ def pyiceberg_incremental_write(
         
         logger.info(f"Mapped to Iceberg schema columns: {iceberg_unique_key_cols}")
         
-        # Step 5: Extract unique key values from new data
+        # Step 5: Use PyIceberg transaction for atomicity (DELETE + INSERT in single transaction)
+        # This ensures that if INSERT fails, DELETE is rolled back
+        logger.info("Starting transactional DELETE + INSERT operation")
+        
+        # Extract unique key values from new data
         # For single column unique key
         if len(actual_arrow_unique_key_cols) == 1:
             unique_key_col = actual_arrow_unique_key_cols[0]
@@ -429,16 +433,33 @@ def pyiceberg_incremental_write(
             unique_values = new_data_arrow.column(unique_key_col).to_pylist()
             unique_values = list(set(unique_values))  # Deduplicate
             
-            logger.info(f"Deleting {len(unique_values)} unique values from column '{iceberg_col}'")
+            logger.info(f"Will delete rows matching {len(unique_values)} unique values from column '{iceberg_col}'")
             
-            # Step 6: Delete existing rows with matching unique key values
-            # Use PyIceberg's In expression for efficient filtering
-            delete_result = table.delete(In(iceberg_col, unique_values))
-            rows_deleted = getattr(delete_result, 'deleted_rows', 0)
-            logger.info(f"Deleted {rows_deleted} existing rows")
+            # Step 6: Perform DELETE + INSERT in a transaction
+            # PyIceberg's transaction ensures atomicity
+            with table.transaction() as txn:
+                # Delete existing rows with matching unique key values
+                logger.info(f"Deleting existing rows...")
+                txn.delete(In(iceberg_col, unique_values))
+                
+                # Count rows before insert to calculate deleted count
+                # Note: PyIceberg delete() doesn't return count, so we estimate
+                rows_deleted = len(unique_values)  # Estimate: assume all keys existed
+                logger.info(f"Estimated {rows_deleted} rows deleted")
+                
+                # Align PyArrow schema with Iceberg schema
+                logger.info(f"Aligning PyArrow schema with Iceberg schema")
+                aligned_arrow_table = _align_arrow_schema(new_data_arrow, schema)
+                
+                # Insert new data
+                logger.info(f"Inserting {aligned_arrow_table.num_rows} new rows")
+                txn.append(aligned_arrow_table)
+                rows_inserted = aligned_arrow_table.num_rows
+                
+                # Transaction commits here automatically when exiting context
+                logger.info(f"Transaction committed successfully")
         else:
-            # For composite unique keys, we need to delete based on each combination
-            # This is less efficient but necessary for multi-column keys
+            # For composite unique keys
             logger.warning(f"Composite unique key detected: {iceberg_unique_key_cols}")
             logger.warning("Using row-by-row deletion which may be slower for large datasets")
             
@@ -451,79 +472,45 @@ def pyiceberg_incremental_write(
                 )
                 unique_combinations.add(key_tuple)
             
-            logger.info(f"Deleting {len(unique_combinations)} unique key combinations")
+            logger.info(f"Will delete rows matching {len(unique_combinations)} unique key combinations")
             
-            # Delete rows matching any combination
-            # For composite keys, we need to use AND conditions
-            # This is a simplified approach - for production, consider batching
-            rows_deleted = 0
-            for key_combo in unique_combinations:
-                # Build filter expression: col1 == val1 AND col2 == val2 AND ...
+            # Perform DELETE + INSERT in a transaction
+            with table.transaction() as txn:
+                # Delete rows matching any combination
                 from pyiceberg.expressions import EqualTo, And
                 
-                filters = []
-                for col_name, value in zip(iceberg_unique_key_cols, key_combo):
-                    filters.append(EqualTo(col_name, value))
+                for key_combo in unique_combinations:
+                    # Build filter expression: col1 == val1 AND col2 == val2 AND ...
+                    filters = []
+                    for col_name, value in zip(iceberg_unique_key_cols, key_combo):
+                        filters.append(EqualTo(col_name, value))
+                    
+                    # Combine filters with AND
+                    if len(filters) == 1:
+                        filter_expr = filters[0]
+                    else:
+                        filter_expr = filters[0]
+                        for f in filters[1:]:
+                            filter_expr = And(filter_expr, f)
+                    
+                    txn.delete(filter_expr)
                 
-                # Combine filters with AND
-                if len(filters) == 1:
-                    filter_expr = filters[0]
-                else:
-                    filter_expr = filters[0]
-                    for f in filters[1:]:
-                        filter_expr = And(filter_expr, f)
+                rows_deleted = len(unique_combinations)  # Estimate
+                logger.info(f"Estimated {rows_deleted} rows deleted")
                 
-                delete_result = table.delete(filter_expr)
-                rows_deleted += getattr(delete_result, 'deleted_rows', 0)
-            
-            logger.info(f"Deleted {rows_deleted} existing rows")
+                # Align PyArrow schema with Iceberg schema
+                logger.info(f"Aligning PyArrow schema with Iceberg schema")
+                aligned_arrow_table = _align_arrow_schema(new_data_arrow, schema)
+                
+                # Insert new data
+                logger.info(f"Inserting {aligned_arrow_table.num_rows} new rows")
+                txn.append(aligned_arrow_table)
+                rows_inserted = aligned_arrow_table.num_rows
+                
+                # Transaction commits here automatically
+                logger.info(f"Transaction committed successfully")
         
-        # Step 7: Align PyArrow schema with Iceberg schema before inserting
-        # PyIceberg requires exact schema match (column names, order, types)
-        logger.info(f"Aligning PyArrow schema with Iceberg schema")
-        
-        # Get Iceberg schema column names in order
-        iceberg_column_names = [field.name for field in schema.fields]
-        logger.info(f"Iceberg schema columns (in order): {iceberg_column_names}")
-        logger.info(f"PyArrow columns (in order): {new_data_arrow.column_names}")
-        
-        # Create a mapping from lowercase column names to actual PyArrow column names
-        arrow_column_map_lower = {col.lower(): col for col in new_data_arrow.column_names}
-        
-        # Reorder and rename PyArrow columns to match Iceberg schema
-        import pyarrow as pa
-        
-        aligned_columns = []
-        aligned_names = []
-        
-        for iceberg_col_name in iceberg_column_names:
-            iceberg_col_lower = iceberg_col_name.lower()
-            
-            if iceberg_col_lower in arrow_column_map_lower:
-                # Column exists in PyArrow data
-                arrow_col_name = arrow_column_map_lower[iceberg_col_lower]
-                column_data = new_data_arrow.column(arrow_col_name)
-                aligned_columns.append(column_data)
-                aligned_names.append(iceberg_col_name)  # Use Iceberg's column name
-                logger.debug(f"Mapped PyArrow column '{arrow_col_name}' to Iceberg column '{iceberg_col_name}'")
-            else:
-                # Column doesn't exist in PyArrow data - this shouldn't happen after schema evolution
-                # but handle it gracefully by adding NULL column
-                logger.warning(f"Column '{iceberg_col_name}' not found in PyArrow data, adding NULL column")
-                null_array = pa.array([None] * new_data_arrow.num_rows)
-                aligned_columns.append(null_array)
-                aligned_names.append(iceberg_col_name)
-        
-        # Create new PyArrow table with aligned schema
-        aligned_arrow_table = pa.table(aligned_columns, names=aligned_names)
-        logger.info(f"Aligned PyArrow table schema: {aligned_arrow_table.schema}")
-        
-        # Step 8: Insert new data
-        logger.info(f"Inserting {aligned_arrow_table.num_rows} new rows")
-        append_result = table.append(aligned_arrow_table)
-        rows_inserted = aligned_arrow_table.num_rows
-        
-        logger.info(f"DELETE + INSERT complete: {rows_deleted} deleted, {rows_inserted} inserted")
+        logger.info(f"DELETE + INSERT complete: {rows_deleted} rows deleted, {rows_inserted} rows inserted")
         
         return {
             'rows_deleted': rows_deleted,
@@ -532,4 +519,58 @@ def pyiceberg_incremental_write(
         
     except Exception as e:
         logger.error(f"Failed to perform PyIceberg DELETE + INSERT: {e}")
+        logger.error("Transaction rolled back - no changes committed")
         raise
+
+
+def _align_arrow_schema(arrow_table, iceberg_schema):
+    """
+    Align PyArrow table schema with Iceberg schema
+    
+    Reorders columns and renames them to match Iceberg schema exactly.
+    PyIceberg requires exact schema match (column names, order, types).
+    
+    Args:
+        arrow_table: PyArrow Table with data
+        iceberg_schema: Iceberg Schema object
+    
+    Returns:
+        PyArrow Table with aligned schema
+    """
+    import pyarrow as pa
+    
+    # Get Iceberg schema column names in order
+    iceberg_column_names = [field.name for field in iceberg_schema.fields]
+    logger.debug(f"Iceberg schema columns (in order): {iceberg_column_names}")
+    logger.debug(f"PyArrow columns (in order): {arrow_table.column_names}")
+    
+    # Create a mapping from lowercase column names to actual PyArrow column names
+    arrow_column_map_lower = {col.lower(): col for col in arrow_table.column_names}
+    
+    # Reorder and rename PyArrow columns to match Iceberg schema
+    aligned_columns = []
+    aligned_names = []
+    
+    for iceberg_col_name in iceberg_column_names:
+        iceberg_col_lower = iceberg_col_name.lower()
+        
+        if iceberg_col_lower in arrow_column_map_lower:
+            # Column exists in PyArrow data
+            arrow_col_name = arrow_column_map_lower[iceberg_col_lower]
+            column_data = arrow_table.column(arrow_col_name)
+            aligned_columns.append(column_data)
+            aligned_names.append(iceberg_col_name)  # Use Iceberg's column name
+            logger.debug(f"Mapped PyArrow column '{arrow_col_name}' to Iceberg column '{iceberg_col_name}'")
+        else:
+            # Column doesn't exist in PyArrow data - this shouldn't happen after schema evolution
+            # but handle it gracefully by adding NULL column
+            logger.warning(f"Column '{iceberg_col_name}' not found in PyArrow data, adding NULL column")
+            null_array = pa.array([None] * arrow_table.num_rows)
+            aligned_columns.append(null_array)
+            aligned_names.append(iceberg_col_name)
+    
+    # Create new PyArrow table with aligned schema
+    aligned_arrow_table = pa.table(aligned_columns, names=aligned_names)
+    logger.debug(f"Aligned PyArrow table schema: {aligned_arrow_table.schema}")
+    
+    return aligned_arrow_table

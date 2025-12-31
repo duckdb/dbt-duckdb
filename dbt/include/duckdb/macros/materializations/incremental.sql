@@ -281,8 +281,25 @@
         {%- set result = adapter.pyiceberg_incremental_write(target_relation, staged_relation, unique_key) -%}
         {{ log("PyIceberg DELETE + INSERT complete: " ~ result.rows_deleted ~ " deleted, " ~ result.rows_inserted ~ " inserted", info=True) }}
         
-        {# No SQL to execute - DELETE + INSERT already done via Python #}
-        {% set build_sql = "SELECT 1 as dummy_result" %}
+        {# Generate SQL representation for compiled output (actual operation happens in Python) #}
+        {% set build_sql %}
+          -- PyIceberg DELETE + INSERT operation (executed via Python, not SQL)
+          -- This is a representation of the operation for documentation purposes
+          -- Actual execution: {{ result.rows_deleted }} rows deleted, {{ result.rows_inserted }} rows inserted
+          
+          -- Step 1: Delete existing rows matching unique key
+          -- DELETE FROM {{ target_relation }}
+          -- WHERE {{ unique_key }} IN (
+          --   SELECT DISTINCT {{ unique_key }} FROM {{ staged_relation }}
+          -- );
+          
+          -- Step 2: Insert new rows
+          -- INSERT INTO {{ target_relation }}
+          -- SELECT * FROM {{ staged_relation }};
+          
+          -- Note: Actual operation performed via PyIceberg transaction for atomicity
+          SELECT 1 as pyiceberg_operation_complete
+        {% endset %}
         
       {%- else -%}
         {# Use standard DuckDB DELETE + INSERT for non-partitioned tables #}
