@@ -394,7 +394,36 @@ def pyiceberg_incremental_write(
                 )
             actual_unique_key_cols.append(column_name_map[col_lower])
         
-        # Step 4: Perform upsert
+        # Step 4: Set identifier fields if not already set
+        # PyIceberg upsert requires identifier_field_ids in the table schema
+        schema = table.schema()
+        
+        # Check if identifier fields are already set
+        if not schema.identifier_field_ids:
+            logger.info("Table does not have identifier_field_ids set, updating schema...")
+            
+            # Get field IDs for unique key columns
+            identifier_field_ids = []
+            for col_name in actual_unique_key_cols:
+                field = schema.find_field(col_name)
+                if field:
+                    identifier_field_ids.append(field.field_id)
+                else:
+                    raise ValueError(f"Column '{col_name}' not found in table schema")
+            
+            logger.info(f"Setting identifier field IDs: {identifier_field_ids} for columns: {actual_unique_key_cols}")
+            
+            # Update the schema to set identifier fields
+            with table.update_schema() as update:
+                update.set_identifier_fields(*actual_unique_key_cols)
+            
+            # Reload table to get updated schema
+            table = catalog.load_table(table_identifier)
+            logger.info("Identifier fields set successfully")
+        else:
+            logger.info(f"Table already has identifier_field_ids: {schema.identifier_field_ids}")
+        
+        # Step 5: Perform upsert
         # PyIceberg's upsert method automatically:
         # - Updates existing rows based on identifier_field_ids (unique_key)
         # - Inserts new rows that don't match existing identifiers
