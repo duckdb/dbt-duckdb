@@ -273,15 +273,15 @@
       {%- set use_pyiceberg = config.get('use_pyiceberg_writes', false) or partition_by -%}
       
       {%- if use_pyiceberg -%}
-        {# Use PyIceberg upsert path for partitioned tables #}
+        {# Use PyIceberg DELETE + INSERT path for partitioned tables #}
         {# DuckDB doesn't support INSERT/DELETE on partitioned Iceberg tables #}
-        {{ log("Using PyIceberg upsert for partitioned table (DuckDB limitation)", info=True) }}
+        {{ log("Using PyIceberg DELETE + INSERT for partitioned table (DuckDB limitation)", info=True) }}
         
-        {# Call adapter method to perform upsert #}
+        {# Call adapter method to perform DELETE + INSERT #}
         {%- set result = adapter.pyiceberg_incremental_write(target_relation, staged_relation, unique_key) -%}
-        {{ log("PyIceberg upsert complete: " ~ result.rows_updated ~ " updated, " ~ result.rows_inserted ~ " inserted", info=True) }}
+        {{ log("PyIceberg DELETE + INSERT complete: " ~ result.rows_deleted ~ " deleted, " ~ result.rows_inserted ~ " inserted", info=True) }}
         
-        {# No SQL to execute - upsert already done via Python #}
+        {# No SQL to execute - DELETE + INSERT already done via Python #}
         {% set build_sql = "SELECT 1 as dummy_result" %}
         
       {%- else -%}
@@ -353,19 +353,6 @@
       {%- set partition_updated = adapter.update_s3_tables_partitioning(target_relation, partition_by) -%}
       {%- if not partition_updated -%}
         {{ exceptions.raise_compiler_error("Failed to set up table partitioning") }}
-      {%- endif -%}
-      {# Commit transaction to force DuckDB to refresh Iceberg metadata #}
-      {% if not adapter.disable_transactions() %}
-        {% do adapter.commit() %}
-      {% endif %}
-    {%- endif -%}
-    
-    {# Set up identifier fields if unique_key is provided (for upsert support) #}
-    {%- if unique_key -%}
-      {{ log("Setting up Iceberg identifier fields for upsert support", info=True) }}
-      {%- set identifier_setup = adapter.setup_s3_tables_identifier_fields(target_relation, unique_key) -%}
-      {%- if not identifier_setup -%}
-        {{ exceptions.raise_compiler_error("Failed to set up identifier fields") }}
       {%- endif -%}
       {# Commit transaction to force DuckDB to refresh Iceberg metadata #}
       {% if not adapter.disable_transactions() %}

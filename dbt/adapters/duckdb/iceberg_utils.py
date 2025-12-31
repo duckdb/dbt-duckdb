@@ -320,79 +320,6 @@ def update_iceberg_partitioning(
     return True
 
 
-def setup_iceberg_identifier_fields(
-    catalog_config: Dict[str, Any],
-    table_identifier: str,
-    unique_key: Union[str, List[str]]
-) -> bool:
-    """
-    Set up identifier fields for an Iceberg table (for upsert support)
-    
-    This should be called after table creation to enable upsert operations.
-    Identifier fields are the primary key columns used for row-level updates.
-    
-    Args:
-        catalog_config: PyIceberg catalog configuration
-        table_identifier: Full table identifier (namespace.table_name)
-        unique_key: Column(s) to use as identifier fields (primary key)
-    
-    Returns:
-        True if successful
-    
-    Raises:
-        Exception if setup fails
-    """
-    try:
-        from pyiceberg.catalog import load_catalog
-        
-        logger.info(f"Setting up identifier fields for {table_identifier}")
-        
-        # Load table
-        catalog = load_catalog('s3_tables', **catalog_config)
-        table = catalog.load_table(table_identifier)
-        schema = table.schema()
-        
-        # Check if already set
-        if schema.identifier_field_ids:
-            logger.info(f"Identifier fields already set: {schema.identifier_field_ids}")
-            return True
-        
-        # Convert unique_key to list
-        if isinstance(unique_key, str):
-            unique_key_cols = [unique_key]
-        else:
-            unique_key_cols = unique_key
-        
-        # Create case-insensitive mapping of Iceberg schema columns
-        schema_column_map = {field.name.lower(): field.name for field in schema.fields}
-        logger.info(f"Iceberg schema columns: {list(schema_column_map.values())}")
-        
-        # Map unique key columns to actual Iceberg schema column names
-        schema_column_names = []
-        for col in unique_key_cols:
-            col_lower = col.lower()
-            if col_lower not in schema_column_map:
-                available_cols = ', '.join(schema_column_map.values())
-                raise ValueError(
-                    f"Column '{col}' not found in table schema. "
-                    f"Available columns: {available_cols}"
-                )
-            schema_column_names.append(schema_column_map[col_lower])
-        
-        logger.info(f"Setting identifier fields to: {schema_column_names}")
-        
-        # Set identifier fields
-        with table.update_schema() as update:
-            update.set_identifier_fields(*schema_column_names)
-        
-        logger.info(f"Successfully set identifier fields for {table_identifier}")
-        return True
-        
-    except Exception as e:
-        logger.error(f"Failed to set up identifier fields for {table_identifier}: {e}")
-        raise
-
-
 def pyiceberg_incremental_write(
     catalog_config: Dict[str, Any],
     table_identifier: str,
@@ -401,38 +328,40 @@ def pyiceberg_incremental_write(
     duckdb_connection
 ) -> Dict[str, int]:
     """
-    Perform incremental write using PyIceberg UPSERT
+    Perform incremental write using PyIceberg DELETE + INSERT pattern
     
     This is used for partitioned tables where DuckDB's INSERT/DELETE don't work.
-    PyIceberg's upsert method handles row-level updates efficiently, even across partitions.
+    Uses PyIceberg's delete() and append() methods to handle row-level updates
+    efficiently, even across partitions.
     
-    Note: The table must be created with identifier_field_ids in the schema,
-    which maps to the unique_key configuration.
+    This approach does NOT require identifier fields or NOT NULL constraints,
+    making it compatible with tables created via DuckDB's CREATE TABLE AS SELECT.
     
     Args:
         catalog_config: PyIceberg catalog configuration
         table_identifier: Full table identifier (namespace.table_name)
         new_data_query: SQL query to get new data from DuckDB
-        unique_key: Column(s) to use for upsert matching
+        unique_key: Column(s) to use for matching rows to delete
         duckdb_connection: DuckDB connection object
     
     Returns:
-        Dict with 'rows_updated' and 'rows_inserted' counts
+        Dict with 'rows_deleted' and 'rows_inserted' counts
     
     Raises:
         Exception if write fails
     """
     try:
         from pyiceberg.catalog import load_catalog
+        from pyiceberg.expressions import In
         
-        logger.info(f"Starting PyIceberg upsert for {table_identifier}")
+        logger.info(f"Starting PyIceberg DELETE + INSERT for {table_identifier}")
         
         # Step 1: Load table
         catalog = load_catalog('s3_tables', **catalog_config)
         table = catalog.load_table(table_identifier)
+        schema = table.schema()
         
         # Step 2: Read new data from DuckDB into PyArrow
-        # The connection is a DuckDBConnectionWrapper, we need to get the cursor
         logger.info(f"Reading new data from DuckDB: {new_data_query}")
         cursor = duckdb_connection.cursor()
         result = cursor.execute(new_data_query)
@@ -444,7 +373,7 @@ def pyiceberg_incremental_write(
         
         if new_data_arrow.num_rows == 0:
             logger.info("No new data to write")
-            return {'rows_updated': 0, 'rows_inserted': 0}
+            return {'rows_deleted': 0, 'rows_inserted': 0}
         
         # Step 3: Validate unique_key columns exist in data (case-insensitive)
         if isinstance(unique_key, str):
@@ -472,73 +401,95 @@ def pyiceberg_incremental_write(
         
         logger.info(f"Matched PyArrow unique key columns: {actual_arrow_unique_key_cols}")
         
-        # Step 4: Set identifier fields if not already set
-        # PyIceberg upsert requires identifier_field_ids in the table schema
-        schema = table.schema()
+        # Step 4: Map unique key columns to Iceberg schema (case-insensitive)
+        schema_column_map = {field.name.lower(): field.name for field in schema.fields}
+        logger.info(f"Iceberg schema columns: {list(schema_column_map.values())}")
         
-        # Check if identifier fields are already set
-        if not schema.identifier_field_ids:
-            logger.info("Table does not have identifier_field_ids set, updating schema...")
+        # Get actual Iceberg schema column names for unique key
+        iceberg_unique_key_cols = []
+        for col_name in actual_arrow_unique_key_cols:
+            col_lower = col_name.lower()
+            if col_lower not in schema_column_map:
+                available_cols = ', '.join(schema_column_map.values())
+                raise ValueError(
+                    f"Column '{col_name}' not found in table schema. "
+                    f"Available columns: {available_cols}"
+                )
+            iceberg_unique_key_cols.append(schema_column_map[col_lower])
+        
+        logger.info(f"Mapped to Iceberg schema columns: {iceberg_unique_key_cols}")
+        
+        # Step 5: Extract unique key values from new data
+        # For single column unique key
+        if len(actual_arrow_unique_key_cols) == 1:
+            unique_key_col = actual_arrow_unique_key_cols[0]
+            iceberg_col = iceberg_unique_key_cols[0]
             
-            # Create case-insensitive mapping of Iceberg schema columns
-            schema_column_map = {field.name.lower(): field.name for field in schema.fields}
-            schema_field_map = {field.name.lower(): field for field in schema.fields}
-            logger.info(f"Iceberg schema columns: {list(schema_column_map.values())}")
+            # Get unique values from PyArrow table
+            unique_values = new_data_arrow.column(unique_key_col).to_pylist()
+            unique_values = list(set(unique_values))  # Deduplicate
             
-            # Map unique key columns to actual Iceberg schema column names and get field IDs
-            schema_column_names = []
-            identifier_field_ids = []
+            logger.info(f"Deleting {len(unique_values)} unique values from column '{iceberg_col}'")
             
-            for col_name in actual_arrow_unique_key_cols:
-                col_lower = col_name.lower()
-                if col_lower not in schema_column_map:
-                    available_cols = ', '.join(schema_column_map.values())
-                    raise ValueError(
-                        f"Column '{col_name}' not found in table schema. "
-                        f"Available columns: {available_cols}"
-                    )
-                # Use the actual Iceberg schema column name (case-sensitive)
-                actual_schema_col_name = schema_column_map[col_lower]
-                schema_column_names.append(actual_schema_col_name)
-                
-                # Get the field ID
-                field = schema_field_map[col_lower]
-                identifier_field_ids.append(field.field_id)
-                
-                logger.info(f"Identifier field: {actual_schema_col_name} (field_id={field.field_id}, required={field.required})")
-            
-            logger.info(f"Setting identifier fields to: {schema_column_names} with IDs: {identifier_field_ids}")
-            
-            # Set identifier fields using actual schema column names
-            with table.update_schema() as update:
-                update.set_identifier_fields(*schema_column_names)
-            
-            # Reload table to get updated schema
-            # This is a fast metadata operation, not a data scan
-            table = catalog.load_table(table_identifier)
-            logger.info("Identifier fields set successfully")
+            # Step 6: Delete existing rows with matching unique key values
+            # Use PyIceberg's In expression for efficient filtering
+            delete_result = table.delete(In(iceberg_col, unique_values))
+            rows_deleted = getattr(delete_result, 'deleted_rows', 0)
+            logger.info(f"Deleted {rows_deleted} existing rows")
         else:
-            logger.info(f"Table already has identifier_field_ids: {schema.identifier_field_ids}")
+            # For composite unique keys, we need to delete based on each combination
+            # This is less efficient but necessary for multi-column keys
+            logger.warning(f"Composite unique key detected: {iceberg_unique_key_cols}")
+            logger.warning("Using row-by-row deletion which may be slower for large datasets")
+            
+            # Build list of unique key combinations
+            unique_combinations = set()
+            for i in range(new_data_arrow.num_rows):
+                key_tuple = tuple(
+                    new_data_arrow.column(col)[i].as_py()
+                    for col in actual_arrow_unique_key_cols
+                )
+                unique_combinations.add(key_tuple)
+            
+            logger.info(f"Deleting {len(unique_combinations)} unique key combinations")
+            
+            # Delete rows matching any combination
+            # For composite keys, we need to use AND conditions
+            # This is a simplified approach - for production, consider batching
+            rows_deleted = 0
+            for key_combo in unique_combinations:
+                # Build filter expression: col1 == val1 AND col2 == val2 AND ...
+                from pyiceberg.expressions import EqualTo, And
+                
+                filters = []
+                for col_name, value in zip(iceberg_unique_key_cols, key_combo):
+                    filters.append(EqualTo(col_name, value))
+                
+                # Combine filters with AND
+                if len(filters) == 1:
+                    filter_expr = filters[0]
+                else:
+                    filter_expr = filters[0]
+                    for f in filters[1:]:
+                        filter_expr = And(filter_expr, f)
+                
+                delete_result = table.delete(filter_expr)
+                rows_deleted += getattr(delete_result, 'deleted_rows', 0)
+            
+            logger.info(f"Deleted {rows_deleted} existing rows")
         
-        # Step 5: Perform upsert
-        # PyIceberg's upsert method automatically:
-        # - Updates existing rows based on identifier_field_ids (unique_key)
-        # - Inserts new rows that don't match existing identifiers
-        # - Handles cross-partition lookups efficiently
-        logger.info(f"Performing upsert with unique_key columns: {actual_arrow_unique_key_cols}")
-        result = table.upsert(new_data_arrow)
+        # Step 7: Insert new data
+        logger.info(f"Inserting {new_data_arrow.num_rows} new rows")
+        append_result = table.append(new_data_arrow)
+        rows_inserted = new_data_arrow.num_rows
         
-        # Extract results
-        rows_updated = getattr(result, 'rows_updated', 0)
-        rows_inserted = getattr(result, 'rows_inserted', 0)
-        
-        logger.info(f"Upsert complete: {rows_updated} updated, {rows_inserted} inserted")
+        logger.info(f"DELETE + INSERT complete: {rows_deleted} deleted, {rows_inserted} inserted")
         
         return {
-            'rows_updated': rows_updated,
+            'rows_deleted': rows_deleted,
             'rows_inserted': rows_inserted
         }
         
     except Exception as e:
-        logger.error(f"Failed to perform PyIceberg upsert: {e}")
+        logger.error(f"Failed to perform PyIceberg DELETE + INSERT: {e}")
         raise

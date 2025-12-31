@@ -300,69 +300,26 @@ class DuckDBAdapter(SQLAdapter):
             raise
     
     @available
-    def setup_s3_tables_identifier_fields(
-        self,
-        relation,
-        unique_key
-    ) -> bool:
-        """
-        Set up identifier fields for S3 Tables (for upsert support)
-        
-        This should be called after table creation to enable upsert operations.
-        
-        Args:
-            relation: dbt relation object
-            unique_key: Column(s) to use as identifier fields (primary key)
-        
-        Returns:
-            True if successful
-        
-        Raises:
-            Exception if setup fails
-        """
-        from dbt.adapters.duckdb.iceberg_utils import setup_iceberg_identifier_fields
-        
-        catalog_config = self.get_s3_tables_catalog_config(relation.database)
-        if not catalog_config:
-            raise DbtRuntimeError(
-                f"Could not get PyIceberg catalog config for database '{relation.database}'. "
-                f"Ensure it's configured as an S3 Tables catalog with endpoint_type='s3_tables'."
-            )
-        
-        table_identifier = f"{relation.schema}.{relation.identifier}"
-        
-        logger.info(f"Setting up identifier fields for {table_identifier}")
-        logger.info(f"  Unique key: {unique_key}")
-        
-        try:
-            return setup_iceberg_identifier_fields(
-                catalog_config=catalog_config,
-                table_identifier=table_identifier,
-                unique_key=unique_key
-            )
-        except Exception as e:
-            logger.error(f"Failed to set up identifier fields: {e}")
-            raise
-    
-    @available
     def pyiceberg_incremental_write(self, relation, temp_relation, unique_key):
         """
-        Wrapper to call PyIceberg upsert for partitioned tables
+        Wrapper to call PyIceberg DELETE + INSERT for partitioned tables
         
         This method is used when DuckDB's native INSERT/DELETE operations
-        don't work on partitioned Iceberg tables. PyIceberg's upsert handles
-        row-level updates efficiently across partitions.
+        don't work on partitioned Iceberg tables. Uses PyIceberg's delete()
+        and append() methods to handle row-level updates efficiently across partitions.
+        
+        This approach does NOT require identifier fields or NOT NULL constraints.
         
         Args:
             relation: Target relation (partitioned Iceberg table)
             temp_relation: Temporary relation with new data
-            unique_key: Column(s) to use for upsert matching
+            unique_key: Column(s) to use for matching rows to delete
         
         Returns:
-            Dict with 'rows_updated' and 'rows_inserted' counts
+            Dict with 'rows_deleted' and 'rows_inserted' counts
         
         Raises:
-            Exception if upsert fails
+            Exception if write fails
         """
         from dbt.adapters.duckdb.iceberg_utils import pyiceberg_incremental_write
         
@@ -376,7 +333,7 @@ class DuckDBAdapter(SQLAdapter):
         table_identifier = f"{relation.schema}.{relation.identifier}"
         new_data_query = f"SELECT * FROM {temp_relation}"
         
-        logger.info(f"DuckDB adapter: Starting PyIceberg upsert for {table_identifier}")
+        logger.info(f"DuckDB adapter: Starting PyIceberg DELETE + INSERT for {table_identifier}")
         
         try:
             return pyiceberg_incremental_write(
@@ -387,8 +344,8 @@ class DuckDBAdapter(SQLAdapter):
                 duckdb_connection=self.connections.get_thread_connection().handle
             )
         except Exception as e:
-            logger.error(f"DuckDB adapter: PyIceberg upsert failed: {e}")
-            raise DbtRuntimeError(f"PyIceberg upsert failed: {e}")
+            logger.error(f"DuckDB adapter: PyIceberg DELETE + INSERT failed: {e}")
+            raise DbtRuntimeError(f"PyIceberg DELETE + INSERT failed: {e}")
 
     @available
     def convert_datetimes_to_strs(self, table: "agate.Table") -> "agate.Table":
