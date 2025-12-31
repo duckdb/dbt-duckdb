@@ -359,8 +359,10 @@ def pyiceberg_incremental_write(
         table = catalog.load_table(table_identifier)
         
         # Step 2: Read new data from DuckDB into PyArrow
+        # The connection is a DuckDBConnectionWrapper, we need to get the cursor
         logger.info(f"Reading new data from DuckDB: {new_data_query}")
-        new_data_arrow = duckdb_connection.execute(new_data_query).arrow()
+        cursor = duckdb_connection.cursor()
+        new_data_arrow = cursor.execute(new_data_query).arrow()
         logger.info(f"Read {new_data_arrow.num_rows} rows from DuckDB")
         
         if new_data_arrow.num_rows == 0:
