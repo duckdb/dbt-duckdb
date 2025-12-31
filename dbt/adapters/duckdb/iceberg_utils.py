@@ -373,22 +373,33 @@ def pyiceberg_incremental_write(
             logger.info("No new data to write")
             return {'rows_updated': 0, 'rows_inserted': 0}
         
-        # Step 3: Validate unique_key columns exist in data
+        # Step 3: Validate unique_key columns exist in data (case-insensitive)
         if isinstance(unique_key, str):
             unique_key_cols = [unique_key]
         else:
             unique_key_cols = unique_key
         
+        # Create a case-insensitive mapping of column names
+        column_name_map = {col.lower(): col for col in new_data_arrow.column_names}
+        
+        # Validate and get actual column names
+        actual_unique_key_cols = []
         for col in unique_key_cols:
-            if col not in new_data_arrow.column_names:
-                raise ValueError(f"Unique key column '{col}' not found in new data")
+            col_lower = col.lower()
+            if col_lower not in column_name_map:
+                available_cols = ', '.join(new_data_arrow.column_names)
+                raise ValueError(
+                    f"Unique key column '{col}' not found in new data. "
+                    f"Available columns: {available_cols}"
+                )
+            actual_unique_key_cols.append(column_name_map[col_lower])
         
         # Step 4: Perform upsert
         # PyIceberg's upsert method automatically:
         # - Updates existing rows based on identifier_field_ids (unique_key)
         # - Inserts new rows that don't match existing identifiers
         # - Handles cross-partition lookups efficiently
-        logger.info(f"Performing upsert with unique_key: {unique_key_cols}")
+        logger.info(f"Performing upsert with unique_key: {actual_unique_key_cols}")
         result = table.upsert(new_data_arrow)
         
         # Extract results
