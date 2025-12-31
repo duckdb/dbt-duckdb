@@ -11,6 +11,7 @@ CHANGES
   - Integrate PyIceberg for automatic schema evolution via dbt.adapters.duckdb.iceberg_utils
   - Schema evolution: automatically add new columns, preserve removed columns with NULL values
   - Support iceberg_properties configuration using set_iceberg_table_properties() function (DuckDB 1.4.2+)
+  - Support partition_by configuration for Iceberg table partitioning (single or multiple partition keys with transforms)
   - Support watermark_column for deduplication in incremental models
   - Use DESCRIBE instead of information_schema for Iceberg metadata queries
   - Add transaction commits after DROP and schema evolution for metadata refresh

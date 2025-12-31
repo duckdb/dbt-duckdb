@@ -47,11 +47,19 @@
       {% endif %}
     {% endif %}
     
-    {# Build CREATE TABLE statement #}
+    {# Build CREATE TABLE statement with optional partitioning #}
+    {%- set partition_by = config.get('partition_by') -%}
     {% call statement('main', language=language) -%}
       CREATE TABLE {{ target_relation }} AS (
         {{ compiled_code }}
       )
+      {%- if partition_by -%}
+        {%- if partition_by is string %}
+      PARTITION BY ({{ partition_by }})
+        {%- elif partition_by is sequence and partition_by is not mapping %}
+      PARTITION BY ({{ partition_by | join(', ') }})
+        {%- endif -%}
+      {%- endif %}
     {%- endcall %}
     
     {# Set Iceberg table properties if provided (DuckDB 1.4.2+) #}
