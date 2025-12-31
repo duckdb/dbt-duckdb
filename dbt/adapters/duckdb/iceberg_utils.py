@@ -403,19 +403,33 @@ def pyiceberg_incremental_write(
             logger.info("Table does not have identifier_field_ids set, updating schema...")
             
             # Get field IDs for unique key columns
+            # We need to use the actual column names from the table schema (case-sensitive)
             identifier_field_ids = []
+            schema_column_names = []
+            
             for col_name in actual_unique_key_cols:
-                field = schema.find_field(col_name)
+                # Find the field in the schema (case-insensitive search)
+                field = None
+                for schema_field in schema.fields:
+                    if schema_field.name.lower() == col_name.lower():
+                        field = schema_field
+                        break
+                
                 if field:
                     identifier_field_ids.append(field.field_id)
+                    schema_column_names.append(field.name)  # Use actual schema column name
                 else:
-                    raise ValueError(f"Column '{col_name}' not found in table schema")
+                    available_cols = ', '.join([f.name for f in schema.fields])
+                    raise ValueError(
+                        f"Column '{col_name}' not found in table schema. "
+                        f"Available columns: {available_cols}"
+                    )
             
-            logger.info(f"Setting identifier field IDs: {identifier_field_ids} for columns: {actual_unique_key_cols}")
+            logger.info(f"Setting identifier field IDs: {identifier_field_ids} for columns: {schema_column_names}")
             
-            # Update the schema to set identifier fields
+            # Update the schema to set identifier fields using actual schema column names
             with table.update_schema() as update:
-                update.set_identifier_fields(*actual_unique_key_cols)
+                update.set_identifier_fields(*schema_column_names)
             
             # Reload table to get updated schema
             table = catalog.load_table(table_identifier)
