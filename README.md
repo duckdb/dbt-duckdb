@@ -419,6 +419,133 @@ WHERE updated_at > (SELECT MAX(updated_at) FROM {{ this }})
 {% endif %}
 ```
 
+##### S3 Tables Configuration Reference
+
+The following table lists all configuration parameters available for S3 Tables (Iceberg) models:
+
+| Parameter | Type | Applies To | Required | Default | Description | Example |
+|-----------|------|------------|----------|---------|-------------|---------|
+| `database` | string | Both | **Yes** | - | The alias of the attached S3 Tables catalog | `database='s3_tables'` |
+| `materialized` | string | Both | **Yes** | - | Materialization strategy: `table` or `incremental` | `materialized='incremental'` |
+| `unique_key` | string/list | Incremental | **Yes** (incremental) | - | Column(s) used to identify records for DELETE + INSERT operations | `unique_key='customer_id'` or `unique_key=['id', 'date']` |
+| `watermark_column` | string | Incremental | No | - | Column for deduplication (keeps latest record per unique_key based on this column) | `watermark_column='updated_at'` |
+| `precombine_column` | string | Incremental | No | - | Alias for `watermark_column` (same functionality) | `precombine_column='modified_at'` |
+| `partition_by` | string/list | Both | No | - | Partition specification(s). Supports: identity (`'country'`), day (`'day(order_date)'`), month (`'month(order_date)'`), year (`'year(order_date)'`), hour (`'hour(timestamp_col)'`). **Note:** bucket and truncate transforms are not supported by AWS S3 Tables API | `partition_by='country'` or `partition_by=['year(order_date)', 'country']` |
+| `iceberg_properties` | dict | Both | No | `{}` | Iceberg table properties to set (e.g., compression, format settings) | `iceberg_properties={'write.format.default': 'parquet', 'write.parquet.compression-codec': 'snappy'}` |
+| `use_pyiceberg_writes` | boolean | Incremental | No | `false` | Force use of PyIceberg for DELETE + INSERT (automatically enabled when `partition_by` is set) | `use_pyiceberg_writes=true` |
+| `on_schema_change` | string | Incremental | No | `'ignore'` | Not applicable to S3 Tables (schema evolution is automatic) | - |
+
+**Common Parameters (Both Table and Incremental):**
+- `database`: Must reference an attached S3 Tables catalog
+- `partition_by`: Defines how data is partitioned in S3
+- `iceberg_properties`: Sets Iceberg-specific table properties
+
+**Table Materialization Only:**
+- Uses DROP + CREATE pattern for full refresh
+- All configuration applied during table creation
+
+**Incremental Materialization Only:**
+- `unique_key`: Required for identifying which rows to update
+- `watermark_column`/`precombine_column`: Optional deduplication based on timestamp or version column
+- `use_pyiceberg_writes`: Automatically enabled for partitioned tables (DuckDB limitation)
+
+**Configuration Examples:**
+
+**Example 1: Simple Table with Partitioning**
+```sql
+{{
+  config(
+    materialized='table',
+    database='s3_tables',
+    partition_by='country'
+  )
+}}
+
+SELECT 
+  customer_id,
+  name,
+  country,
+  created_at
+FROM source_table
+```
+
+**Example 2: Incremental with Watermark and Multiple Partitions**
+```sql
+{{
+  config(
+    materialized='incremental',
+    database='s3_tables',
+    unique_key='customer_id',
+    watermark_column='updated_at',
+    partition_by=['year(order_date)', 'country']
+  )
+}}
+
+SELECT 
+  customer_id,
+  order_date,
+  country,
+  amount,
+  updated_at
+FROM orders
+{% if is_incremental() %}
+WHERE updated_at > (SELECT MAX(updated_at) FROM {{ this }})
+{% endif %}
+```
+
+**Example 3: Table with Iceberg Properties**
+```sql
+{{
+  config(
+    materialized='table',
+    database='s3_tables',
+    partition_by='day(event_timestamp)',
+    iceberg_properties={
+      'write.format.default': 'parquet',
+      'write.parquet.compression-codec': 'snappy',
+      'write.metadata.compression-codec': 'gzip'
+    }
+  )
+}}
+
+SELECT * FROM events
+```
+
+**Example 4: Incremental with Composite Unique Key**
+```sql
+{{
+  config(
+    materialized='incremental',
+    database='s3_tables',
+    unique_key=['user_id', 'event_date'],
+    watermark_column='event_timestamp',
+    partition_by='month(event_date)'
+  )
+}}
+
+SELECT 
+  user_id,
+  event_date,
+  event_type,
+  event_timestamp
+FROM user_events
+{% if is_incremental() %}
+WHERE event_timestamp > (SELECT MAX(event_timestamp) FROM {{ this }})
+{% endif %}
+```
+
+**Partition Transform Reference:**
+
+| Transform | Syntax | Description | Example |
+|-----------|--------|-------------|---------|
+| Identity | `'column_name'` | Partition by exact column value | `partition_by='country'` |
+| Day | `'day(date_column)'` | Partition by day (YYYY-MM-DD) | `partition_by='day(order_date)'` |
+| Month | `'month(date_column)'` | Partition by month (YYYY-MM) | `partition_by='month(order_date)'` |
+| Year | `'year(date_column)'` | Partition by year (YYYY) | `partition_by='year(order_date)'` |
+| Hour | `'hour(timestamp_column)'` | Partition by hour (YYYY-MM-DD-HH) | `partition_by='hour(event_timestamp)'` |
+
+**Note:** Multiple partitions can be specified as a list: `partition_by=['year(order_date)', 'country', 'region']`
+
 For more details on S3 Tables, see the [AWS S3 Tables documentation](https://docs.aws.amazon.com/AmazonS3/latest/userguide/s3-tables.html).
 
 #### Configuring dbt-duckdb Plugins
