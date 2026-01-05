@@ -9,6 +9,7 @@ from dbt.tests.adapter.incremental.test_incremental_on_schema_change import (
     BaseIncrementalOnSchemaChangeSetup
 )
 from dbt.artifacts.schemas.results import RunStatus
+from dbt.exceptions import ParsingError
 from dbt.tests.util import run_dbt, check_relations_equal, relation_from_name
 import pytest
 
@@ -21,6 +22,35 @@ except ImportError:
     # Microbatch tests not available in older dbt versions
     BaseMicrobatch = None
     MICROBATCH_AVAILABLE = False
+
+
+# ---------------------------
+# Microbatch validation models
+# ---------------------------
+microbatch_missing_event_time = """
+{{ config(materialized='incremental', incremental_strategy='microbatch') }}
+
+select 1 as id, '2020-01-01 00:00:00'::timestamp as event_time
+"""
+
+microbatch_missing_batch_context = """
+{{ config(materialized='incremental', incremental_strategy='microbatch', event_time='event_time') }}
+
+select 1 as id, '2020-01-01 00:00:00'::timestamp as event_time
+"""
+
+microbatch_unique_key_not_supported = """
+{{ config(
+    materialized='incremental',
+    incremental_strategy='microbatch',
+    unique_key='id',
+    event_time='event_time',
+    begin='2026-01-01',
+    batch_size='day'
+) }}
+
+select 1 as id, '2020-01-01 00:00:00'::timestamp as event_time
+"""
 
 class doUniqueKey(BaseIncrementalUniqueKey):
     def test__bad_unique_key_list(self, project):
@@ -166,6 +196,13 @@ class TestMicrobatch(BaseMicrobatch):
     """
 
     @pytest.fixture(scope="class")
+    def microbatch_model_sql(self) -> str:
+        return """
+{{ config(materialized='incremental', incremental_strategy='microbatch', event_time='event_time', batch_size='day', begin=modules.datetime.datetime(2020, 1, 1, 0, 0, 0)) }}
+select * from {{ ref('input_model') }}
+"""
+
+    @pytest.fixture(scope="class")
     def input_model_sql(self) -> str:
         """Override input model to use DuckDB-compatible timestamp format.
 
@@ -192,6 +229,58 @@ select 3 as id, '2020-01-03 00:00:00'::timestamp as event_time
             database=project.database, schema=project.test_schema
         )
         return f"insert into {test_schema_relation}.input_model (id, event_time) values (4, '2020-01-04 00:00:00'::timestamp), (5, '2020-01-05 00:00:00'::timestamp)"
+
+
+@pytest.mark.skipif(not MICROBATCH_AVAILABLE, reason="Microbatch tests require dbt-core >= 1.9")
+class TestMicrobatchValidationMissingEventTime:
+    @pytest.fixture(scope="class")
+    def models(self):
+        return {
+            "microbatch_missing_event_time.sql": microbatch_missing_event_time,
+        }
+
+    def test_missing_event_time_config(self, project):
+        with pytest.raises(ParsingError) as excinfo:
+            run_dbt(
+                ["run", "--select", "microbatch_missing_event_time"], expect_pass=False
+            )
+
+        assert "must provide an 'event_time'" in str(excinfo.value)
+
+
+@pytest.mark.skipif(not MICROBATCH_AVAILABLE, reason="Microbatch tests require dbt-core >= 1.9")
+class TestMicrobatchValidationMissingBatchContext:
+    @pytest.fixture(scope="class")
+    def models(self):
+        return {
+            "microbatch_missing_batch_context.sql": microbatch_missing_batch_context,
+        }
+
+    def test_missing_batch_context(self, project):
+        with pytest.raises(ParsingError) as excinfo:
+            run_dbt(
+                ["run", "--select", "microbatch_missing_batch_context"], expect_pass=False
+            )
+
+        assert "must provide a 'begin'" in str(excinfo.value)
+
+
+@pytest.mark.skipif(not MICROBATCH_AVAILABLE, reason="Microbatch tests require dbt-core >= 1.9")
+class TestMicrobatchUniqueKeyNotSupported:
+    @pytest.fixture(scope="class")
+    def models(self):
+        return {
+            "microbatch_unique_key_not_supported.sql": microbatch_unique_key_not_supported,
+        }
+
+    def test_unique_key_not_supported(self, project, capsys):
+        # Compilation should fail fast with a clear message.
+        run_dbt(
+            ["run", "--select", "microbatch_unique_key_not_supported"],
+            expect_pass=False,
+        )
+        captured = capsys.readouterr()
+        assert "does not support 'unique_key'" in (captured.out + captured.err)
 
 
 # Test models for merge strategy testing
@@ -475,6 +564,34 @@ _merge_invalid_clause_element = """
 SELECT 1 AS id, 'Alice' AS name, 25 AS age, 'Engineer' AS job
 """
 
+_merge_invalid_incremental_predicates = """
+{{ config(
+    materialized='incremental',
+    incremental_strategy='merge',
+    unique_key='id',
+    incremental_predicates={'bad': 'dict'}
+) }}
+
+SELECT 1 AS id, 'Alice' AS name, 25 AS age, 'Engineer' AS job
+"""
+
+_merge_composite_incremental_predicates = """
+{{ config(
+    materialized='incremental',
+    incremental_strategy='merge',
+    unique_key=['id', 'category'],
+    incremental_predicates=["DBT_INTERNAL_SOURCE.category = 'A'"]
+) }}
+
+{% if is_incremental() %}
+SELECT 1 AS id, 'A' AS category, 'new_a' AS val
+{% else %}
+SELECT 1 AS id, 'A' AS category, 'old_a' AS val
+UNION ALL
+SELECT 2 AS id, 'B' AS category, 'old_b' AS val
+{% endif %}
+"""
+
 # DuckLake restriction test models
 _merge_ducklake_multiple_updates = """
 {{ config(
@@ -547,6 +664,7 @@ class TestIncrementalMerge:
             "merge_with_set_expressions.sql": _merge_with_set_expressions,
             "merge_with_returning.sql": _merge_with_returning,
             "merge_custom_clauses.sql": _merge_custom_clauses,
+            "merge_composite_incremental_predicates.sql": _merge_composite_incremental_predicates,
         }
 
     def test_merge_debug(self, project):
@@ -650,6 +768,19 @@ class TestIncrementalMerge:
         bob = project.run_sql(f"SELECT COUNT(*) as count FROM {relation} WHERE id = 2", fetch="one")
         assert bob[0] == 1
 
+    def test_merge_composite_incremental_predicates(self, project):
+        """Composite unique_key merges keep unrelated rows untouched when predicates are present"""
+        run_dbt(["run", "--select", "merge_composite_incremental_predicates"], expect_pass=True)
+        run_dbt(["run", "--select", "merge_composite_incremental_predicates"], expect_pass=True)
+
+        relation = relation_from_name(project.adapter, "merge_composite_incremental_predicates")
+        rows = project.run_sql(
+            f"SELECT id, category, val FROM {relation} ORDER BY category",
+            fetch="all",
+        )
+
+        assert rows == [(1, "A", "new_a"), (2, "B", "old_b")]
+
 
 class TestIncrementalMergeValidation:
     """Test class for DuckDB merge configuration validation"""
@@ -668,6 +799,7 @@ class TestIncrementalMergeValidation:
             "merge_ducklake_multiple_updates.sql": _merge_ducklake_multiple_updates,
             "merge_ducklake_update_delete.sql": _merge_ducklake_update_delete,
             "merge_ducklake_valid_single_update.sql": _merge_ducklake_valid_single_update,
+            "merge_invalid_incremental_predicates.sql": _merge_invalid_incremental_predicates,
         }
 
     def test_invalid_condition_type(self, project):
@@ -720,6 +852,16 @@ class TestIncrementalMergeValidation:
         run_dbt(["run", "--select", "merge_invalid_clause_element"], expect_pass=True)
         result = run_dbt(["run", "--select", "merge_invalid_clause_element"], expect_pass=False)
         assert "elements must be dictionaries, found: not_a_dict" in str(result.results[0].message)
+
+    def test_invalid_incremental_predicates_type(self, project):
+        """Test validation fails for invalid incremental_predicates types"""
+        run_dbt(["run", "--select", "merge_invalid_incremental_predicates"], expect_pass=True)
+        result = run_dbt(
+            ["run", "--select", "merge_invalid_incremental_predicates"], expect_pass=False
+        )
+        assert "incremental_predicates must be a list of strings or a string" in str(
+            result.results[0].message
+        )
 
     # NOTE: The following DuckLake tests require a DuckLake attachment to be active
     # They will only trigger validation errors when the target relation is in a ducklake database

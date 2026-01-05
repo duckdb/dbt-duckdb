@@ -27,6 +27,8 @@
 {%- macro validate_incremental_predicates(incremental_predicates) -%}
   {%- if incremental_predicates is none -%}
         {%- set incremental_predicates = [] -%}
+  {%- elif incremental_predicates is mapping -%}
+    {{ exceptions.raise_compiler_error("incremental_predicates must be a list of strings or a string") }}
     {%- elif incremental_predicates is string -%}
         {%- set incremental_predicates = [incremental_predicates] -%}
     {%- elif incremental_predicates is sequence -%}

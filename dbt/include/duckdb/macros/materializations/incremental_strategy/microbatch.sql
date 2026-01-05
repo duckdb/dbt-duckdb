@@ -5,6 +5,12 @@
         {{ exceptions.raise_compiler_error("microbatch incremental strategy requires an 'event_time' model config") }}
     {%- endif -%}
 
+    {# microbatch is implemented as delete+insert on event_time; unique_key is ignored and misleading #}
+    {%- set unique_key = config.get('unique_key') -%}
+    {%- if unique_key -%}
+        {{ exceptions.raise_compiler_error("microbatch incremental strategy does not support 'unique_key'. Microbatch runs delete+insert per batch based on 'event_time' and does not do key-based upserts. Remove 'unique_key' or use incremental_strategy='merge'.") }}
+    {%- endif -%}
+
     {# Extract batch context - dbt sets these per batch run based on lookback window #}
     {%- set batch_ctx = model.get('batch') -%}
     {%- set batch_start = batch_ctx.get('event_time_start') if batch_ctx else none -%}
