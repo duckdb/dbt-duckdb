@@ -98,12 +98,14 @@ class DuckDBConnectionManager(SQLConnectionManager):
         except RuntimeError as e:
             logger.debug("duckdb error: {}".format(str(e)))
             logger.debug("Error running SQL: {}".format(sql))
-            # Preserve original RuntimeError with full context instead of swallowing
+            logger.debug("Rolling back transaction.")
+            self.rollback_if_open()
             raise dbt.exceptions.DbtRuntimeError(str(e)) from e
         except Exception as exc:
             logger.debug("duckdb error: {}".format(str(exc)))
             logger.debug("Error running SQL: {}".format(sql))
             logger.debug("Rolling back transaction.")
+            self.rollback_if_open()
             raise dbt.exceptions.DbtRuntimeError(str(exc)) from exc
 
     @classmethod
