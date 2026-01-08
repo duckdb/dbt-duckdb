@@ -24,7 +24,7 @@
     {%- set target = arg_dict["target_relation"] -%}
     {%- set source = arg_dict["temp_relation"] -%}
     {%- set dest_columns = arg_dict["dest_columns"] -%}
-    {%- set incremental_predicates = validate_incremental_predicates(arg_dict.get("incremental_predicates")) -%}
+    {%- set incremental_predicates = normalize_incremental_predicates(arg_dict.get("incremental_predicates")) -%}
     {%- set dest_cols_csv = get_quoted_csv(dest_columns | map(attribute="name")) -%}
 
     {# Build the batch time filter predicate #}

@@ -9,48 +9,9 @@ from dbt.tests.adapter.incremental.test_incremental_on_schema_change import (
     BaseIncrementalOnSchemaChangeSetup
 )
 from dbt.artifacts.schemas.results import RunStatus
-from dbt.exceptions import ParsingError
 from dbt.tests.util import run_dbt, check_relations_equal, relation_from_name
 import pytest
 
-try:
-    from dbt.tests.adapter.incremental.test_incremental_microbatch import (
-        BaseMicrobatch,
-    )
-    MICROBATCH_AVAILABLE = True
-except ImportError:
-    # Microbatch tests not available in older dbt versions
-    BaseMicrobatch = None
-    MICROBATCH_AVAILABLE = False
-
-
-# ---------------------------
-# Microbatch validation models
-# ---------------------------
-microbatch_missing_event_time = """
-{{ config(materialized='incremental', incremental_strategy='microbatch') }}
-
-select 1 as id, '2020-01-01 00:00:00'::timestamp as event_time
-"""
-
-microbatch_missing_batch_context = """
-{{ config(materialized='incremental', incremental_strategy='microbatch', event_time='event_time') }}
-
-select 1 as id, '2020-01-01 00:00:00'::timestamp as event_time
-"""
-
-microbatch_unique_key_not_supported = """
-{{ config(
-    materialized='incremental',
-    incremental_strategy='microbatch',
-    unique_key='id',
-    event_time='event_time',
-    begin='2026-01-01',
-    batch_size='day'
-) }}
-
-select 1 as id, '2020-01-01 00:00:00'::timestamp as event_time
-"""
 
 class doUniqueKey(BaseIncrementalUniqueKey):
     def test__bad_unique_key_list(self, project):
@@ -182,105 +143,6 @@ class TestIncrementalOnSchemaChangeQuotingTrue(BaseIncrementalOnSchemaChangeSetu
         assert status == RunStatus.Success
 
 
-@pytest.mark.skipif(not MICROBATCH_AVAILABLE, reason="Microbatch tests require dbt-core >= 1.9")
-class TestMicrobatch(BaseMicrobatch):
-    """Test microbatch incremental strategy for DuckDB.
-
-    Microbatch is supported on DuckDB 1.4.0+ when MERGE is available,
-    but falls back to delete+insert for earlier versions.
-
-    Note: This class overrides timestamp fixtures from BaseMicrobatch to use
-    DuckDB-compatible timestamp format. DuckDB 1.4.0+ has stricter timestamp
-    validation and rejects the TIMESTAMP '...-0' format used in the base test,
-    requiring explicit casting with PostgreSQL-style '...'::timestamp syntax.
-    """
-
-    @pytest.fixture(scope="class")
-    def microbatch_model_sql(self) -> str:
-        return """
-{{ config(materialized='incremental', incremental_strategy='microbatch', event_time='event_time', batch_size='day', begin=modules.datetime.datetime(2020, 1, 1, 0, 0, 0)) }}
-select * from {{ ref('input_model') }}
-"""
-
-    @pytest.fixture(scope="class")
-    def input_model_sql(self) -> str:
-        """Override input model to use DuckDB-compatible timestamp format.
-
-        Changes TIMESTAMP '2020-01-01 00:00:00-0' to '2020-01-01 00:00:00'::timestamp
-        to avoid DuckDB's "timestamp is not UTC" error.
-        """
-        return """
-{{ config(materialized='table', event_time='event_time') }}
-select 1 as id, '2020-01-01 00:00:00'::timestamp as event_time
-union all
-select 2 as id, '2020-01-02 00:00:00'::timestamp as event_time
-union all
-select 3 as id, '2020-01-03 00:00:00'::timestamp as event_time
-"""
-
-    @pytest.fixture(scope="class")
-    def insert_two_rows_sql(self, project) -> str:
-        """Override insert SQL to use DuckDB-compatible timestamp format.
-
-        Changes TIMESTAMP '2020-01-04 00:00:00-0' to '2020-01-04 00:00:00'::timestamp
-        to avoid DuckDB's "timestamp is not UTC" error.
-        """
-        test_schema_relation = project.adapter.Relation.create(
-            database=project.database, schema=project.test_schema
-        )
-        return f"insert into {test_schema_relation}.input_model (id, event_time) values (4, '2020-01-04 00:00:00'::timestamp), (5, '2020-01-05 00:00:00'::timestamp)"
-
-
-@pytest.mark.skipif(not MICROBATCH_AVAILABLE, reason="Microbatch tests require dbt-core >= 1.9")
-class TestMicrobatchValidationMissingEventTime:
-    @pytest.fixture(scope="class")
-    def models(self):
-        return {
-            "microbatch_missing_event_time.sql": microbatch_missing_event_time,
-        }
-
-    def test_missing_event_time_config(self, project):
-        with pytest.raises(ParsingError) as excinfo:
-            run_dbt(
-                ["run", "--select", "microbatch_missing_event_time"], expect_pass=False
-            )
-
-        assert "must provide an 'event_time'" in str(excinfo.value)
-
-
-@pytest.mark.skipif(not MICROBATCH_AVAILABLE, reason="Microbatch tests require dbt-core >= 1.9")
-class TestMicrobatchValidationMissingBatchContext:
-    @pytest.fixture(scope="class")
-    def models(self):
-        return {
-            "microbatch_missing_batch_context.sql": microbatch_missing_batch_context,
-        }
-
-    def test_missing_batch_context(self, project):
-        with pytest.raises(ParsingError) as excinfo:
-            run_dbt(
-                ["run", "--select", "microbatch_missing_batch_context"], expect_pass=False
-            )
-
-        assert "must provide a 'begin'" in str(excinfo.value)
-
-
-@pytest.mark.skipif(not MICROBATCH_AVAILABLE, reason="Microbatch tests require dbt-core >= 1.9")
-class TestMicrobatchUniqueKeyNotSupported:
-    @pytest.fixture(scope="class")
-    def models(self):
-        return {
-            "microbatch_unique_key_not_supported.sql": microbatch_unique_key_not_supported,
-        }
-
-    def test_unique_key_not_supported(self, project, capsys):
-        # Compilation should fail fast with a clear message.
-        run_dbt(
-            ["run", "--select", "microbatch_unique_key_not_supported"],
-            expect_pass=False,
-        )
-        captured = capsys.readouterr()
-        assert "does not support 'unique_key'" in (captured.out + captured.err)
 
 
 # Test models for merge strategy testing

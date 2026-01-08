@@ -24,7 +24,7 @@
   {%- endif -%}
 {%- endmacro -%}
 
-{%- macro validate_incremental_predicates(incremental_predicates) -%}
+{%- macro normalize_incremental_predicates(incremental_predicates) -%}
   {%- if incremental_predicates is none -%}
         {%- set incremental_predicates = [] -%}
   {%- elif incremental_predicates is mapping -%}

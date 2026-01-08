@@ -577,35 +577,33 @@ models:
 For maximum flexibility, use `merge_clauses` to define custom `when_matched` and `when_not_matched` behaviors.  This is especially helpful in more complex scenarios where you have more than one action, multiple conditions, or error handling within a `when_matched` or `when_not_matched` clause.
 
 *Supported When Matched Actions and Modes:*
-
-* `update`: Update the matched record
-  * `mode: by_name`: Use `UPDATE BY NAME` (default)
-  * `mode: by_position`: Use `UPDATE BY POSITION`
-  * `mode: star`: Use `UPDATE SET *`
-  * `mode: explicit`: Use explicit column list with custom expressions
-    * `update.include`: List of columns to include in the update
-    * `update.exclude`: List of columns to exclude from the update
-    * `update.set_expressions`: Dictionary of column-to-expression mappings for custom update values
-* `delete`: Delete the matched record
-* `do_nothing`: Skip the matched record
-* `error`: Raise an error for matched records
-  * `error_message`: Optional custom error message
+- `update`: Update the matched record
+  - `mode: by_name`: Use `UPDATE BY NAME` (default)
+  - `mode: by_position`: Use `UPDATE BY POSITION`
+  - `mode: star`: Use `UPDATE SET *`
+  - `mode: explicit`: Use explicit column list with custom expressions
+    - `update.include`: List of columns to include in the update
+    - `update.exclude`: List of columns to exclude from the update
+    - `update.set_expressions`: Dictionary of column-to-expression mappings for custom update values
+- `delete`: Delete the matched record
+- `do_nothing`: Skip the matched record
+- `error`: Raise an error for matched records
+  - `error_message`: Optional custom error message
 
 *Supported When Not Matched Actions and Modes:*
-
-* `insert`: Insert the unmatched record
-  * `mode: by_name`: Use `INSERT BY NAME` (default)
-  * `mode: by_position`: Use `INSERT BY POSITION`
-  * `mode: star`: Use `INSERT *`
-  * `mode: explicit`: Use explicit column and value lists
-    * `insert.columns`: List of column names for the INSERT statement
-    * `insert.values`: List of values/expressions corresponding to the columns
-* `update`: Update unmatched records (for WHEN NOT MATCHED BY SOURCE scenarios)
-  * `set_expressions`: Dictionary of column-to-expression mappings
-* `delete`: Delete unmatched records
-* `do_nothing`: Skip the unmatched record
-* `error`: Raise an error for unmatched records
-  * `error_message`: Optional custom error message
+- `insert`: Insert the unmatched record
+  - `mode: by_name`: Use `INSERT BY NAME` (default)
+  - `mode: by_position`: Use `INSERT BY POSITION`
+  - `mode: star`: Use `INSERT *`
+  - `mode: explicit`: Use explicit column and value lists
+    - `insert.columns`: List of column names for the INSERT statement
+    - `insert.values`: List of values/expressions corresponding to the columns
+- `update`: Update unmatched records (for WHEN NOT MATCHED BY SOURCE scenarios)
+  - `set_expressions`: Dictionary of column-to-expression mappings
+- `delete`: Delete unmatched records
+- `do_nothing`: Skip the unmatched record
+- `error`: Raise an error for unmatched records
+  - `error_message`: Optional custom error message
 
 **Example with Custom Merge Clauses:**
 
@@ -644,12 +642,10 @@ When using DuckLake (attached DuckLake databases), MERGE statements are limited 
 **Table Aliases:**
 
 In conditions and expressions, use these table aliases:
-
-* `DBT_INTERNAL_SOURCE`: References the incoming data (your model's SELECT)
-* `DBT_INTERNAL_DEST`: References the existing target table
+- `DBT_INTERNAL_SOURCE`: References the incoming data (your model's SELECT)
+- `DBT_INTERNAL_DEST`: References the existing target table
 
 #### Re-running external models with an in-memory version of dbt-duckdb
-
 When using `:memory:` as the DuckDB database, subsequent dbt runs can fail when selecting a subset of models that depend on external tables. This is because external files are only registered as  DuckDB views when they are created, not when they are referenced. To overcome this issue we have provided the `register_upstream_external_models` macro that can be triggered at the beginning of a run. To enable this automatic registration, place the following in your `dbt_project.yml` file:
 
 ```yaml
@@ -662,7 +658,6 @@ on-run-start:
 dbt-duckdb also provides a custom table_function materialization to use DuckDB's Table Function / Table Macro feature to provide parameterized views.
 
 Why use this materialization?
-
 * Late binding of functions means that the underlying table can change (have new columns added) and the function does not need to be recreated.
   * (With a view, the create view statement would need to be re-run).
   * This allows for skipping parts of the dbt DAG, even if the underlying table changed.
@@ -671,7 +666,6 @@ Why use this materialization?
 
 
 Example table_function creation with 0 parameters:
-
 ```sql
 {{
     config(
@@ -682,13 +676,11 @@ select * from {{ ref("example_table") }}
 ```
 
 Example table_function invocation (note the parentheses are needed even with 0 parameters!):
-
 ```sql
 select * from {{ ref("my_table_function") }}()
 ```
 
 Example table_function creation with 2 parameters:
-
 ```sql
 {{
     config(
@@ -704,7 +696,6 @@ where 1=1
 ```
 
 Example table_function with 2 parameters invocation:
-
 ```sql
 select * from {{ ref("my_table_function_with_parameters") }}(1, 2)
 ```
@@ -730,8 +721,7 @@ any Python object that DuckDB knows how to turn into a table, including a Pandas
 
 As of version 1.6.1, it is possible to both read and write data in chunks, which allows for larger-than-memory
 datasets to be manipulated in Python models. Here is a basic example:
-
-```python
+```
 import pyarrow as pa
 
 def batcher(batch_reader: pa.RecordBatchReader):
@@ -785,37 +775,34 @@ python -m dbt.adapters.duckdb.cli
 
 You can specify a profile to use with the `--profile` flag:
 
-```bash
+```
 python -m dbt.adapters.duckdb.cli --profile my_profile
 ```
 
 The shell provides access to all standard dbt commands:
-
-* `run` - Run dbt models
-* `test` - Run tests on dbt models
-* `build` - Build and test dbt models
-* `seed` - Load seed files
-* `snapshot` - Run snapshots
-* `compile` - Compile models without running them
-* `parse` - Parse the project
-* `debug` - Debug connection
-* `deps` - Install dependencies
-* `list` - List resources
+- `run` - Run dbt models
+- `test` - Run tests on dbt models
+- `build` - Build and test dbt models
+- `seed` - Load seed files
+- `snapshot` - Run snapshots
+- `compile` - Compile models without running them
+- `parse` - Parse the project
+- `debug` - Debug connection
+- `deps` - Install dependencies
+- `list` - List resources
 
 When you launch the shell, it automatically:
-
 1. Runs `dbt debug` to test your connection
 2. Parses your dbt project
 3. Launches the DuckDB UI for visual data exploration
 
 The shell supports model name autocompletion if you install the optional `iterfzf` package:
 
-```bash
+```
 pip install iterfzf
 ```
 
 Example workflow:
-
 1. Start the interactive shell
 2. View your project's models in the launched DuckDB UI
 3. Run `build` to build your models
