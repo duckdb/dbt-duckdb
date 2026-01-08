@@ -72,18 +72,6 @@
         merge_clause_defaults.when_not_matched_insert_by_name
     ]) -%}
 
-    {% if unique_key %}
-        {% if unique_key is sequence and unique_key is not mapping and unique_key is not string %}
-            {% for key in unique_key %}
-                {% do predicates.append("DBT_INTERNAL_SOURCE." ~ key ~ " = DBT_INTERNAL_DEST." ~ key) %}
-            {% endfor %}
-        {% else %}
-            {% do predicates.append("DBT_INTERNAL_SOURCE." ~ unique_key ~ " = DBT_INTERNAL_DEST." ~ unique_key) %}
-        {% endif %}
-    {% else %}
-        {% do predicates.append('FALSE') %}
-    {% endif %}
-
     {{ sql_header if sql_header is not none }}
 
     MERGE INTO {{ target }} AS DBT_INTERNAL_DEST
