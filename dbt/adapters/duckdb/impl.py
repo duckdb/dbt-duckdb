@@ -262,10 +262,11 @@ class DuckDBAdapter(SQLAdapter):
     def duckdb_incremental_strategies(self) -> Sequence[str]:
         """Return valid incremental strategies for the current DuckDB connection (cached)."""
         if self.duckdb_version >= Version(DUCKDB_MERGE_LOWEST_VERSION_POSSIBLE):
-            return DUCKDB_BASE_INCREMENTAL_STRATEGIES + ["merge"]
+            return DUCKDB_BASE_INCREMENTAL_STRATEGIES + ["merge", "microbatch"]
 
         return DUCKDB_BASE_INCREMENTAL_STRATEGIES
 
+    @available
     def valid_incremental_strategies(self) -> Sequence[str]:
         """Return valid incremental strategies for the current DuckDB connection."""
         return self.duckdb_incremental_strategies
