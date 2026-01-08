@@ -1,4 +1,3 @@
-from urllib.parse import urlparse
 import pytest
 from unittest import mock
 from unittest.mock import Mock
@@ -55,7 +54,7 @@ def model(dbt, con):
 @pytest.mark.skip_profile("buenavista", "file", "memory")
 class TestMDPlugin:
     @pytest.fixture(scope="class")
-    def profiles_config_update(self, dbt_profile_target):
+    def profiles_config_update(self, dbt_profile_target, test_database_name):
         md_config = {"token": dbt_profile_target.get("token")}
         plugins = [{"module": "motherduck", "config": md_config}]
         return {
@@ -63,9 +62,7 @@ class TestMDPlugin:
                 "outputs": {
                     "dev": {
                         "type": "duckdb",
-                        # make path unique from other tests that don't pass the token via config
-                        # to avoid duckdb 1.1.0 caching error (see https://github.com/duckdb/duckdb/pull/13129)
-                        "path": dbt_profile_target.get("path", ":memory:") + "?user=test_motherduck",
+                        "path": f"md:{test_database_name}",
                         "plugins": plugins,
                     }
                 },
@@ -74,14 +71,10 @@ class TestMDPlugin:
         }
 
     @pytest.fixture(scope="class")
-    def database_name(self, dbt_profile_target):
-        return urlparse(dbt_profile_target["path"]).path
-    
-    @pytest.fixture(scope="class")
-    def md_sql(self, database_name):
+    def md_sql(self, test_database_name):
         # Reads from a MD database in my test account in the cloud
         return f"""
-            select * FROM {database_name}.main.plugin_table
+            select * FROM {test_database_name}.main.plugin_table
         """
 
     @pytest.fixture(scope="class")
@@ -94,16 +87,15 @@ class TestMDPlugin:
         }
 
     @pytest.fixture(autouse=True)
-    def run_dbt_scope(self, project, database_name):
-        project.run_sql(f"CREATE DATABASE IF NOT EXISTS {database_name}")
+    def run_dbt_scope(self, project):
         project.run_sql("CREATE OR REPLACE TABLE plugin_table (i integer, j string)")
         project.run_sql("INSERT INTO plugin_table (i, j) VALUES (1, 'foo')")
         yield
-        project.run_sql("DROP VIEW md_table")
-        project.run_sql("DROP TABLE random_logs_test")
-        project.run_sql("DROP TABLE summary_of_logs_test")
-        project.run_sql("DROP TABLE plugin_table")
-        project.run_sql("DROP TABLE python_pyarrow_table_model")
+        project.run_sql("DROP VIEW IF EXISTS md_table")
+        project.run_sql("DROP TABLE IF EXISTS random_logs_test")
+        project.run_sql("DROP TABLE IF EXISTS summary_of_logs_test")
+        project.run_sql("DROP TABLE IF EXISTS plugin_table")
+        project.run_sql("DROP TABLE IF EXISTS python_pyarrow_table_model")
 
     def test_motherduck(self, project):
         run_dbt()
@@ -112,7 +104,7 @@ class TestMDPlugin:
         res = project.run_sql("SELECT * FROM python_pyarrow_table_model", fetch="all")
         assert res == [(1,), (2,), (3,)]
 
-    def test_incremental(self, project):
+    def test_incremental(self, project, test_database_name):
         run_dbt()
         res = project.run_sql("SELECT count(*) FROM summary_of_logs_test", fetch="one")
         assert res == (70,)
@@ -121,11 +113,11 @@ class TestMDPlugin:
         res = project.run_sql("SELECT count(*) FROM summary_of_logs_test", fetch="one")
         assert res == (105,)
 
-        res = project.run_sql("SELECT schema_name FROM information_schema.schemata WHERE catalog_name = 'test'", fetch="all")
+        res = project.run_sql(f"SELECT schema_name FROM information_schema.schemata WHERE catalog_name = '{test_database_name}'", fetch="all")
         assert "dbt_temp_test" in [_r for (_r,) in res]
 
-    def test_incremental_temp_table_exists(self, project):
-        project.run_sql('create or replace table test.dbt_temp_test.summary_of_logs_test as (select 1 from generate_series(1,10) g(x))')
+    def test_incremental_temp_table_exists(self, project, test_database_name):
+        project.run_sql(f'create or replace table {test_database_name}.dbt_temp_test.summary_of_logs_test as (select 1 from generate_series(1,10) g(x))')
         run_dbt()
         res = project.run_sql("SELECT count(*) FROM summary_of_logs_test", fetch="one")
         assert res == (70,)

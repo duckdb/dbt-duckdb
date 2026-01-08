@@ -300,7 +300,7 @@ Please remember that using plugins may require you to add additional dependencie
 
 * `excel` depends on `pandas`, and `openpyxl` or `xlsxwriter` to perform writes
 * `gsheet` depends on `gspread` and `pandas`
-*  `iceberg` depends on `pyiceberg` and Python >= 3.8
+* `iceberg` depends on `pyiceberg` and Python >= 3.10
 * `sqlalchemy` depends on `pandas`, `sqlalchemy`, and the driver(s) you need
 
 **Experimental:**

@@ -1,4 +1,3 @@
-from urllib.parse import urlparse
 import pytest
 from dbt.tests.util import (
     run_dbt,
@@ -46,7 +45,7 @@ def model(dbt, con):
 @pytest.mark.skip_profile("buenavista", "file", "memory")
 class TestMDPluginAttach:
     @pytest.fixture(scope="class")
-    def profiles_config_update(self, dbt_profile_target):
+    def profiles_config_update(self, dbt_profile_target, test_database_name):
         md_config = {"token": dbt_profile_target.get("token")}
         plugins = [{"module": "motherduck", "config": md_config}]
         return {
@@ -58,7 +57,7 @@ class TestMDPluginAttach:
                         "plugins": plugins,
                         "attach": [
                             {
-                                "path": dbt_profile_target.get("path", ":memory:"),
+                                "path": f"md:{test_database_name}",
                                 "type": "motherduck"
                             }
                         ]
@@ -67,7 +66,7 @@ class TestMDPluginAttach:
                 "target": "dev",
             }
         }
-    
+
     @pytest.fixture(scope="class")
     def models(self, md_sql):
         return {
@@ -76,29 +75,24 @@ class TestMDPluginAttach:
             "summary_of_logs_test.sql": summary_of_logs_sql,
             "python_pyarrow_table_model.py": python_pyarrow_table_model,
         }
-    
+
     @pytest.fixture(scope="class")
-    def database_name(self, dbt_profile_target):
-        return urlparse(dbt_profile_target["path"]).path
-    
-    @pytest.fixture(scope="class")
-    def md_sql(self, database_name):
+    def md_sql(self, test_database_name):
         # Reads from a MD database in my test account in the cloud
         return f"""
-            select * FROM {database_name}.main.plugin_table
+            select * FROM {test_database_name}.main.plugin_table
         """
     
     @pytest.fixture(autouse=True)
-    def run_dbt_scope(self, project, database_name):
-        project.run_sql(f"CREATE DATABASE IF NOT EXISTS {database_name}")
-        project.run_sql(f"CREATE OR REPLACE TABLE {database_name}.plugin_table (i integer, j string)")
-        project.run_sql(f"INSERT INTO {database_name}.plugin_table (i, j) VALUES (1, 'foo')")
+    def run_dbt_scope(self, project, test_database_name):
+        project.run_sql(f"CREATE OR REPLACE TABLE {test_database_name}.plugin_table (i integer, j string)")
+        project.run_sql(f"INSERT INTO {test_database_name}.plugin_table (i, j) VALUES (1, 'foo')")
         yield
-        project.run_sql("DROP VIEW md_table")
-        project.run_sql("DROP TABLE random_logs_test")
-        project.run_sql("DROP TABLE summary_of_logs_test")
-        project.run_sql(f"DROP TABLE {database_name}.plugin_table")
-        project.run_sql("DROP TABLE python_pyarrow_table_model")
+        project.run_sql("DROP VIEW IF EXISTS md_table")
+        project.run_sql("DROP TABLE IF EXISTS random_logs_test")
+        project.run_sql("DROP TABLE IF EXISTS summary_of_logs_test")
+        project.run_sql(f"DROP TABLE IF EXISTS {test_database_name}.plugin_table")
+        project.run_sql("DROP TABLE IF EXISTS python_pyarrow_table_model")
 
     def test_motherduck(self, project):
         run_dbt(expect_pass=True)
@@ -107,7 +101,7 @@ class TestMDPluginAttach:
 @pytest.mark.skip_profile("buenavista", "file", "memory")
 class TestMDPluginAttachWithSettings(TestMDPluginAttach):
     @pytest.fixture(scope="class")
-    def profiles_config_update(self, dbt_profile_target):
+    def profiles_config_update(self, dbt_profile_target, test_database_name):
         md_setting = {"motherduck_token": dbt_profile_target.get("token")}
         return {
             "test": {
@@ -117,7 +111,7 @@ class TestMDPluginAttachWithSettings(TestMDPluginAttach):
                         "path": ":memory:",
                         "attach": [
                             {
-                                "path": dbt_profile_target.get("path", ":memory:"),
+                                "path": f"md:{test_database_name}",
                                 "type": "motherduck"
                             }
                         ],
@@ -132,7 +126,7 @@ class TestMDPluginAttachWithSettings(TestMDPluginAttach):
 @pytest.mark.skip_profile("buenavista", "file", "memory")
 class TestMDPluginAttachWithTokenInPath(TestMDPluginAttach):
     @pytest.fixture(scope="class")
-    def profiles_config_update(self, dbt_profile_target):
+    def profiles_config_update(self, dbt_profile_target, test_database_name):
         token = dbt_profile_target.get("token")
         return {
             "test": {
@@ -142,7 +136,7 @@ class TestMDPluginAttachWithTokenInPath(TestMDPluginAttach):
                         "path": ":memory:",
                         "attach": [
                             {
-                                "path": dbt_profile_target.get("path", ":memory:") + f"?motherduck_token={token}&user=1",
+                                "path": f"md:{test_database_name}?motherduck_token={token}&user=1",
                                 "type": "motherduck"
                             }
                         ]

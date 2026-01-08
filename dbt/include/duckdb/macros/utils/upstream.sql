@@ -35,7 +35,7 @@
     {% endif %}
   {% endfor %}
 {% endfor %}
-{% if upstream_nodes %}
+{% if upstream_schemas %}
   {% do adapter.commit() %}
 {% endif %}
 {% endif %}
