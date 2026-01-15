@@ -400,6 +400,10 @@ class DuckDBAdapter(SQLAdapter):
             database=model.database,
             identifier=f"{model.identifier}__{_uuid}",
         )
+    
+    @available
+    def get_temp_schema(self):
+        return self._temp_schema_name
 
     def post_model_hook(self, config: Any, context: Any) -> None:
         """A hook for cleaning up the remote temporary table on MotherDuck if the
