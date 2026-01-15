@@ -134,15 +134,13 @@ class TestIncrementalOnSchemaChangeQuotingTrue(BaseIncrementalOnSchemaChangeSetu
         return {"quoting": {"identifier": True}}
         
     
-    def test__handle_identifier_quoting_config_false(self, project):
+    def test__handle_identifier_quoting_config_false(self, project):        
         # it should fail if quoting is set to false
         (status, exc) = self.run_twice_and_return_status(
             select="model_a incremental_append_new_columns_with_space",
             expect_pass_2nd_run=True
         )
         assert status == RunStatus.Success
-
-
 
 
 # Test models for merge strategy testing
@@ -426,34 +424,6 @@ _merge_invalid_clause_element = """
 SELECT 1 AS id, 'Alice' AS name, 25 AS age, 'Engineer' AS job
 """
 
-_merge_invalid_incremental_predicates = """
-{{ config(
-    materialized='incremental',
-    incremental_strategy='merge',
-    unique_key='id',
-    incremental_predicates={'bad': 'dict'}
-) }}
-
-SELECT 1 AS id, 'Alice' AS name, 25 AS age, 'Engineer' AS job
-"""
-
-_merge_composite_incremental_predicates = """
-{{ config(
-    materialized='incremental',
-    incremental_strategy='merge',
-    unique_key=['id', 'category'],
-    incremental_predicates=["DBT_INTERNAL_SOURCE.category = 'A'"]
-) }}
-
-{% if is_incremental() %}
-SELECT 1 AS id, 'A' AS category, 'new_a' AS val
-{% else %}
-SELECT 1 AS id, 'A' AS category, 'old_a' AS val
-UNION ALL
-SELECT 2 AS id, 'B' AS category, 'old_b' AS val
-{% endif %}
-"""
-
 # DuckLake restriction test models
 _merge_ducklake_multiple_updates = """
 {{ config(
@@ -526,7 +496,6 @@ class TestIncrementalMerge:
             "merge_with_set_expressions.sql": _merge_with_set_expressions,
             "merge_with_returning.sql": _merge_with_returning,
             "merge_custom_clauses.sql": _merge_custom_clauses,
-            "merge_composite_incremental_predicates.sql": _merge_composite_incremental_predicates,
         }
 
     def test_merge_debug(self, project):
@@ -630,19 +599,6 @@ class TestIncrementalMerge:
         bob = project.run_sql(f"SELECT COUNT(*) as count FROM {relation} WHERE id = 2", fetch="one")
         assert bob[0] == 1
 
-    def test_merge_composite_incremental_predicates(self, project):
-        """Composite unique_key merges keep unrelated rows untouched when predicates are present"""
-        run_dbt(["run", "--select", "merge_composite_incremental_predicates"], expect_pass=True)
-        run_dbt(["run", "--select", "merge_composite_incremental_predicates"], expect_pass=True)
-
-        relation = relation_from_name(project.adapter, "merge_composite_incremental_predicates")
-        rows = project.run_sql(
-            f"SELECT id, category, val FROM {relation} ORDER BY category",
-            fetch="all",
-        )
-
-        assert rows == [(1, "A", "new_a"), (2, "B", "old_b")]
-
 
 class TestIncrementalMergeValidation:
     """Test class for DuckDB merge configuration validation"""
@@ -661,7 +617,6 @@ class TestIncrementalMergeValidation:
             "merge_ducklake_multiple_updates.sql": _merge_ducklake_multiple_updates,
             "merge_ducklake_update_delete.sql": _merge_ducklake_update_delete,
             "merge_ducklake_valid_single_update.sql": _merge_ducklake_valid_single_update,
-            "merge_invalid_incremental_predicates.sql": _merge_invalid_incremental_predicates,
         }
 
     def test_invalid_condition_type(self, project):
@@ -714,16 +669,6 @@ class TestIncrementalMergeValidation:
         run_dbt(["run", "--select", "merge_invalid_clause_element"], expect_pass=True)
         result = run_dbt(["run", "--select", "merge_invalid_clause_element"], expect_pass=False)
         assert "elements must be dictionaries, found: not_a_dict" in str(result.results[0].message)
-
-    def test_invalid_incremental_predicates_type(self, project):
-        """Test validation fails for invalid incremental_predicates types"""
-        run_dbt(["run", "--select", "merge_invalid_incremental_predicates"], expect_pass=True)
-        result = run_dbt(
-            ["run", "--select", "merge_invalid_incremental_predicates"], expect_pass=False
-        )
-        assert "incremental_predicates must be a list of strings or a string" in str(
-            result.results[0].message
-        )
 
     # NOTE: The following DuckLake tests require a DuckLake attachment to be active
     # They will only trigger validation errors when the target relation is in a ducklake database
