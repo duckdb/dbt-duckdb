@@ -511,8 +511,7 @@ models:
 ```
 
 > [!TIP]
-> Microbatching might not always be best option from a performance perspective. Consider that DuckDB operates on row groups, not physical partitions (unless you have explicitly partitioned data in a DuckLake). While DuckDB does
-> not allow batch processing in parallel due to its constraints, you can benefit from *multi_threading* by setting `threads` > 1 in your profile to minimize overhead between batches.
+> Microbatching might not always be best option from a performance perspective. Consider that DuckDB operates on row groups, not physical partitions (unless you have explicitly partitioned data in a DuckLake). While you can do batch processing in parallel, more threads with more batches in parallel does not always equal better performance as row groups might not align 1-1 with the batches. Be sure to test different amounts of threads to match your use case.
 
 
 **Merge Strategy (DuckDB >= 1.4.0):**
