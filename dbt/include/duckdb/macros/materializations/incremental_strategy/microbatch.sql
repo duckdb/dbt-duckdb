@@ -50,7 +50,6 @@
         insert into {{ target }} ({{ dest_cols_csv }})
         select {{ dest_cols_csv }}
         from {{ source }}
-        where {{ where_clause }}
     {%- endset -%}
 
     {{ return(build_sql) }}
