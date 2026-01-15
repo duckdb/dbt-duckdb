@@ -85,7 +85,7 @@ select id, event_date from {{ ref('microbatch_event_date_input') }}
 """
 
 models__microbatch_batch_hour_input = """
-{{ config(materialized='table') }}
+{{ config(materialized='table', event_time='event_time') }}
 
 select 1 as id, '2025-01-01 00:00:00'::timestamp as event_time
 union all
@@ -429,3 +429,67 @@ class TestMicrobatchScenarios:
             f"SELECT note FROM {relation} WHERE id = 2", fetch="one"
         )
         assert note[0] == "bravo-updated"
+
+    def test_microbatch_with_timestamp_cli_args(self, project):
+        """Test that CLI args with full timestamp format work correctly."""
+        # Use timestamp format with time component in CLI args
+        self._run_with_bounds(
+            "microbatch_exec_input microbatch_exec",
+            project,
+            expect_pass=True,
+            full_refresh=True,
+            start="2025-01-01 00:00:00",
+            end="2025-01-04 00:00:00",
+        )
+
+        relation = relation_from_name(project.adapter, "microbatch_exec")
+        count = project.run_sql(
+            f"SELECT COUNT(*) as count FROM {relation}", fetch="one"
+        )
+        assert count[0] == 3
+
+        # Test with time component - dbt truncates to batch_size boundaries (day)
+        # so 2025-01-01 12:00:00 to 2025-01-03 12:00:00 still processes 3 day batches
+        self._run_with_bounds(
+            "microbatch_exec_input microbatch_exec",
+            project,
+            expect_pass=True,
+            full_refresh=True,
+            start="2025-01-01 12:00:00",
+            end="2025-01-03 12:00:00",
+        )
+
+        # With batch_size='day', batches are aligned to full days
+        # All 3 records are included as their days fall within the range
+        count = project.run_sql(
+            f"SELECT COUNT(*) as count FROM {relation}", fetch="one"
+        )
+        assert count[0] == 3
+
+    def test_microbatch_with_timestamp_cli_args_hourly(self, project):
+        """Test that CLI args with timestamp format work correctly for hourly batches."""
+        # Run with partial hour range - only process T01 and T02 batches
+        # id=1 (2025-01-01 00:00:00) - excluded (T00 batch not processed)
+        # id=2 (2025-01-01 01:00:00) - included (T01 batch)
+        # id=3 (2025-01-01 02:00:00) - included (T02 batch)
+        self._run_with_bounds(
+            "microbatch_batch_hour_input microbatch_batch_hour",
+            project,
+            expect_pass=True,
+            full_refresh=True,
+            start="2025-01-01 01:00:00",
+            end="2025-01-01 03:00:00",
+        )
+
+        relation = relation_from_name(project.adapter, "microbatch_batch_hour")
+        count = project.run_sql(
+            f"SELECT COUNT(*) as count FROM {relation}", fetch="one"
+        )
+        # Only 2 records because T00 batch (id=1) was never processed
+        assert count[0] == 2
+
+        # Verify the correct records are present
+        ids = project.run_sql(
+            f"SELECT id FROM {relation} ORDER BY id", fetch="all"
+        )
+        assert [row[0] for row in ids] == [2, 3]

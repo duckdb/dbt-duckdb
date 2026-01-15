@@ -28,9 +28,10 @@
     {%- set dest_cols_csv = get_quoted_csv(dest_columns | map(attribute="name")) -%}
 
     {# Build the batch time filter predicate #}
+    {# batch_start and batch_end are already UTC timestamps from dbt Python code #}
     {%- set batch_predicate -%}
-        {{ event_time }} >= cast('{{ batch_start }}' as timestamp)
-        and {{ event_time }} < cast('{{ batch_end }}' as timestamp)
+        {{ event_time }} >= '{{ batch_start }}'
+        and {{ event_time }} < '{{ batch_end }}'
     {%- endset -%}
 
     {# Build combined WHERE clause with optional incremental predicates #}
