@@ -510,6 +510,10 @@ models:
       incremental_predicates: ["country = 'US'"]
 ```
 
+> [!TIP]
+> Microbatching might not always be best option from a performance perspective. Consider that DuckDB operates on row groups, not physical partitions (unless you have explicitly partitioned data in a DuckLake). While DuckDB does
+> not allow batch processing in parallel due to its constraints, you can benefit from *multi_threading* by setting `threads` > 1 in your profile to minimize overhead between batches.
+
 
 **Merge Strategy (DuckDB >= 1.4.0):**
 

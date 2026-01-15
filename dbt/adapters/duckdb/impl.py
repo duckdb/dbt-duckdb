@@ -30,6 +30,10 @@ from dbt.adapters.base import BaseRelation
 from dbt.adapters.base.column import Column as BaseColumn
 from dbt.adapters.base.impl import ConstraintSupport
 from dbt.adapters.base.meta import available
+from dbt.adapters.capability import Capability
+from dbt.adapters.capability import CapabilityDict
+from dbt.adapters.capability import CapabilitySupport
+from dbt.adapters.capability import Support
 from dbt.adapters.contracts.connection import AdapterResponse
 from dbt.adapters.contracts.relation import Path
 from dbt.adapters.contracts.relation import RelationType
@@ -101,6 +105,13 @@ class DuckDBAdapter(SQLAdapter):
         ConstraintType.primary_key: ConstraintSupport.ENFORCED,
         ConstraintType.foreign_key: ConstraintSupport.ENFORCED,
     }
+
+    # DuckDB does not support concurrent microbatch execution due to table locking
+    _capabilities = CapabilityDict(
+        {
+            Capability.MicrobatchConcurrency: CapabilitySupport(support=Support.Unsupported),
+        }
+    )
 
     # can be overridden via the model config metadata
     _temp_schema_name = DEFAULT_TEMP_SCHEMA_NAME
