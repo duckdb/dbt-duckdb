@@ -399,17 +399,23 @@ class DuckDBAdapter(SQLAdapter):
         super().pre_model_hook(config)
 
     @available
-    def get_temp_relation_path(self, model: Any):
+    def get_temp_relation_path(self, model: Any, batch_id: str = ""):
         """This is a workaround to enable incremental models on MotherDuck because it
         currently doesn't support remote temporary tables. Instead we use a regular
         table that is dropped at the end of the incremental macro or post-model hook.
+
+        For microbatch with concurrent batches, each batch needs its own temp table.
+        The batch_id parameter (derived from batch timestamps) ensures uniqueness.
         """
         # Add a unique identifier for this model (scoped per dbt run)
         _uuid = self._temp_schema_model_uuid[model.identifier]
+        identifier = f"{model.identifier}__{_uuid}"
+        if batch_id:
+            identifier = f"{identifier}__{batch_id}"
         return Path(
             schema=self._temp_schema_name,
             database=model.database,
-            identifier=f"{model.identifier}__{_uuid}",
+            identifier=identifier,
         )
 
     def post_model_hook(self, config: Any, context: Any) -> None:
