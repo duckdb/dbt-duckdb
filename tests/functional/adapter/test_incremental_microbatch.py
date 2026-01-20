@@ -41,13 +41,13 @@ select 1 as id, '2025-01-01 00:00:00'::timestamp as event_time
 
 # Scenario models
 models__microbatch_exec_input = """
-{{ config(materialized='table') }}
+{{ config(materialized='table', event_time='event_time') }}
 
-select 1 as id, '2025-01-01 00:00:00'::timestamp as event_time
+select 1 as id, '2025-01-01'::date as event_time
 union all
-select 2 as id, '2025-01-02 00:00:00'::timestamp as event_time
+select 2 as id, '2025-01-02'::date as event_time
 union all
-select 3 as id, '2025-01-03 00:00:00'::timestamp as event_time
+select 3 as id, '2025-01-03'::date as event_time
 """
 
 models__microbatch_exec = """
@@ -63,7 +63,7 @@ select id, event_time from {{ ref('microbatch_exec_input') }}
 """
 
 models__microbatch_event_date_input = """
-{{ config(materialized='table') }}
+{{ config(materialized='table', event_time='event_date  ') }}
 
 select 1 as id, '2025-01-01'::date as event_date
 union all
@@ -107,7 +107,7 @@ select id, event_time from {{ ref('microbatch_batch_hour_input') }}
 """
 
 models__microbatch_batch_month_input = """
-{{ config(materialized='table') }}
+{{ config(materialized='table', event_time='event_time') }}
 
 select 1 as id, '2025-01-01'::timestamp as event_time
 union all
@@ -129,7 +129,7 @@ select id, event_time from {{ ref('microbatch_batch_month_input') }}
 """
 
 models__microbatch_reprocess_input = """
-{{ config(materialized='table') }}
+{{ config(materialized='table', event_time='event_time') }}
 
 select 1 as id, '2025-01-01 00:00:00'::timestamp as event_time, 'alpha' as note
 union all
@@ -148,6 +148,33 @@ models__microbatch_reprocess = """
 ) }}
 
 select id, event_time, note from {{ ref('microbatch_reprocess_input') }}
+"""
+
+models__microbatch_lookback_input = """
+{{ config(materialized='table', event_time='event_time') }}
+
+select 1 as id, '2025-01-01 00:00:00'::timestamp as event_time, 'v1' as version
+union all
+select 2 as id, '2025-01-02 00:00:00'::timestamp as event_time, 'v1' as version
+union all
+select 3 as id, '2025-01-03 00:00:00'::timestamp as event_time, 'v1' as version
+union all
+select 4 as id, '2025-01-04 00:00:00'::timestamp as event_time, 'v1' as version
+union all
+select 5 as id, '2025-01-05 00:00:00'::timestamp as event_time, 'v1' as version
+"""
+
+models__microbatch_lookback = """
+{{ config(
+    materialized='incremental',
+    incremental_strategy='microbatch',
+    event_time='event_time',
+    batch_size='day',
+    begin=modules.datetime.datetime(2025, 1, 1, 0, 0, 0),
+    lookback=3
+) }}
+
+select id, event_time, version from {{ ref('microbatch_lookback_input') }}
 """
 
 
@@ -260,6 +287,8 @@ class TestMicrobatchScenarios:
             "microbatch_batch_month.sql": models__microbatch_batch_month,
             "microbatch_reprocess_input.sql": models__microbatch_reprocess_input,
             "microbatch_reprocess.sql": models__microbatch_reprocess,
+            "microbatch_lookback_input.sql": models__microbatch_lookback_input,
+            "microbatch_lookback.sql": models__microbatch_lookback,
         }
 
     def _run_with_bounds(
@@ -493,3 +522,67 @@ class TestMicrobatchScenarios:
             f"SELECT id FROM {relation} ORDER BY id", fetch="all"
         )
         assert [row[0] for row in ids] == [2, 3]
+
+    def test_microbatch_lookback_reprocesses_previous_batches(self, project):
+        """Test that lookback config causes previous batches to be reprocessed.
+
+        With lookback=3, when dbt automatically determines batches (no explicit
+        --event-time-start/end), it looks at the latest checkpoint and goes back
+        3 batches. This test verifies that:
+        1. Initial run creates data for Jan 1-3
+        2. Update data in Jan 2 batch
+        3. Freeze time to Jan 5, run without explicit bounds
+        4. dbt should reprocess recent batches due to lookback, picking up changes
+        """
+        from freezegun import freeze_time
+
+        # Initial run: create first 3 days of data (Jan 1-3)
+        self._run_with_bounds(
+            "microbatch_lookback_input microbatch_lookback",
+            project,
+            expect_pass=True,
+            full_refresh=True,
+            start="2025-01-01",
+            end="2025-01-04",
+        )
+
+        relation = relation_from_name(project.adapter, "microbatch_lookback")
+        count = project.run_sql(
+            f"SELECT COUNT(*) as count FROM {relation}", fetch="one"
+        )
+        assert count[0] == 3
+
+        # Verify initial version for Jan 2
+        version = project.run_sql(
+            f"SELECT version FROM {relation} WHERE id = 2", fetch="one"
+        )
+        assert version[0] == "v1"
+
+        # Update data for Jan 2 (id=2) in the source
+        source = relation_from_name(project.adapter, "microbatch_lookback_input")
+        project.run_sql(
+            f"UPDATE {source} SET version = 'v2' WHERE id = 2"
+        )
+
+        # Freeze time to Jan 5 and run without explicit bounds.
+        # With lookback=3, dbt will go back 3 batches from checkpoint and
+        # process forward to current time, picking up the v2 change in Jan 2.
+        # It will also process new batches (Jan 4, Jan 5) up to current time.
+        with freeze_time("2025-01-05 12:00:00"):
+            run_dbt(
+                ["run", "--select", "microbatch_lookback"],
+                expect_pass=True,
+            )
+
+        # Count should be 4: original 3 + Jan 4 batch (Jan 5 data exists but
+        # time is 12:00 so Jan 5 batch may or may not be included depending on ceiling)
+        count = project.run_sql(
+            f"SELECT COUNT(*) as count FROM {relation}", fetch="one"
+        )
+        assert count[0] >= 4  # At least Jan 1-4
+
+        # Jan 2 should now have v2 (was reprocessed due to lookback)
+        version = project.run_sql(
+            f"SELECT version FROM {relation} WHERE id = 2", fetch="one"
+        )
+        assert version[0] == "v2"

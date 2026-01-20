@@ -49,7 +49,7 @@
 
         insert into {{ target }} ({{ dest_cols_csv }})
         select {{ dest_cols_csv }}
-        from {{ source }}
+        from {{ source }};
     {%- endset -%}
 
     {{ return(build_sql) }}
