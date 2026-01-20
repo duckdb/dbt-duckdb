@@ -49,7 +49,8 @@
 
         insert into {{ target }} ({{ dest_cols_csv }})
         select {{ dest_cols_csv }}
-        from {{ source }};
+        from {{ source }}
+        where {{ batch_predicate }};
     {%- endset -%}
 
     {{ return(build_sql) }}

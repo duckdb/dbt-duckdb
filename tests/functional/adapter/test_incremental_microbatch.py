@@ -41,13 +41,13 @@ select 1 as id, '2025-01-01 00:00:00'::timestamp as event_time
 
 # Scenario models
 models__microbatch_exec_input = """
-{{ config(materialized='table', event_time='event_time') }}
+{{ config(materialized='table') }}
 
-select 1 as id, '2025-01-01'::date as event_time
+select 1 as id, '2025-01-01'::date as event_ts
 union all
-select 2 as id, '2025-01-02'::date as event_time
+select 2 as id, '2025-01-02'::date as event_ts
 union all
-select 3 as id, '2025-01-03'::date as event_time
+select 3 as id, '2025-01-03'::date as event_ts
 """
 
 models__microbatch_exec = """
@@ -59,7 +59,7 @@ models__microbatch_exec = """
     begin=modules.datetime.datetime(2025, 1, 1, 0, 0, 0)
 ) }}
 
-select id, event_time from {{ ref('microbatch_exec_input') }}
+select id, event_ts as event_time from {{ ref('microbatch_exec_input') }}
 """
 
 models__microbatch_event_date_input = """
@@ -331,7 +331,7 @@ class TestMicrobatchScenarios:
 
         source = relation_from_name(project.adapter, "microbatch_exec_input")
         project.run_sql(
-            f"insert into {source} (id, event_time) values "
+            f"insert into {source} (id, event_ts) values "
             "(4, '2025-01-02 12:00:00'::timestamp), "
             "(5, '2025-01-03 12:00:00'::timestamp)"
         )
