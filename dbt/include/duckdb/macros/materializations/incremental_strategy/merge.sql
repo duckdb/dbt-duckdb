@@ -32,7 +32,7 @@
   {%- set temp_relation = args_dict['temp_relation'] -%}
   {%- set unique_key = args_dict['unique_key'] -%}
   {%- set dest_columns = args_dict['dest_columns'] -%}
-  {%- set incremental_predicates = args_dict.get('incremental_predicates') -%}
+  {%- set incremental_predicates = normalize_incremental_predicates(args_dict.get('incremental_predicates')) -%}
 
   {%- set build_sql = duckdb__get_merge_sql(target_relation, temp_relation, unique_key, dest_columns, incremental_predicates) -%}
 
@@ -40,6 +40,8 @@
 {% endmacro %}
 
 {% macro duckdb__get_merge_sql(target, source, unique_key, dest_columns, incremental_predicates=none) -%}
+    {%- set predicates = normalize_incremental_predicates(incremental_predicates) -%}
+
     {{ validate_merge_config(config, target) }}
 
     {%- set sql_header = config.get('sql_header', none) -%}

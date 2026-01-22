@@ -440,15 +440,19 @@ Unfortunately incremental materialization strategies are not yet supported for `
 
 #### Incremental Strategy Configuration
 
-dbt-duckdb supports the `delete+insert`, `append`, and `merge` strategies for incremental `table` models. The `merge` strategy requires DuckDB >= 1.4.0 and provides access to DuckDB's native MERGE statement.
+dbt-duckdb supports the `delete+insert`, `append`, `merge`, and `microbatch` strategies for incremental `table` models.
+
+* The `merge` strategy requires DuckDB >= 1.4.0 and provides access to DuckDB's native MERGE statement.
+* The `microbatch` strategy requires dbt-core's microbatch support (dbt-core >= 1.9).
 
 **Append Strategy:**
 
-| Configuration | Type | Default | Description |
-|---------------|------|---------|-------------|
-| `incremental_predicates` | list | null | SQL conditions to filter which records get appended |
+| Configuration | Type | Default | Description
+| :---: | :---: | :---: | ---
+| `incremental_predicates` | list | null | SQL conditions to filter which records get appended
 
 Example:
+
 ```yaml
 models:
   - name: my_incremental_model
@@ -458,14 +462,16 @@ models:
       incremental_predicates: ["created_at > (select max(created_at) from {{ this }})"]
 ```
 
+
 **Delete+Insert Strategy:**
 
-| Configuration | Type | Default | Description |
-|---------------|------|---------|-------------|
-| `unique_key` | string/list | required | Column(s) used to identify records for deletion |
-| `incremental_predicates` | list | null | SQL conditions to filter the delete and insert operations |
+| Configuration | Type | Default | Description
+| :---: | :---: | :---: | ---
+| `unique_key` | string/list | required | Column(s) used to identify records for deletion
+| `incremental_predicates` | list | null | SQL conditions to filter the delete and insert operations
 
 Example:
+
 ```yaml
 models:
   - name: my_incremental_model
@@ -475,6 +481,38 @@ models:
       unique_key: id  # or ['id', 'date'] for composite keys
       incremental_predicates: ["updated_at >= '2023-01-01'"]
 ```
+
+
+**Microbatch Strategy:**
+
+Microbatch runs incremental builds in time-based batches (using a configured `event_time` column) and generates per-batch `delete` + `insert` statements scoped to the batch window. Note that microbatching is most performant for physically _partitioned_ tables, for example on a DuckLake, but it is not necessarily the best strategy for DuckDB tables or Parquet files that work with row groups.
+
+Important: dbt-duckdb does not support `unique_key` with `incremental_strategy: microbatch`. Microbatch does not do key-based upserts, and specifying `unique_key` is ignored/misleading. If you need key-based upserts, use `incremental_strategy: merge`.
+
+| Configuration | Type | Default | Description
+| :---: | :---: | :---: | ---
+| `event_time` | string | required | Name of the timestamp column used for microbatch windowing
+| `begin` | string | required | Start time for batching (for example `YYYY-MM-DD`)
+| `batch_size` | string | required | Batch grain (for example `day`, `hour`)
+| `incremental_predicates` | list | null | Optional additional predicates applied within each batch
+
+Example:
+
+```yaml
+models:
+  - name: my_microbatch_model
+    config:
+      materialized: incremental
+      incremental_strategy: microbatch
+      event_time: event_time
+      begin: '2025-01-01'
+      batch_size: day
+      incremental_predicates: ["country = 'US'"]
+```
+
+> [!TIP]
+> Microbatching might not always be best option from a performance perspective. Consider that DuckDB operates on row groups, not physical partitions (unless you have explicitly partitioned data in a DuckLake). While you can do batch processing in parallel, more threads with more batches in parallel does not always equal better performance as row groups might not align 1-1 with the batches. Be sure to test different amounts of threads to match your use case.
+
 
 **Merge Strategy (DuckDB >= 1.4.0):**
 
@@ -494,6 +532,7 @@ models:
 ```
 
 This generates SQL equivalent to:
+
 ```sql
 MERGE INTO target AS DBT_INTERNAL_DEST
 USING source AS DBT_INTERNAL_SOURCE
@@ -506,19 +545,20 @@ WHEN NOT MATCHED THEN INSERT BY NAME
 
 These options extend the basic merge behavior with additional control over which records get updated or inserted, which columns are affected, and how values are set.
 
-| Configuration | Type | Default | Description |
-|---------------|------|---------|-------------|
-| `unique_key` | string/list | required | Column(s) used for the MERGE join condition |
-| `incremental_predicates` | list | null | Additional SQL conditions to filter the MERGE operation |
-| `merge_on_using_columns` | list | null | Columns for USING clause syntax instead of ON for the join condition |
-| `merge_update_condition` | string | null | SQL condition to control when matched records are updated |
-| `merge_insert_condition` | string | null | SQL condition to control when unmatched records are inserted |
-| `merge_update_columns` | list | null | Specific columns to update |
-| `merge_exclude_columns` | list | null | Columns to exclude from updates |
-| `merge_update_set_expressions` | dict | null | Custom expressions for column updates |
-| `merge_returning_columns` | list | null | Columns to return from the MERGE operation |
+| Configuration | Type | Default | Description
+| :---: | :---: | :---: | ---
+| `unique_key` | string/list | required | Column(s) used for the MERGE join condition
+| `incremental_predicates` | list | null | Additional SQL conditions to filter the MERGE operation
+| `merge_on_using_columns` | list | null | Columns for USING clause syntax instead of ON for the join condition
+| `merge_update_condition` | string | null | SQL condition to control when matched records are updated
+| `merge_insert_condition` | string | null | SQL condition to control when unmatched records are inserted
+| `merge_update_columns` | list | null | Specific columns to update
+| `merge_exclude_columns` | list | null | Columns to exclude from updates
+| `merge_update_set_expressions` | dict | null | Custom expressions for column updates
+| `merge_returning_columns` | list | null | Columns to return from the MERGE operation
 
 **Example with Enhanced Options:**
+
 ```yaml
 models:
   - name: my_incremental_model
@@ -732,7 +772,7 @@ As of version 1.9.3, dbt-duckdb includes an interactive shell that allows you to
 
 To start the interactive shell, use:
 
-```
+```bash
 python -m dbt.adapters.duckdb.cli
 ```
 
