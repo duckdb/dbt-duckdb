@@ -184,8 +184,8 @@ def materialize(df, con):
     {% do return(base_relation.incorporate(
                                   path={
                                     "identifier": tmp_identifier,
-                                    "schema": none,
-                                    "database": none
+                                    "schema": adapter.get_temp_schema(),
+                                    "database": base_relation.database
                                   })) -%}
 {% endmacro %}
 
