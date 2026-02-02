@@ -487,11 +487,11 @@ def pyiceberg_incremental_write(
                     
                     # Combine filters with AND
                     if len(filters) == 1:
-                        filter_expr = filters[0]
+                        filter_expr = filters[0]  # type: ignore[assignment]
                     else:
-                        filter_expr = filters[0]
+                        filter_expr = filters[0]  # type: ignore[assignment]
                         for f in filters[1:]:
-                            filter_expr = And(filter_expr, f)
+                            filter_expr = And(filter_expr, f)  # type: ignore[assignment]
                     
                     txn.delete(filter_expr)
                 
