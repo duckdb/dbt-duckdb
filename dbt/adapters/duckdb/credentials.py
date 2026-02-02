@@ -43,6 +43,9 @@ class Attachment(dbtClassMixin):
     # which is the case in fully managed ducklake in MotherDuck.
     is_ducklake: Optional[bool] = None
 
+    # Optional endpoint type for ATTACH options (rendered as ENDPOINT_TYPE <value>)
+    endpoint_type: Optional[str] = None
+
     def to_sql(self) -> str:
         # remove query parameters (not supported in ATTACH)
         parsed = urlparse(self.path)
@@ -86,9 +89,17 @@ class Attachment(dbtClassMixin):
         elif self.options and "read_only" in self.options and self.options["read_only"]:
             all_options.append("READ_ONLY")
 
+        # Endpoint type is a special-case option that should be rendered
+        # without quotes (e.g., ENDPOINT_TYPE s3_tables) to match typical
+        # DuckDB ATTACH syntax for S3 table endpoints.
+        if self.endpoint_type:
+            all_options.append(f"ENDPOINT_TYPE {self.endpoint_type}")
+        elif self.options and "endpoint_type" in self.options:
+            all_options.append(f"ENDPOINT_TYPE {self.options['endpoint_type']}")
+
         # Add arbitrary options from the options dict (excluding handled ones)
         if self.options:
-            handled_keys = {"type", "secret", "read_only"}
+            handled_keys = {"type", "secret", "read_only", "endpoint_type"}
             for key, value in self.options.items():
                 if key in handled_keys:
                     continue

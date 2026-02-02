@@ -256,6 +256,303 @@ attach:
 
 Note: If you specify the same option in both a direct field (`type`, `secret`, `read_only`) and in the `options` dict, dbt-duckdb will raise an error to prevent conflicts.
 
+#### AWS S3 Tables (Iceberg) Support
+
+As of dbt-duckdb 1.10.1, you can work with [AWS S3 Tables](https://aws.amazon.com/s3/features/tables/) which use Apache Iceberg format. S3 Tables provide managed Iceberg tables with automatic schema evolution, ACID transactions, and optimized query performance.
+
+##### Configuring S3 Tables
+
+To use S3 Tables, attach them using the `iceberg` type and specify `endpoint_type: s3_tables`:
+
+```yaml
+default:
+  outputs:
+    dev:
+      type: duckdb
+      path: /tmp/dbt.duckdb
+      extensions:
+        - iceberg
+      attach:
+        - path: "arn:aws:s3tables:us-east-1:123456789012:bucket/my-bucket"
+          alias: "s3_tables"
+          type: "iceberg"
+          endpoint_type: "s3_tables"
+          read_only: false
+  target: dev
+```
+
+**Important**: You must install PyIceberg for schema evolution support:
+```bash
+pip install dbt-duckdb[s3tables]
+# or
+cd dbt-duckdb
+pip install .[s3tables]
+```
+
+##### S3 Tables Features
+
+**Automatic Schema Evolution**: When your dbt models add or remove columns, dbt-duckdb automatically evolves the Iceberg schema using PyIceberg. Columns removed from your model are preserved in the table with NULL values (no data loss).
+
+**Supported Materializations**:
+- `table`: Full refresh using DROP + CREATE pattern
+- `incremental`: DELETE + INSERT pattern with automatic schema evolution
+
+**Iceberg Table Properties**: You can specify Iceberg table properties when creating tables:
+
+```sql
+{{
+  config(
+    materialized='table',
+    database='s3_tables',
+    schema='glue_db',
+    iceberg_properties={
+      'write.format.default': 'parquet',
+      'write.parquet.compression-codec': 'snappy'
+    }
+  )
+}}
+
+SELECT * FROM source_table
+```
+
+##### Incremental Models with Schema Evolution
+
+For incremental models, dbt-duckdb automatically handles schema changes:
+
+```sql
+{{
+  config(
+    materialized='incremental',
+    database='s3_tables',
+    schema='glue_db',
+    unique_key='customer_id',
+    watermark_column='updated_at'  -- Optional: for deduplication
+  )
+}}
+
+SELECT
+  customer_id,
+  name,
+  email,
+  new_column  -- Automatically added to target table
+FROM source_table
+WHERE updated_at > (SELECT MAX(updated_at) FROM {{ this }})
+```
+
+**Schema Evolution Behavior**:
+- **New columns**: Automatically added to target table via PyIceberg
+- **Removed columns**: Preserved in target table, receive NULL values for new rows
+- **No data loss**: Historical data with removed columns remains intact
+- **No breaking changes**: Downstream systems can still query removed columns
+
+##### S3 Tables Limitations
+
+Due to Iceberg/S3 Tables constraints, the following are NOT supported:
+- `CREATE OR REPLACE TABLE` (use DROP + CREATE instead)
+- `ALTER TABLE` via SQL (use PyIceberg for schema changes)
+- `UPDATE` or `MERGE INTO` statements
+- `DROP TABLE CASCADE`
+
+dbt-duckdb automatically handles these limitations by using appropriate patterns (DROP + CREATE for full refresh, DELETE + INSERT for incremental).
+
+##### Authentication
+
+S3 Tables use AWS credentials from your environment:
+- IAM role (recommended for EC2/ECS/Lambda)
+- AWS CLI configuration (`~/.aws/credentials`)
+- Environment variables (`AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`)
+
+Ensure your IAM role/user has permissions for:
+- `s3tables:GetTable`
+- `s3tables:PutTable`
+- `s3tables:DeleteTable`
+- `s3tables:GetTableMetadata`
+- `s3tables:PutTableMetadata`
+
+##### Example Project Structure
+
+```
+my_dbt_project/
+├── dbt_project.yml
+├── profiles.yml
+└── models/
+    ├── staging/
+    │   └── stg_customers.sql  -- incremental with schema evolution
+    └── marts/
+        └── dim_customers.sql  -- table materialization
+```
+
+**profiles.yml**:
+```yaml
+my_project:
+  outputs:
+    dev:
+      type: duckdb
+      path: /tmp/dbt.duckdb
+      extensions:
+        - iceberg
+      attach:
+        - path: "arn:aws:s3tables:us-east-1:123456789012:bucket/my-iceberg-bucket"
+          alias: "s3_tables"
+          type: "iceberg"
+          endpoint_type: "s3_tables"
+          read_only: false
+  target: dev
+```
+
+**models/staging/stg_customers.sql**:
+```sql
+{{
+  config(
+    materialized='incremental',
+    database='s3_tables',
+    unique_key='customer_id',
+    watermark_column='updated_at'
+  )
+}}
+
+SELECT
+  customer_id,
+  name,
+  email,
+  updated_at
+FROM raw.customers
+{% if is_incremental() %}
+WHERE updated_at > (SELECT MAX(updated_at) FROM {{ this }})
+{% endif %}
+```
+
+##### S3 Tables Configuration Reference
+
+The following table lists all configuration parameters available for S3 Tables (Iceberg) models:
+
+| Parameter | Type | Applies To | Required | Default | Description | Example |
+|-----------|------|------------|----------|---------|-------------|---------|
+| `database` | string | Both | **Yes** | - | Attached S3 Tables catalog | `database='s3_tables'` |
+| `schema` | string | Both | **Yes** | - | The Glue Database Name inside catalog | `schema='glue_db'` |
+| `alias` | string | Both | **No** | - | The Target Table Name, if not pass it will create table with model name. | `alias='customers_table'` |
+| `materialized` | string | Both | **Yes** | - | Materialization strategy: `table` or `incremental` | `materialized='incremental'` |
+| `unique_key` | string/list | Incremental | **Yes** (incremental) | - | Column(s) used to identify records for DELETE + INSERT operations | `unique_key='customer_id'` or `unique_key=['id', 'date']` |
+| `watermark_column` | string | Incremental | No | - | Column for deduplication (keeps latest record per unique_key based on this column) | `watermark_column='updated_at'` |
+| `precombine_column` | string | Incremental | No | - | Alias for `watermark_column` (same functionality) | `precombine_column='modified_at'` |
+| `partition_by` | string/list | Both | No | - | Partition specification(s). Supports: identity (`'country'`), day (`'day(order_date)'`), month (`'month(order_date)'`), year (`'year(order_date)'`), hour (`'hour(timestamp_col)'`). **Note:** bucket and truncate transforms are not supported by AWS S3 Tables API | `partition_by='country'` or `partition_by=['year(order_date)', 'country']` |
+| `iceberg_properties` | dict | Both | No | `{}` | Iceberg table properties to set (e.g., compression, format settings) | `iceberg_properties={'write.format.default': 'parquet', 'write.parquet.compression-codec': 'snappy'}` |
+| `use_pyiceberg_writes` | boolean | Incremental | No | `false` | Force use of PyIceberg for DELETE + INSERT (automatically enabled when `partition_by` is set) | `use_pyiceberg_writes=true` |
+| `on_schema_change` | string | Incremental | No | `'ignore'` | Not applicable to S3 Tables (schema evolution is automatic) | - |
+
+**Common Parameters (Both Table and Incremental):**
+- `database`: Must reference an attached S3 Tables catalog
+- `partition_by`: Defines how data is partitioned in S3 and decide table is partition or Non-partition Table.
+- `iceberg_properties`: Sets Iceberg-specific table properties
+
+**Table Materialization Only:**
+- Uses DROP + CREATE pattern for full refresh
+- All configuration applied during table creation
+
+**Incremental Materialization Only:**
+- `unique_key`: Required for identifying which rows to update
+- `watermark_column`/`precombine_column`: Optional deduplication based on timestamp or version column
+- `use_pyiceberg_writes`: Automatically enabled for partitioned tables (DuckDB limitation)
+
+**Configuration Examples:**
+
+**Example 1: Simple Table with Partitioning**
+```sql
+{{
+  config(
+    materialized='table',
+    database='s3_tables',
+    partition_by='country'
+  )
+}}
+
+SELECT
+  customer_id,
+  name,
+  country,
+  created_at
+FROM source_table
+```
+
+**Example 2: Incremental with Watermark and Multiple Partitions**
+```sql
+{{
+  config(
+    materialized='incremental',
+    database='s3_tables',
+    unique_key='customer_id',
+    watermark_column='updated_at',
+    partition_by=['year(order_date)', 'country']
+  )
+}}
+
+SELECT
+  customer_id,
+  order_date,
+  country,
+  amount,
+  updated_at
+FROM orders
+{% if is_incremental() %}
+WHERE updated_at > (SELECT MAX(updated_at) FROM {{ this }})
+{% endif %}
+```
+
+**Example 3: Table with Iceberg Properties**
+```sql
+{{
+  config(
+    materialized='table',
+    database='s3_tables',
+    partition_by='day(event_timestamp)',
+    iceberg_properties={
+      'write.format.default': 'parquet',
+      'write.parquet.compression-codec': 'snappy',
+      'write.metadata.compression-codec': 'gzip'
+    }
+  )
+}}
+
+SELECT * FROM events
+```
+
+**Example 4: Incremental with Composite Unique Key**
+```sql
+{{
+  config(
+    materialized='incremental',
+    database='s3_tables',
+    unique_key=['user_id', 'event_date'],
+    watermark_column='event_timestamp',
+    partition_by='month(event_date)'
+  )
+}}
+
+SELECT
+  user_id,
+  event_date,
+  event_type,
+  event_timestamp
+FROM user_events
+{% if is_incremental() %}
+WHERE event_timestamp > (SELECT MAX(event_timestamp) FROM {{ this }})
+{% endif %}
+```
+
+**Partition Transform Reference:**
+
+| Transform | Syntax | Description | Example |
+|-----------|--------|-------------|---------|
+| Identity | `'column_name'` | Partition by exact column value | `partition_by='country'` |
+| Day | `'day(date_column)'` | Partition by day (YYYY-MM-DD) | `partition_by='day(order_date)'` |
+| Month | `'month(date_column)'` | Partition by month (YYYY-MM) | `partition_by='month(order_date)'` |
+| Year | `'year(date_column)'` | Partition by year (YYYY) | `partition_by='year(order_date)'` |
+| Hour | `'hour(timestamp_column)'` | Partition by hour (YYYY-MM-DD-HH) | `partition_by='hour(event_timestamp)'` |
+
+**Note:** Multiple partitions can be specified as a list: `partition_by=['year(order_date)', 'country', 'region']`
+
+For more details on S3 Tables, see the [AWS S3 Tables documentation](https://docs.aws.amazon.com/AmazonS3/latest/userguide/s3-tables.html).
+
 #### Configuring dbt-duckdb Plugins
 
 dbt-duckdb has its own [plugin](dbt/adapters/duckdb/plugins/__init__.py) system to enable advanced users to extend
