@@ -330,7 +330,7 @@ For incremental models, dbt-duckdb automatically handles schema changes:
   )
 }}
 
-SELECT 
+SELECT
   customer_id,
   name,
   email,
@@ -411,7 +411,7 @@ my_project:
   )
 }}
 
-SELECT 
+SELECT
   customer_id,
   name,
   email,
@@ -466,7 +466,7 @@ The following table lists all configuration parameters available for S3 Tables (
   )
 }}
 
-SELECT 
+SELECT
   customer_id,
   name,
   country,
@@ -486,7 +486,7 @@ FROM source_table
   )
 }}
 
-SELECT 
+SELECT
   customer_id,
   order_date,
   country,
@@ -528,7 +528,7 @@ SELECT * FROM events
   )
 }}
 
-SELECT 
+SELECT
   user_id,
   event_date,
   event_type,
