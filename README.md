@@ -285,7 +285,8 @@ default:
 ```bash
 pip install dbt-duckdb[s3tables]
 # or
-pip install pyiceberg>=0.5.0
+cd dbt-duckdb
+pip install .[s3tables]
 ```
 
 ##### S3 Tables Features
@@ -303,6 +304,7 @@ pip install pyiceberg>=0.5.0
   config(
     materialized='table',
     database='s3_tables',
+    schema='glue_db',
     iceberg_properties={
       'write.format.default': 'parquet',
       'write.parquet.compression-codec': 'snappy'
@@ -322,6 +324,7 @@ For incremental models, dbt-duckdb automatically handles schema changes:
   config(
     materialized='incremental',
     database='s3_tables',
+    schema='glue_db',
     unique_key='customer_id',
     watermark_column='updated_at'  -- Optional: for deduplication
   )
@@ -425,7 +428,9 @@ The following table lists all configuration parameters available for S3 Tables (
 
 | Parameter | Type | Applies To | Required | Default | Description | Example |
 |-----------|------|------------|----------|---------|-------------|---------|
-| `database` | string | Both | **Yes** | - | The alias of the attached S3 Tables catalog | `database='s3_tables'` |
+| `database` | string | Both | **Yes** | - | Attached S3 Tables catalog | `database='s3_tables'` |
+| `schema` | string | Both | **Yes** | - | The Glue Database Name inside catalog | `schema='glue_db'` |
+| `alias` | string | Both | **No** | - | The Target Table Name, if not pass it will create table with model name. | `alias='customers_table'` |
 | `materialized` | string | Both | **Yes** | - | Materialization strategy: `table` or `incremental` | `materialized='incremental'` |
 | `unique_key` | string/list | Incremental | **Yes** (incremental) | - | Column(s) used to identify records for DELETE + INSERT operations | `unique_key='customer_id'` or `unique_key=['id', 'date']` |
 | `watermark_column` | string | Incremental | No | - | Column for deduplication (keeps latest record per unique_key based on this column) | `watermark_column='updated_at'` |
@@ -437,7 +442,7 @@ The following table lists all configuration parameters available for S3 Tables (
 
 **Common Parameters (Both Table and Incremental):**
 - `database`: Must reference an attached S3 Tables catalog
-- `partition_by`: Defines how data is partitioned in S3
+- `partition_by`: Defines how data is partitioned in S3 and decide table is partition or Non-partition Table.
 - `iceberg_properties`: Sets Iceberg-specific table properties
 
 **Table Materialization Only:**
