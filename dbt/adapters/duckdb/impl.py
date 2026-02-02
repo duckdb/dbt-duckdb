@@ -30,6 +30,10 @@ from dbt.adapters.base import BaseRelation
 from dbt.adapters.base.column import Column as BaseColumn
 from dbt.adapters.base.impl import ConstraintSupport
 from dbt.adapters.base.meta import available
+from dbt.adapters.capability import Capability
+from dbt.adapters.capability import CapabilityDict
+from dbt.adapters.capability import CapabilitySupport
+from dbt.adapters.capability import Support
 from dbt.adapters.contracts.connection import AdapterResponse
 from dbt.adapters.contracts.relation import Path
 from dbt.adapters.contracts.relation import RelationType
@@ -101,6 +105,12 @@ class DuckDBAdapter(SQLAdapter):
         ConstraintType.primary_key: ConstraintSupport.ENFORCED,
         ConstraintType.foreign_key: ConstraintSupport.ENFORCED,
     }
+
+    _capabilities = CapabilityDict(
+        {
+            Capability.MicrobatchConcurrency: CapabilitySupport(support=Support.Full),
+        }
+    )
 
     # can be overridden via the model config metadata
     _temp_schema_name = DEFAULT_TEMP_SCHEMA_NAME
@@ -472,10 +482,11 @@ class DuckDBAdapter(SQLAdapter):
     def duckdb_incremental_strategies(self) -> Sequence[str]:
         """Return valid incremental strategies for the current DuckDB connection (cached)."""
         if self.duckdb_version >= Version(DUCKDB_MERGE_LOWEST_VERSION_POSSIBLE):
-            return DUCKDB_BASE_INCREMENTAL_STRATEGIES + ["merge"]
+            return DUCKDB_BASE_INCREMENTAL_STRATEGIES + ["merge", "microbatch"]
 
         return DUCKDB_BASE_INCREMENTAL_STRATEGIES
 
+    @available
     def valid_incremental_strategies(self) -> Sequence[str]:
         """Return valid incremental strategies for the current DuckDB connection."""
         return self.duckdb_incremental_strategies
@@ -598,17 +609,23 @@ class DuckDBAdapter(SQLAdapter):
         super().pre_model_hook(config)
 
     @available
-    def get_temp_relation_path(self, model: Any):
+    def get_temp_relation_path(self, model: Any, batch_id: str = ""):
         """This is a workaround to enable incremental models on MotherDuck because it
         currently doesn't support remote temporary tables. Instead we use a regular
         table that is dropped at the end of the incremental macro or post-model hook.
+
+        For microbatch with concurrent batches, each batch needs its own temp table.
+        The batch_id parameter (derived from batch timestamps) ensures uniqueness.
         """
         # Add a unique identifier for this model (scoped per dbt run)
         _uuid = self._temp_schema_model_uuid[model.identifier]
+        identifier = f"{model.identifier}__{_uuid}"
+        if batch_id:
+            identifier = f"{identifier}__{batch_id}"
         return Path(
             schema=self._temp_schema_name,
             database=model.database,
-            identifier=f"{model.identifier}__{_uuid}",
+            identifier=identifier,
         )
 
     def post_model_hook(self, config: Any, context: Any) -> None:
