@@ -16,6 +16,10 @@
   {%- set unique_key = config.get('unique_key') -%}
   {%- set full_refresh_mode = (should_full_refresh()  or existing_relation.is_view) -%}
   {%- set on_schema_change = incremental_validate_on_schema_change(config.get('on_schema_change'), default='ignore') -%}
+  {%- set partitioned_by = none -%}
+  {%- if existing_relation is none or full_refresh_mode -%}
+    {%- set partitioned_by = duckdb__get_partitioned_by(target_relation, false) -%}
+  {%- endif -%}
 
   -- the temp_ and backup_ relations should not already exist in the database; get_relation
   -- will return None in that case. Otherwise, we get a relation that we can drop
@@ -51,18 +55,18 @@
   {{ run_hooks(pre_hooks, inside_transaction=True) }}
 
   {% if existing_relation is none %}
-    {% set build_sql = create_table_as(False, target_relation, compiled_code, language) %}
+    {% set build_sql = duckdb__create_table_as(False, target_relation, compiled_code, language, partitioned_by=partitioned_by) %}
   {% elif full_refresh_mode %}
-    {% set build_sql = create_table_as(False, intermediate_relation, compiled_code, language) %}
+    {% set build_sql = duckdb__create_table_as(False, intermediate_relation, compiled_code, language, partitioned_by=partitioned_by) %}
     {% set need_swap = true %}
   {% else %}
     {% if language == 'python' %}
-      {% set build_python = create_table_as(temporary, temp_relation, compiled_code, language) %}
+      {% set build_python = duckdb__create_table_as(temporary, temp_relation, compiled_code, language, partitioned_by=none) %}
       {% call statement("pre", language=language) %}
         {{- build_python }}
       {% endcall %}
     {% else %} {# SQL #}
-      {% do run_query(create_table_as(temporary, temp_relation, compiled_code, language)) %}
+      {% do run_query(duckdb__create_table_as(temporary, temp_relation, compiled_code, language, partitioned_by=none)) %}
     {% endif %}
     {% do adapter.expand_target_column_types(
              from_relation=temp_relation,

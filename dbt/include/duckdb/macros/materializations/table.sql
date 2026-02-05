@@ -30,7 +30,8 @@
 
   -- build model
   {% call statement('main', language=language) -%}
-    {{- create_table_as(False, intermediate_relation, compiled_code, language) }}
+    {%- set partitioned_by = duckdb__get_partitioned_by(target_relation, false) -%}
+    {{- duckdb__create_table_as(False, intermediate_relation, compiled_code, language, partitioned_by=partitioned_by) }}
   {%- endcall %}
 
   -- cleanup
