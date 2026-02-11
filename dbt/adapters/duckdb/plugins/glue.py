@@ -34,6 +34,12 @@ class UndetectedType(Exception):
 
 def _dbt2glue(dtype: str, ignore_null: bool = False) -> str:  # pragma: no cover
     """DuckDB to Glue data types conversion."""
+    # Check if it's an array type
+    if dtype.strip().endswith("[]"):
+        base_type = dtype.strip()[:-2]  # Remove the [] suffix
+        base_glue_type = _dbt2glue(base_type, ignore_null)
+        return f"array<{base_glue_type}>"
+    
     data_type = dtype.split("(")[0]
     if data_type.lower() in ["int1", "tinyint"]:
         return "tinyint"
@@ -49,7 +55,9 @@ def _dbt2glue(dtype: str, ignore_null: bool = False) -> str:  # pragma: no cover
         )
     if data_type.lower() in ["float4", "float", "real"]:
         return "float"
-    if data_type.lower() in ["float8", "numeric", "decimal", "double"]:
+    if data_type.lower() in ["decimal"]:
+        return "decimal"
+    if data_type.lower() in ["float8", "numeric", "double"]:
         return "double"
     if data_type.lower() in ["boolean", "bool", "logical"]:
         return "boolean"
@@ -161,6 +169,28 @@ def _create_table(
         )
 
 
+def _add_partition(
+    client: "GlueClient",
+    database: str,
+    table_def: "TableInputTypeDef",
+    partition_columns: List[Dict[str, str]],
+) -> None:
+
+    if partition_columns != []:
+        partition_input, partition_values = _parse_partition_columns(partition_columns, table_def)
+
+        try:
+            client.create_partition(
+                DatabaseName=database, TableName=table_def["Name"], PartitionInput=partition_input
+            )
+        except client.exceptions.AlreadyExistsException:
+            client.update_partition(
+                DatabaseName=database,
+                TableName=table_def["Name"],
+                PartitionValueList=partition_values,
+                PartitionInput=partition_input,
+            )
+
 def _update_table(
     client: "GlueClient",
     database: str,
@@ -178,6 +208,7 @@ def _update_table(
                 TableName=table_def["Name"],
                 PartitionValues=partition_values,
             )
+
             client.update_partition(
                 DatabaseName=database,
                 TableName=table_def["Name"],
@@ -337,9 +368,24 @@ def create_or_update_table(
     if glue_table:
         # Existing columns in AWS Glue catalog
         glue_columns = _get_column_type_def(glue_table)
-        # Create new version only if columns are changed
-        if glue_columns != columns:
+        partition_names = {col["Name"] for col in partition_columns}
+
+        # Filter out dicts in model_columns that have a 'Name' in partition_names
+        columns = [col for col in columns if col["Name"] not in partition_names]
+
+        # Convert both column lists to lowercase for case-insensitive comparison
+        glue_columns_lower = [{k: v.lower() if isinstance(v, str) else v for k, v in col.items()} for col in glue_columns] if glue_columns else []
+        columns_lower = [{k: v.lower() if isinstance(v, str) else v for k, v in col.items()} for col in columns]
+
+        if glue_columns_lower != columns_lower:
             _update_table(
+                client=client,
+                database=database,
+                table_def=table_def,
+                partition_columns=partition_columns,
+            )
+        else:
+            _add_partition(
                 client=client,
                 database=database,
                 table_def=table_def,

@@ -240,14 +240,29 @@ class DuckDBAdapter(SQLAdapter):
         return ", ".join(ret)
 
     @available
-    def external_read_location(self, write_location: str, rendered_options: dict) -> str:
-        if rendered_options.get("partition_by") or rendered_options.get("per_thread_output"):
-            globs = [write_location, "*"]
-            if rendered_options.get("partition_by"):
-                partition_by = str(rendered_options.get("partition_by"))
-                globs.extend(["*"] * len(partition_by.split(",")))
-            return ".".join(["/".join(globs), str(rendered_options.get("format", "parquet"))])
-        return write_location
+    def external_read_location(
+        self,
+        write_location: str,
+        rendered_options: dict,
+        partition_columns: list,
+        partition_delimiter= "=",
+    ) -> str:
+        """
+        :param partition_columns: A list of dictionaries describing partition columns and values.
+                                e.g.: [{'Name': 'import_day', 'Value': '2'}, ...]
+        :param partition_delimiter: String used to join the partition name and value.
+                                    Defaults to "=" (Hive-style).
+                                    Examples: "_", "-", ""
+        """
+        if rendered_options.get("partition_by"):
+            parts = [write_location]
+            for col in partition_columns:
+                # Use the delimiter to form the partition path
+                parts.append(f"{col['Name']}{partition_delimiter}{col['Value']}")
+            parts.append("*")
+            return "/".join(parts)
+        else:
+            return write_location
 
     @available
     def warn_once(self, msg: str):
