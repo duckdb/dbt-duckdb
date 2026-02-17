@@ -5,6 +5,18 @@ import pytest
 from dbt.tests.util import run_dbt
 
 
+# NOTE: This module intentionally includes "compile-only" tests that call low-level adapter
+# macros (e.g. `duckdb__create_table_as` / `py_write_table`) via small helper macros.
+#
+# Rationale:
+# - The DuckLake `partitioned_by` implementation is mostly Jinja logic that decides whether to
+#   emit `ALTER TABLE .. SET PARTITIONED BY ..` and how to validate/parse user input.
+# - These tests unit-test that compilation output includes (or omits) the expected statements,
+#   without requiring DuckLake attachments or DuckLake metadata tables.
+#
+# See `tests/functional/adapter/test_ducklake_partitioned_by_integration.py` for end-to-end
+# integration tests that assert partition metadata on real DuckLake tables.
+
 models__partitioned_by_table = """
 {{ config(materialized='view', partitioned_by='ds') }}
 
