@@ -17,6 +17,17 @@ from dbt.adapters.duckdb.secrets import Secret
 
 
 @dataclass
+class DuckLakeRetries(dbtClassMixin):
+    # Retry attempts for transient MotherDuck DuckLake commit/write conflicts. This is a
+    # message-based retry (substring match) rather than an exception-class-based retry.
+    query_attempts: int = 6
+    base_sleep_seconds: float = 0.25
+    max_sleep_seconds: float = 4.0
+    # Optional list of additional retryable message substrings (case-insensitive).
+    retryable_messages: Optional[List[str]] = None
+
+
+@dataclass
 class Attachment(dbtClassMixin):
     # The path to the database to be attached (may be a URL)
     path: str
@@ -227,6 +238,11 @@ class DuckDBCredentials(Credentials):
     # by networking issues)
     retries: Optional[Retries] = None
 
+    # Optional retry strategy for transient MotherDuck DuckLake commit conflicts when running
+    # with concurrency. This is separate from `retries` because DuckLake errors are often not
+    # distinguishable by exception class.
+    ducklake_retries: Optional[DuckLakeRetries] = None
+
     # An optional flag to indicate whether the database is a ducklake database,
     # so that the adapter can generate queries that work for ducklake.
     # This is not always necessary when using a ducklake database, but
@@ -392,4 +408,5 @@ class DuckDBCredentials(Credentials):
             "remote",
             "plugins",
             "disable_transactions",
+            "ducklake_retries",
         )

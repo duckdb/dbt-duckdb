@@ -47,7 +47,13 @@ class DuckDBConnectionManager(SQLConnectionManager):
                     "For MotherDuck DuckLake targets, dbt-duckdb forces disable_transactions=true "
                     "when threads>1 to avoid intermittent DuckLake commit conflicts under concurrency."
                 )
+            # Ensure both the connection manager and macro-level `adapter.disable_transactions()`
+            # see consistent values.
             self.disable_transactions = True
+            try:
+                config.credentials.disable_transactions = True  # type: ignore[attr-defined]
+            except Exception:
+                pass
 
     @classmethod
     def env(cls) -> environments.Environment:
