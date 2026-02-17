@@ -130,10 +130,11 @@ def mock_plugin_config():
 
 @pytest.fixture
 def mock_creds(dbt_profile_target, mock_plugin_config):
+    path = dbt_profile_target.get("path", ":memory:")
     plugin_config = PluginConfig(module="motherduck", config=mock_plugin_config)
-    if "md:" in dbt_profile_target["path"]:
-        return DuckDBCredentials(path=dbt_profile_target["path"], plugins=[plugin_config])
-    return DuckDBCredentials(path=dbt_profile_target["path"])
+    if "md:" in path:
+        return DuckDBCredentials(path=path, plugins=[plugin_config])
+    return DuckDBCredentials(path=path)
 
 
 @pytest.fixture
@@ -145,6 +146,7 @@ def mock_plugins(mock_creds, mock_plugin_config):
 
 
 def test_motherduck_user_agent(dbt_profile_target, mock_plugins, mock_creds):
+    path = dbt_profile_target.get("path", ":memory:")
     with mock.patch("dbt.adapters.duckdb.environments.duckdb.connect") as mock_connect:
         mock_creds.settings = {"custom_user_agent": "downstream-dep"}
         Environment.initialize_db(mock_creds, plugins=mock_plugins)
@@ -156,6 +158,6 @@ def test_motherduck_user_agent(dbt_profile_target, mock_plugins, mock_creds):
                     'motherduck_token': 'quack'
                 }
             }
-            mock_connect.assert_called_with(dbt_profile_target["path"], **kwargs)
+            mock_connect.assert_called_with(path, **kwargs)
         else:
-            mock_connect.assert_called_with(dbt_profile_target["path"], read_only=False, config = {})
+            mock_connect.assert_called_with(path, read_only=False, config={})

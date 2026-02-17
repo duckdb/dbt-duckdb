@@ -27,11 +27,11 @@
 
   -- `BEGIN` happens here:
   {{ run_hooks(pre_hooks, inside_transaction=True) }}
+  {%- set partitioned_by = duckdb__get_partitioned_by(target_relation, false) -%}
 
   -- build model
   {% call statement('main', language=language) -%}
-    {%- set partitioned_by = duckdb__get_partitioned_by(target_relation, false) -%}
-    {{- duckdb__create_table_as(False, intermediate_relation, compiled_code, language, partitioned_by=partitioned_by) }}
+    {{- duckdb__create_table_as(False, intermediate_relation, compiled_code, language) }}
   {%- endcall %}
 
   -- cleanup
@@ -42,6 +42,9 @@
   {% endif %}
 
   {{ adapter.rename_relation(intermediate_relation, target_relation) }}
+  {% if partitioned_by %}
+    {% do run_query(duckdb__alter_table_set_partitioned_by(target_relation, partitioned_by)) %}
+  {% endif %}
 
   {% do create_indexes(target_relation) %}
 

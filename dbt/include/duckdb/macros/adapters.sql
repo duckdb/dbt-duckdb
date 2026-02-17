@@ -57,6 +57,39 @@
   )
 {% endmacro %}
 
+
+{% macro duckdb__is_valid_partition_identifier(identifier) -%}
+  {%- set ident = identifier | trim -%}
+  {%- if ident == '' -%}
+    {{ return(false) }}
+  {%- endif -%}
+
+  {# Allow quoted identifiers, but disallow embedded quotes. #}
+  {%- if ident[:1] == '"' and ident[-1:] == '"' and ident | length > 2 -%}
+    {%- set inner = ident[1:-1] -%}
+    {%- if '"' in inner -%}
+      {{ return(false) }}
+    {%- endif -%}
+    {{ return(true) }}
+  {%- endif -%}
+
+  {%- set first_chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_" -%}
+  {%- set rest_chars = first_chars ~ "0123456789" -%}
+
+  {%- if ident[0] not in first_chars -%}
+    {{ return(false) }}
+  {%- endif -%}
+
+  {%- for ch in ident[1:] -%}
+    {%- if ch not in rest_chars -%}
+      {{ return(false) }}
+    {%- endif -%}
+  {%- endfor -%}
+
+  {{ return(true) }}
+{%- endmacro %}
+
+
 {% macro duckdb__get_partitioned_by(relation, temporary) -%}
   {%- if temporary -%}
     {{ return(none) }}
@@ -70,37 +103,64 @@
     {{ return(none) }}
   {%- endif -%}
 
+  {%- set type_error = "partitioned_by/partition_by must be a string or list of strings" -%}
+  {%- set list_item_error = "partitioned_by/partition_by list values must be non-empty strings" -%}
+  {%- set value_error = "partitioned_by/partition_by values must be valid column identifiers" -%}
+  {%- set empty_list_error = "partitioned_by/partition_by list must contain at least one value" -%}
+
   {%- if raw is mapping -%}
-    {% do exceptions.raise_compiler_error("partitioned_by/partition_by must be a string or list of strings") %}
+    {% do exceptions.raise_compiler_error(type_error) %}
   {%- elif raw is string -%}
-    {%- set value = raw -%}
+    {%- set source_is_list = false -%}
+    {%- set value = raw | trim -%}
+    {%- if value == '' -%}
+      {{ return(none) }}
+    {%- endif -%}
+    {%- if value[:1] == '(' and value[-1:] == ')' -%}
+      {%- set value = value[1:-1] | trim -%}
+    {%- endif -%}
+    {%- set raw_parts = value.split(',') -%}
   {%- elif raw is iterable -%}
-    {%- set values = [] -%}
-    {%- for item in raw -%}
-      {%- if item is not string -%}
-        {% do exceptions.raise_compiler_error("partitioned_by/partition_by list values must be non-empty strings") %}
-      {%- endif -%}
-      {%- set cleaned_item = item | trim -%}
-      {%- if cleaned_item == '' -%}
-        {% do exceptions.raise_compiler_error("partitioned_by/partition_by list values must be non-empty strings") %}
-      {%- endif -%}
-      {%- do values.append(cleaned_item) -%}
-    {%- endfor -%}
-    {%- set value = values | join(', ') -%}
+    {%- set source_is_list = true -%}
+    {%- set raw_parts = raw -%}
+    {%- if raw_parts | length == 0 -%}
+      {% do exceptions.raise_compiler_error(empty_list_error) %}
+    {%- endif -%}
   {%- else -%}
-    {% do exceptions.raise_compiler_error("partitioned_by/partition_by must be a string or list of strings") %}
+    {% do exceptions.raise_compiler_error(type_error) %}
   {%- endif -%}
 
-  {%- set value = value | trim -%}
-  {%- if value == '' -%}
+  {%- set value_parts = [] -%}
+  {%- for part in raw_parts -%}
+    {%- if part is not string -%}
+      {% do exceptions.raise_compiler_error(list_item_error) %}
+    {%- endif -%}
+    {%- set cleaned_part = part | trim -%}
+    {%- if cleaned_part == '' -%}
+      {% if source_is_list %}
+        {% do exceptions.raise_compiler_error(list_item_error) %}
+      {% else %}
+        {% do exceptions.raise_compiler_error(value_error) %}
+      {% endif %}
+    {%- endif -%}
+    {%- if not duckdb__is_valid_partition_identifier(cleaned_part) -%}
+      {% do exceptions.raise_compiler_error(value_error) %}
+    {%- endif -%}
+    {%- do value_parts.append(cleaned_part) -%}
+  {%- endfor -%}
+  {%- set value = value_parts | join(', ') -%}
+
+  {# Apply partitioning only on the final target relation, not staging/intermediate relations. #}
+  {%- if this is defined and config.get('materialized') in ['table', 'incremental']
+      and relation.identifier and this.identifier and relation.identifier != this.identifier -%}
     {{ return(none) }}
-  {%- endif -%}
-  {%- if value[:1] == '(' and value[-1:] == ')' -%}
-    {%- set value = value[1:-1] | trim -%}
   {%- endif -%}
 
   {%- if not adapter.is_ducklake(relation) -%}
-    {% do adapter.warn_once("partitioned_by/partition_by is only supported for DuckLake relations; ignoring for " ~ relation) %}
+    {% do adapter.warn_once(
+      "partitioned_by/partition_by is only supported for DuckLake relations; ignoring for "
+      ~ relation
+    ) %}
     {{ return(none) }}
   {%- endif -%}
 
