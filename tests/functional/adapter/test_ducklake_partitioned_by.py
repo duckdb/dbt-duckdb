@@ -114,8 +114,10 @@ class BasePartitionedByCompile:
 class TestDucklakePartitionedByCompile(BasePartitionedByCompile):
     @pytest.fixture(scope="class")
     def dbt_profile_target(self, dbt_profile_target):
-        dbt_profile_target["is_ducklake"] = True
-        return dbt_profile_target
+        # Avoid mutating the session-scoped fixture in-place.
+        target = dict(dbt_profile_target)
+        target["is_ducklake"] = True
+        return target
 
     def test_partitioned_by_string(self, project):
         run_dbt(["compile"])
@@ -158,8 +160,10 @@ class TestDucklakePartitionedByCompile(BasePartitionedByCompile):
 class TestNonDucklakePartitionedByCompile(BasePartitionedByCompile):
     @pytest.fixture(scope="class")
     def dbt_profile_target(self, dbt_profile_target):
-        dbt_profile_target.pop("is_ducklake", None)
-        return dbt_profile_target
+        # Avoid mutating the session-scoped fixture in-place.
+        target = dict(dbt_profile_target)
+        target.pop("is_ducklake", None)
+        return target
 
     def test_partitioned_by_ignored(self, project):
         run_dbt(["compile"])
@@ -197,8 +201,10 @@ class TestPartitionedByValidation:
 
     @pytest.fixture(scope="class")
     def dbt_profile_target(self, dbt_profile_target):
-        dbt_profile_target["is_ducklake"] = True
-        return dbt_profile_target
+        # Avoid mutating the session-scoped fixture in-place.
+        target = dict(dbt_profile_target)
+        target["is_ducklake"] = True
+        return target
 
     def test_partitioned_by_list_values_must_be_strings(self, project):
         with pytest.raises(Exception, match="partitioned_by/partition_by list values must be non-empty strings"):
