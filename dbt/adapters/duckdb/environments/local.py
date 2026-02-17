@@ -1,5 +1,4 @@
 import threading
-from typing import Dict
 
 from dbt_common.exceptions import DbtRuntimeError
 
@@ -11,9 +10,8 @@ from dbt.adapters.contracts.connection import Connection
 
 
 class DuckDBCursorWrapper:
-    def __init__(self, cursor, execute_lock=None):
+    def __init__(self, cursor):
         self._cursor = cursor
-        self._execute_lock = execute_lock
 
     # forward along all non-execute() methods/attribute look-ups
     def __getattr__(self, name):
@@ -21,31 +19,23 @@ class DuckDBCursorWrapper:
 
     def execute(self, sql, bindings=None):
         try:
-            if self._execute_lock is not None:
-                with self._execute_lock:
-                    if bindings is None:
-                        return self._cursor.execute(sql)
-                    else:
-                        return self._cursor.execute(sql, bindings)
+            if bindings is None:
+                return self._cursor.execute(sql)
             else:
-                if bindings is None:
-                    return self._cursor.execute(sql)
-                else:
-                    return self._cursor.execute(sql, bindings)
+                return self._cursor.execute(sql, bindings)
         except RuntimeError as e:
             # Preserve original error with full context including potential transaction state info
             raise DbtRuntimeError(str(e)) from e
 
 
 class DuckDBConnectionWrapper:
-    def __init__(self, cursor, env, thread_id: int, execute_lock=None):
-        self._cursor = DuckDBCursorWrapper(cursor, execute_lock=execute_lock)
+    def __init__(self, cursor, env):
+        self._cursor = DuckDBCursorWrapper(cursor)
         self._env = env
-        self._thread_id = thread_id
 
     def close(self):
         self._cursor.close()
-        self._env.notify_closed(self._thread_id)
+        self._env.notify_closed()
 
     def cursor(self):
         return self._cursor
@@ -56,42 +46,20 @@ class LocalEnvironment(Environment):
         # Set the conn attribute to None so it always exists even if
         # DB initialization fails
         super().__init__(credentials)
-        # Kept for backward compatibility: some tests introspect `env.conn`.
         self.conn = None
-
-        # DuckDB in-memory databases are per-connection. dbt's test utilities can execute dbt in a
-        # different thread than the test assertions, so for `:memory:` we must share a single
-        # connection across threads to ensure all cursors see the same database.
-        self._share_conn_across_threads = credentials.path == ":memory:"
-
-        # For non-`:memory:` targets, DuckDB Python connections are not safe to share across
-        # threads. dbt executes models concurrently using multiple threads, so we keep one
-        # connection per thread.
-        self._conns: Dict[int, object] = {}
-        self._handle_counts: Dict[int, int] = {}
-        self._shared_handle_count = 0
         self._plugins = self.initialize_plugins(credentials)
+        self.handle_count = 0
         self.lock = threading.RLock()
-        self._execute_lock = threading.RLock()
         self._keep_open = (
             credentials.keep_open or credentials.path == ":memory:" or credentials.is_motherduck
         )
         self._REGISTERED_DF: dict = {}
 
-    def notify_closed(self, thread_id: int):
+    def notify_closed(self):
         with self.lock:
-            if self._share_conn_across_threads:
-                self._shared_handle_count -= 1
-                if self._shared_handle_count <= 0 and not self._keep_open:
-                    self.close()
-            else:
-                self._handle_counts[thread_id] = self._handle_counts.get(thread_id, 0) - 1
-                if self._handle_counts[thread_id] <= 0:
-                    self._handle_counts.pop(thread_id, None)
-                    if not self._keep_open:
-                        conn = self._conns.pop(thread_id, None)
-                        if conn is not None:
-                            conn.close()
+            self.handle_count -= 1
+            if self.handle_count == 0 and not self._keep_open:
+                self.close()
 
     def is_cancelable(cls):
         return True
@@ -102,33 +70,15 @@ class LocalEnvironment(Environment):
 
     def handle(self):
         # Extensions/settings need to be configured per cursor
-        thread_id = threading.get_ident()
         with self.lock:
-            if self._share_conn_across_threads:
-                if self.conn is None:
-                    self.conn = self.initialize_db(self.creds, self._plugins)
-                self._shared_handle_count += 1
-                cursor = self.initialize_cursor(
-                    self.creds, self.conn.cursor(), self._plugins, self._REGISTERED_DF
-                )
-                return DuckDBConnectionWrapper(
-                    cursor, self, thread_id, execute_lock=self._execute_lock
-                )
+            if self.conn is None:
+                self.conn = self.initialize_db(self.creds, self._plugins)
+            self.handle_count += 1
 
-            conn = self._conns.get(thread_id)
-            if conn is None:
-                conn = self.initialize_db(self.creds, self._plugins)
-                self._conns[thread_id] = conn
-                if self.conn is None:
-                    self.conn = conn
-            self._handle_counts[thread_id] = self._handle_counts.get(thread_id, 0) + 1
-
-            # Create the cursor while holding the lock. Even with per-thread connections, this
-            # prevents accidental cross-thread cursor creation if callers misbehave.
-            cursor = self.initialize_cursor(
-                self.creds, conn.cursor(), self._plugins, self._REGISTERED_DF
-            )
-            return DuckDBConnectionWrapper(cursor, self, thread_id)
+        cursor = self.initialize_cursor(
+            self.creds, self.conn.cursor(), self._plugins, self._REGISTERED_DF
+        )
+        return DuckDBConnectionWrapper(cursor, self)
 
     def submit_python_job(self, handle, parsed_model: dict, compiled_code: str) -> AdapterResponse:
         con = handle.cursor()
@@ -211,19 +161,9 @@ class LocalEnvironment(Environment):
         plugin.store(target_config)
 
     def close(self):
-        with self.lock:
-            if self.conn is not None:
-                self.conn.close()
-                self.conn = None
-            for conn in self._conns.values():
-                # Might already be closed if `self.conn` aliases a thread connection.
-                try:
-                    conn.close()
-                except Exception:
-                    pass
-            self._conns.clear()
-            self._handle_counts.clear()
-            self._shared_handle_count = 0
+        if self.conn:
+            self.conn.close()
+            self.conn = None
 
     def __del__(self):
         self.close()

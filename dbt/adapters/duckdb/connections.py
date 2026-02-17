@@ -32,29 +32,6 @@ class DuckDBConnectionManager(SQLConnectionManager):
         super().__init__(config, mp_context)
         self.disable_transactions = config.credentials.disable_transactions  # type: ignore
 
-        # DuckLake on MotherDuck can raise intermittent commit/write conflicts when multiple dbt
-        # threads run concurrent DDL/DML. Disabling explicit transactions makes failures
-        # statement-scoped, which we can safely retry.
-        threads = getattr(config, "threads", 1)
-        if (
-            getattr(config.credentials, "is_motherduck", False)
-            and getattr(config.credentials, "is_ducklake", False)
-            and isinstance(threads, int)
-            and threads > 1
-        ):
-            if not self.disable_transactions:
-                self.warn_once(
-                    "For MotherDuck DuckLake targets, dbt-duckdb forces disable_transactions=true "
-                    "when threads>1 to avoid intermittent DuckLake commit conflicts under concurrency."
-                )
-            # Ensure both the connection manager and macro-level `adapter.disable_transactions()`
-            # see consistent values.
-            self.disable_transactions = True
-            try:
-                config.credentials.disable_transactions = True  # type: ignore[attr-defined]
-            except Exception:
-                pass
-
     @classmethod
     def env(cls) -> environments.Environment:
         with cls._LOCK:
@@ -139,11 +116,6 @@ class DuckDBConnectionManager(SQLConnectionManager):
     def close_all_connections(cls):
         with cls._LOCK:
             if cls._ENV is not None:
-                # Ensure underlying DuckDB connections are closed (important for thread-local envs).
-                try:
-                    cls._ENV.close()
-                except Exception:
-                    pass
                 cls._ENV = None
 
     def execute(

@@ -295,18 +295,14 @@ class DuckDBAdapter(SQLAdapter):
         return super().get_incremental_strategy_macro(model_context, strategy)
 
     def commit_if_has_connection(self) -> None:
-        """Commit if a connection exists.
-
-        dbt-core may call commit in some execution paths even when no transaction was opened
-        (for example, around Python model execution). Treat "no open transaction" as a no-op.
-        """
+        """This is just a quick-fix. Python models do not execute begin function so the transaction_open is always false."""
         try:
             self.connections.commit_if_has_connection()
         except DbtInternalError as e:
-            # In some execution paths (notably Python models), dbt-core may call commit even when
-            # no transaction was opened. Preserve historical behavior and treat this as a no-op.
-            logger.debug(f"Ignoring commit on connection with no open transaction: {e}")
-            return
+            # Log commit errors instead of silently swallowing them to aid debugging
+            logger.warning(f"Commit failed with DbtInternalError: {e}\n{traceback.format_exc()}")
+            # Still pass to maintain backward compatibility, but now with visibility
+            pass
 
     def submit_python_job(self, parsed_model: dict, compiled_code: str) -> AdapterResponse:
         connection = self.connections.get_if_exists()
