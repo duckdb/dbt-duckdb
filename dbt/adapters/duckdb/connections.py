@@ -35,13 +35,17 @@ class DuckDBConnectionManager(SQLConnectionManager):
         # DuckLake on MotherDuck can raise intermittent commit/write conflicts when multiple dbt
         # threads run concurrent DDL/DML. Disabling explicit transactions makes failures
         # statement-scoped, which we can safely retry.
-        if getattr(config.credentials, "is_motherduck", False) and getattr(
-            config.credentials, "is_ducklake", False
+        threads = getattr(config, "threads", 1)
+        if (
+            getattr(config.credentials, "is_motherduck", False)
+            and getattr(config.credentials, "is_ducklake", False)
+            and isinstance(threads, int)
+            and threads > 1
         ):
             if not self.disable_transactions:
                 self.warn_once(
                     "For MotherDuck DuckLake targets, dbt-duckdb forces disable_transactions=true "
-                    "to avoid intermittent DuckLake commit conflicts under concurrency."
+                    "when threads>1 to avoid intermittent DuckLake commit conflicts under concurrency."
                 )
             self.disable_transactions = True
 
