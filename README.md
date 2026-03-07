@@ -59,7 +59,3 @@ zensical build --clean   # output in /site
 ```bash
 zensical serve -o   # opens at localhost:8000/dbt-duckdb
 ```
-
-## Contributing
-
-Please open an issue or pull request on [GitHub](https://github.com/duckdb/dbt-duckdb).
