@@ -1,0 +1,51 @@
+[project]
+site_name = "dbt-duckdb"
+site_url = "https://leosharer.github.io/dbt-duckdb"
+site_description = "Documentation for the dbt-duckdb project."
+repo_url = "https://github.com/leosharer/dbt-duckdb"
+repo_name = "leosharer/dbt-duckdb"
+variant = "modern"
+docs_dir = "docs"
+
+nav = [
+  {"Home" = "index.md"},
+  {"Installation" = "installation.md"},
+  {"Configuration" = [
+    "configuration/index.md",
+    "configuration/motherduck.md",
+    "configuration/extensions.md",
+    "configuration/databases.md",
+    "configuration/plugins.md",
+  ]},
+  {"External Files" = [
+    "external-files/reading.md",
+    "external-files/writing.md",
+  ]},
+  {"Incremental Models" = [
+    "incremental/index.md",
+    "incremental/merge.md",
+  ]},
+  {"Table Function" = "table-function.md"},
+  {"Python Models" = "python-models.md"},
+  {"Custom Plugins" = "custom-plugins.md"},
+  {"Interactive Shell" = "interactive-shell.md"},
+]
+
+[project.theme.icon]
+repo = "fontawesome/brands/github"
+
+# Palette toggle for light mode
+[[project.theme.palette]]
+scheme = "default"
+primary = "deep orange"
+accent = "indigo"
+toggle.icon = "lucide/moon"
+toggle.name = "Switch to dark mode"
+
+# Palette toggle for dark mode
+[[project.theme.palette]]
+scheme = "slate"
+primary = "deep orange"
+accent = "yellow"
+toggle.icon = "lucide/sun"
+toggle.name = "Switch to light mode"
