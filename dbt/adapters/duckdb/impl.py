@@ -25,6 +25,10 @@ from dbt.adapters.base import BaseRelation
 from dbt.adapters.base.column import Column as BaseColumn
 from dbt.adapters.base.impl import ConstraintSupport
 from dbt.adapters.base.meta import available
+from dbt.adapters.capability import Capability
+from dbt.adapters.capability import CapabilityDict
+from dbt.adapters.capability import CapabilitySupport
+from dbt.adapters.capability import Support
 from dbt.adapters.contracts.connection import AdapterResponse
 from dbt.adapters.contracts.relation import Path
 from dbt.adapters.contracts.relation import RelationType
@@ -88,6 +92,10 @@ class DuckDBAdapter(SQLAdapter):
     Relation = DuckDBRelation
 
     AdapterSpecificConfigs = DuckDBConfig
+
+    _capabilities: CapabilityDict = CapabilityDict(
+        {Capability.SchemaMetadataByRelations: CapabilitySupport(support=Support.Full)}
+    )
 
     CONSTRAINT_SUPPORT = {
         ConstraintType.check: ConstraintSupport.ENFORCED,
