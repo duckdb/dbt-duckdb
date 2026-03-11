@@ -200,13 +200,14 @@ class TestCatalogRelationsDuckDB:
         return path
 
     @pytest.fixture(scope="class")
-    def profiles_config_update(self, dbt_profile_target, attach_test_db):
+    def profiles_config_update(self, dbt_profile_target, attach_test_db, unique_schema):
         return {
             "test": {
                 "outputs": {
                     "dev": {
                         "type": "duckdb",
                         "path": dbt_profile_target.get("path", ":memory:"),
+                        "schema": unique_schema,
                         "attach": [{"path": attach_test_db}],
                     }
                 },
