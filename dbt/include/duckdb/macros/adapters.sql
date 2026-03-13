@@ -58,7 +58,121 @@
 {% endmacro %}
 
 
-{% macro duckdb__create_table_as(temporary, relation, compiled_code, language='sql') -%}
+{% macro duckdb__is_valid_partition_identifier(identifier) -%}
+  {%- set ident = identifier | trim -%}
+  {%- if ident == '' -%}
+    {{ return(false) }}
+  {%- endif -%}
+
+  {# Allow quoted identifiers, but disallow embedded quotes. #}
+  {%- if ident[:1] == '"' and ident[-1:] == '"' and ident | length > 2 -%}
+    {%- set inner = ident[1:-1] -%}
+    {%- if '"' in inner -%}
+      {{ return(false) }}
+    {%- endif -%}
+    {{ return(true) }}
+  {%- endif -%}
+
+  {%- set first_chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_" -%}
+  {%- set rest_chars = first_chars ~ "0123456789" -%}
+
+  {%- if ident[0] not in first_chars -%}
+    {{ return(false) }}
+  {%- endif -%}
+
+  {%- for ch in ident[1:] -%}
+    {%- if ch not in rest_chars -%}
+      {{ return(false) }}
+    {%- endif -%}
+  {%- endfor -%}
+
+  {{ return(true) }}
+{%- endmacro %}
+
+
+{% macro duckdb__get_partitioned_by(relation, temporary) -%}
+  {%- if temporary -%}
+    {{ return(none) }}
+  {%- endif -%}
+
+  {%- set raw = config.get('partitioned_by', none) -%}
+  {%- if raw is none -%}
+    {%- set raw = config.get('partition_by', none) -%}
+  {%- endif -%}
+  {%- if raw is none -%}
+    {{ return(none) }}
+  {%- endif -%}
+
+  {%- set type_error = "partitioned_by/partition_by must be a string or list of strings" -%}
+  {%- set list_item_error = "partitioned_by/partition_by list values must be non-empty strings" -%}
+  {%- set value_error = "partitioned_by/partition_by values must be valid column identifiers" -%}
+  {%- set empty_list_error = "partitioned_by/partition_by list must contain at least one value" -%}
+
+  {%- if raw is mapping -%}
+    {% do exceptions.raise_compiler_error(type_error) %}
+  {%- elif raw is string -%}
+    {%- set source_is_list = false -%}
+    {%- set value = raw | trim -%}
+    {%- if value == '' -%}
+      {{ return(none) }}
+    {%- endif -%}
+    {%- if value[:1] == '(' and value[-1:] == ')' -%}
+      {%- set value = value[1:-1] | trim -%}
+    {%- endif -%}
+    {%- set raw_parts = value.split(',') -%}
+  {%- elif raw is iterable -%}
+    {%- set source_is_list = true -%}
+    {%- set raw_parts = raw -%}
+    {%- if raw_parts | length == 0 -%}
+      {% do exceptions.raise_compiler_error(empty_list_error) %}
+    {%- endif -%}
+  {%- else -%}
+    {% do exceptions.raise_compiler_error(type_error) %}
+  {%- endif -%}
+
+  {%- set value_parts = [] -%}
+  {%- for part in raw_parts -%}
+    {%- if part is not string -%}
+      {% do exceptions.raise_compiler_error(list_item_error) %}
+    {%- endif -%}
+    {%- set cleaned_part = part | trim -%}
+    {%- if cleaned_part == '' -%}
+      {% if source_is_list %}
+        {% do exceptions.raise_compiler_error(list_item_error) %}
+      {% else %}
+        {% do exceptions.raise_compiler_error(value_error) %}
+      {% endif %}
+    {%- endif -%}
+    {%- if not duckdb__is_valid_partition_identifier(cleaned_part) -%}
+      {% do exceptions.raise_compiler_error(value_error) %}
+    {%- endif -%}
+    {%- do value_parts.append(cleaned_part) -%}
+  {%- endfor -%}
+  {%- set value = value_parts | join(', ') -%}
+
+  {# Apply partitioning only on the final target relation, not staging/intermediate relations. #}
+  {%- if this is defined and config.get('materialized') in ['table', 'incremental']
+      and relation.identifier and this.identifier and relation.identifier != this.identifier -%}
+    {{ return(none) }}
+  {%- endif -%}
+
+  {%- if not adapter.is_ducklake(relation) -%}
+    {% do adapter.warn_once(
+      "partitioned_by/partition_by is only supported for DuckLake relations; ignoring for "
+      ~ relation
+    ) %}
+    {{ return(none) }}
+  {%- endif -%}
+
+  {{ return(value) }}
+{%- endmacro %}
+
+
+{% macro duckdb__alter_table_set_partitioned_by(relation, partitioned_by) -%}
+  alter table {{ relation }} set partitioned by ({{ partitioned_by }});
+{%- endmacro %}
+
+{% macro duckdb__create_table_as(temporary, relation, compiled_code, language='sql', partitioned_by=none) -%}
   {%- if language == 'sql' -%}
     {% set contract_config = config.get('contract') %}
     {% if contract_config.enforced %}
@@ -73,22 +187,39 @@
   {% if contract_config.enforced and not temporary %}
     {#-- DuckDB doesnt support constraints on temp tables --#}
     {{ get_table_columns_and_constraints() }} ;
+    {% if partitioned_by %}
+      {{ duckdb__alter_table_set_partitioned_by(relation, partitioned_by) }}
+    {% endif %}
     insert into {{ relation }} {{ get_column_names() }} (
       {{ get_select_subquery(compiled_code) }}
     );
   {% else %}
+    {% if partitioned_by %}
+    as (
+      select * from (
+        {{ compiled_code }}
+      ) as model_subq
+      limit 0
+    );
+    {{ duckdb__alter_table_set_partitioned_by(relation, partitioned_by) }}
+    insert into {{ relation }}
+      select * from (
+        {{ compiled_code }}
+      ) as model_subq;
+    {% else %}
     as (
       {{ compiled_code }}
     );
+    {% endif %}
   {% endif %}
   {%- elif language == 'python' -%}
-    {{ py_write_table(temporary=temporary, relation=relation, compiled_code=compiled_code) }}
+    {{ py_write_table(temporary=temporary, relation=relation, compiled_code=compiled_code, partitioned_by=partitioned_by) }}
   {%- else -%}
       {% do exceptions.raise_compiler_error("duckdb__create_table_as macro didn't get supported language, it got %s" % language) %}
   {%- endif -%}
 {% endmacro %}
 
-{% macro py_write_table(temporary, relation, compiled_code) -%}
+{% macro py_write_table(temporary, relation, compiled_code, partitioned_by=none) -%}
 {{ compiled_code }}
 
 def materialize(df, con):
@@ -103,7 +234,13 @@ def materialize(df, con):
             import pyarrow.dataset
     tmp_name = '__dbt_python_model_df_' + '{{ relation.identifier }}'
     con.register(tmp_name, df)
+    {% if partitioned_by %}
+    con.execute('create table {{ relation }} as select * from ' + tmp_name + ' limit 0')
+    con.execute('alter table {{ relation }} set partitioned by ({{ partitioned_by }})')
+    con.execute('insert into {{ relation }} select * from ' + tmp_name)
+    {% else %}
     con.execute('create table {{ relation }} as select * from ' + tmp_name)
+    {% endif %}
     con.unregister(tmp_name)
 {% endmacro %}
 

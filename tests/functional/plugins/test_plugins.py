@@ -1,4 +1,5 @@
 import os
+import tempfile
 import pytest
 import sqlite3
 
@@ -45,7 +46,10 @@ plugin_sql = """
 class TestPlugins:
     @pytest.fixture(scope="class")
     def sqlite_test_db(self):
-        path = "/tmp/satest.db"
+        fd, path = tempfile.mkstemp(prefix="satest_", suffix=".db")
+        os.close(fd)
+        if os.path.exists(path):
+            os.unlink(path)
         db = sqlite3.connect(path)
         cursor = db.cursor()
         cursor.execute("CREATE TABLE tt1 (id int, name text)")

@@ -513,6 +513,38 @@ models:
 > [!TIP]
 > Microbatching might not always be best option from a performance perspective. Consider that DuckDB operates on row groups, not physical partitions (unless you have explicitly partitioned data in a DuckLake). While you can do batch processing in parallel, more threads with more batches in parallel does not always equal better performance as row groups might not align 1-1 with the batches. Be sure to test different amounts of threads to match your use case.
 
+#### DuckLake Table Partitioning
+
+For DuckLake-backed tables (including MotherDuck-managed DuckLake), you can configure physical partitioning for `table` or `incremental` models using `partitioned_by`:
+
+```sql
+{{ config(materialized='table', partitioned_by=['year', 'month']) }}
+
+select
+  *,
+  year(event_time) as year,
+  month(event_time) as month
+from {{ ref('upstream_model') }}
+```
+
+`partition_by` is accepted as an alias for `partitioned_by`. This setting is only applied for DuckLake relations; on non-DuckLake targets it is ignored with a warning.
+
+DuckLake applies partitioning via `ALTER TABLE ... SET PARTITIONED BY (...)`, and partitioning only affects new data. For first builds or full refreshes, dbt-duckdb creates an empty table, sets partitioning, then inserts data so the initial load is partitioned. For incremental runs that only insert/update, no ALTER is issued. See the DuckLake docs for details: [ducklake.select](https://ducklake.select/docs/stable/duckdb/advanced_features/partitioning).
+
+Example partitions (day, month, year, hour):
+
+```sql
+{{ config(materialized='table', partitioned_by=['event_day', 'event_month', 'event_year', 'event_hour']) }}
+
+select
+  *,
+  date_trunc('day', event_time) as event_day,
+  date_trunc('month', event_time) as event_month,
+  date_trunc('year', event_time) as event_year,
+  date_trunc('hour', event_time) as event_hour
+from {{ ref('upstream_model') }}
+```
+
 
 **Merge Strategy (DuckDB >= 1.4.0):**
 
