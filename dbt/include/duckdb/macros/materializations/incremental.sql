@@ -20,6 +20,7 @@
   {%- if existing_relation is none or full_refresh_mode -%}
     {%- set partitioned_by = duckdb__get_partitioned_by(target_relation, false) -%}
   {%- endif -%}
+  {%- set use_non_transactional_partitioning = partitioned_by and adapter.is_ducklake(target_relation) -%}
 
   -- the temp_ and backup_ relations should not already exist in the database; get_relation
   -- will return None in that case. Otherwise, we get a relation that we can drop
@@ -57,7 +58,7 @@
   {% if existing_relation is none %}
     {% set build_sql = duckdb__create_table_as(False, target_relation, compiled_code, language, partitioned_by=partitioned_by) %}
   {% elif full_refresh_mode %}
-    {% set build_sql = duckdb__create_table_as(False, intermediate_relation, compiled_code, language, partitioned_by=none) %}
+    {% set build_sql = duckdb__create_table_as(False, intermediate_relation, compiled_code, language, partitioned_by=partitioned_by) %}
     {% set need_swap = true %}
   {% else %}
     {% if language == 'python' %}
@@ -87,7 +88,7 @@
 
   {% endif %}
 
-  {% call statement("main", language=language) %}
+  {% call statement("main", language=language, auto_begin=not use_non_transactional_partitioning) %}
       {{- build_sql }}
   {% endcall %}
 
@@ -96,9 +97,6 @@
       {% do drop_indexes_on_relation(target_relation) %}
       {% do adapter.rename_relation(target_relation, backup_relation) %}
       {% do adapter.rename_relation(intermediate_relation, target_relation) %}
-      {% if partitioned_by %}
-        {% do run_query(duckdb__alter_table_set_partitioned_by(target_relation, partitioned_by)) %}
-      {% endif %}
       {% do to_drop.append(backup_relation) %}
   {% endif %}
 
