@@ -12,16 +12,15 @@ class BaseCommunityExtensions:
 
     @pytest.fixture(scope="class")
     def dbt_profile_target(self, dbt_profile_target):
-        target = dbt_profile_target.copy()
-        target["extensions"] = [
-            {"name": "capi_quack", "repo": "community"},
+        dbt_profile_target["extensions"] = [
+            {"name": "quack", "repo": "community"},
         ]
-        return target
+        return dbt_profile_target
 
     @pytest.fixture(scope="class")
     def models(self):
         return {
-            "quack_model.sql": "select multiply_numbers_together(6, 7) as quack_world",
+            "quack_model.sql": "select quack('world') as quack_world",
         }
 
     @pytest.fixture(scope="class")
