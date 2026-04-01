@@ -98,6 +98,10 @@ class DuckDBAdapter(SQLAdapter):
 
     AdapterSpecificConfigs = DuckDBConfig
 
+    _capabilities: CapabilityDict = CapabilityDict(
+        {Capability.SchemaMetadataByRelations: CapabilitySupport(support=Support.Full)}
+    )
+
     CONSTRAINT_SUPPORT = {
         ConstraintType.check: ConstraintSupport.ENFORCED,
         ConstraintType.not_null: ConstraintSupport.ENFORCED,
