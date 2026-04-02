@@ -56,18 +56,18 @@
   {{ run_hooks(pre_hooks, inside_transaction=True) }}
 
   {% if existing_relation is none %}
-    {% set build_sql = duckdb__create_table_as(False, target_relation, compiled_code, language, partitioned_by=partitioned_by) %}
+    {% set build_sql = create_table_as(False, target_relation, compiled_code, language, partitioned_by=partitioned_by) %}
   {% elif full_refresh_mode %}
-    {% set build_sql = duckdb__create_table_as(False, intermediate_relation, compiled_code, language, partitioned_by=partitioned_by) %}
+    {% set build_sql = create_table_as(False, intermediate_relation, compiled_code, language, partitioned_by=partitioned_by) %}
     {% set need_swap = true %}
   {% else %}
     {% if language == 'python' %}
-      {% set build_python = duckdb__create_table_as(temporary, temp_relation, compiled_code, language, partitioned_by=none) %}
+      {% set build_python = create_table_as(temporary, temp_relation, compiled_code, language, partitioned_by=none) %}
       {% call statement("pre", language=language) %}
         {{- build_python }}
       {% endcall %}
     {% else %} {# SQL #}
-      {% do run_query(duckdb__create_table_as(temporary, temp_relation, compiled_code, language, partitioned_by=none)) %}
+      {% do run_query(create_table_as(temporary, temp_relation, compiled_code, language, partitioned_by=none)) %}
     {% endif %}
     {% do adapter.expand_target_column_types(
              from_relation=temp_relation,

@@ -32,7 +32,7 @@
 
   -- build model
   {% call statement('main', language=language, auto_begin=not use_non_transactional_partitioning) -%}
-    {{- duckdb__create_table_as(False, intermediate_relation, compiled_code, language, partitioned_by=partitioned_by) }}
+    {{- create_table_as(False, intermediate_relation, compiled_code, language, partitioned_by=partitioned_by) }}
   {%- endcall %}
 
   -- cleanup
