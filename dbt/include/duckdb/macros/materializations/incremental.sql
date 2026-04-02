@@ -20,7 +20,7 @@
   {%- if existing_relation is none or full_refresh_mode -%}
     {%- set partitioned_by = duckdb__get_partitioned_by(target_relation, false) -%}
   {%- endif -%}
-  {%- set use_non_transactional_partitioning = partitioned_by and adapter.is_ducklake(target_relation) -%}
+  {%- set skip_auto_begin = partitioned_by and adapter.is_ducklake(target_relation) -%}
 
   -- the temp_ and backup_ relations should not already exist in the database; get_relation
   -- will return None in that case. Otherwise, we get a relation that we can drop
@@ -88,7 +88,7 @@
 
   {% endif %}
 
-  {% call statement("main", language=language, auto_begin=not use_non_transactional_partitioning) %}
+  {% call statement("main", language=language, auto_begin=not skip_auto_begin) %}
       {{- build_sql }}
   {% endcall %}
 
