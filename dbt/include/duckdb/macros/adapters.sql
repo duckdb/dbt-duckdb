@@ -74,7 +74,7 @@
   {%- set parts = normalize_string_or_list(raw, "partitioned_by/partition_by") -%}
 
   {%- if parts | length == 0 -%}
-    {{ return(none) }}
+    {% do exceptions.raise_compiler_error("partitioned_by/partition_by must contain at least one column") %}
   {%- endif -%}
 
   {# Apply partitioning only on the final target relation, not staging/intermediate relations. #}
@@ -91,7 +91,12 @@
     {{ return(none) }}
   {%- endif -%}
 
-  {{ return(parts | join(', ')) }}
+  {%- set quoted = [] -%}
+  {%- for col in parts -%}
+    {%- set escaped = col | replace('"', '""') -%}
+    {%- do quoted.append(adapter.quote(escaped)) -%}
+  {%- endfor -%}
+  {{ return(quoted | join(', ')) }}
 {%- endmacro %}
 
 

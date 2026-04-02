@@ -206,13 +206,12 @@ class TestPartitionedByValidation(BaseDucklakePartitionedBy):
 
     def test_partitioned_by_empty_list_is_invalid(self, project):
         result = run_dbt(["run", "--select", "empty_partitioned_by_list"], expect_pass=False)
-        assert "partitioned_by/partition_by list must contain at least one value" in str(
+        assert "partitioned_by/partition_by must contain at least one column" in str(
             result.results[0].message
         )
 
-    def test_partitioned_by_string_must_be_identifier_list(self, project):
+    def test_partitioned_by_invalid_string_rejected_by_duckdb(self, project):
+        """Invalid identifier is quoted and DuckDB rejects it as a nonexistent column."""
         result = run_dbt(["run", "--select", "invalid_partitioned_by_string"], expect_pass=False)
-        assert "partitioned_by/partition_by values must be valid column identifiers" in str(
-            result.results[0].message
-        )
+        assert "does not exist" in str(result.results[0].message)
 

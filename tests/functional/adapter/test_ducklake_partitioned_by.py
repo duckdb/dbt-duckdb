@@ -134,13 +134,13 @@ class TestDucklakePartitionedByCompile(BasePartitionedByCompile):
     def test_partitioned_by_string(self, project):
         run_dbt(["compile"])
         sql = read_compiled_file(project, "partitioned_by_table", "sql")
-        assert re.search(r"alter\s+table.*set\s+partitioned\s+by\s*\(\s*ds\s*\)", sql, re.IGNORECASE | re.DOTALL)
+        assert re.search(r'alter\s+table.*set\s+partitioned\s+by\s*\(\s*"ds"\s*\)', sql, re.IGNORECASE | re.DOTALL)
 
     def test_partition_by_list(self, project):
         run_dbt(["compile"])
         sql = read_compiled_file(project, "partition_by_incremental", "sql")
         assert re.search(
-            r"alter\s+table.*set\s+partitioned\s+by\s*\(\s*ds\s*,\s*region\s*\)",
+            r'alter\s+table.*set\s+partitioned\s+by\s*\(\s*"ds"\s*,\s*"region"\s*\)',
             sql,
             re.IGNORECASE | re.DOTALL,
         )
@@ -149,7 +149,7 @@ class TestDucklakePartitionedByCompile(BasePartitionedByCompile):
         run_dbt(["compile"])
         python_code = read_compiled_file(project, "partitioned_by_python", "sql")
         assert re.search(
-            r"alter\s+table.*set\s+partitioned\s+by\s*\(\s*ds\s*\)",
+            r'alter\s+table.*set\s+partitioned\s+by\s*\(\s*"ds"\s*\)',
             python_code,
             re.IGNORECASE | re.DOTALL,
         )
@@ -157,13 +157,13 @@ class TestDucklakePartitionedByCompile(BasePartitionedByCompile):
     def test_partitioned_by_contract(self, project):
         run_dbt(["compile"])
         sql = read_compiled_file(project, "contract_partitioned_by", "sql")
-        assert re.search(r"alter\s+table.*set\s+partitioned\s+by\s*\(\s*ds\s*\)", sql, re.IGNORECASE | re.DOTALL)
+        assert re.search(r'alter\s+table.*set\s+partitioned\s+by\s*\(\s*"ds"\s*\)', sql, re.IGNORECASE | re.DOTALL)
 
     def test_partitioned_by_time_parts(self, project):
         run_dbt(["compile"])
         sql = read_compiled_file(project, "partitioned_by_time_parts", "sql")
         assert re.search(
-            r"alter\s+table.*set\s+partitioned\s+by\s*\(\s*event_day\s*,\s*event_month\s*,\s*event_year\s*,\s*event_hour\s*\)",
+            r'alter\s+table.*set\s+partitioned\s+by\s*\(\s*"event_day"\s*,\s*"event_month"\s*,\s*"event_year"\s*,\s*"event_hour"\s*\)',
             sql,
             re.IGNORECASE | re.DOTALL,
         )
