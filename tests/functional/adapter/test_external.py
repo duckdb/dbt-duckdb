@@ -1,3 +1,4 @@
+import copy
 import os
 from uuid import uuid4
 import boto3
@@ -98,8 +99,9 @@ class BaseExternalMaterializations:
 
     @pytest.fixture(scope="class")
     def dbt_profile_target(self, profile_type, dbt_profile_target, extroot):
-        dbt_profile_target["external_root"] = extroot
-        dbt_profile_target["secrets"] = [
+        target = copy.deepcopy(dbt_profile_target)
+        target["external_root"] = extroot
+        target["secrets"] = [
             {
                 "type": DEST_S3,
                 "region": os.getenv("S3_MD_ORG_REGION"),
@@ -108,8 +110,8 @@ class BaseExternalMaterializations:
             }
         ]
         if profile_type == "md":
-            dbt_profile_target["secrets"][0]["persistent"] = True
-        return dbt_profile_target
+            target["secrets"][0]["persistent"] = True
+        return target
 
     @pytest.fixture(scope="class")
     def project_config_update(self):
@@ -117,8 +119,8 @@ class BaseExternalMaterializations:
             "name": "base",
         }
 
+    @pytest.mark.with_s3_creds
     def test_base(self, project, empty):
-
         # seed command
         results = run_dbt(["seed"])
         # seed result length
