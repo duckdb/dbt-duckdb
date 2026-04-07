@@ -118,7 +118,9 @@ class DuckDBAdapter(SQLAdapter):
 
     # can be overridden via the model config metadata
     _temp_schema_name = DEFAULT_TEMP_SCHEMA_NAME
-    _temp_schema_model_uuid: dict[str, str] = defaultdict(lambda: str(uuid4()).split("-")[-1])
+    _temp_schema_model_uuid: dict[str, str] = defaultdict(
+        lambda: str(uuid4()).split("-")[-1]
+    )
 
     @classmethod
     def date_function(cls) -> str:
@@ -180,7 +182,9 @@ class DuckDBAdapter(SQLAdapter):
                     [
                         (
                             column.name,
-                            agate.Formula(agate.Text(), lambda row: str(row[column.name])),
+                            agate.Formula(
+                                agate.Text(), lambda row: str(row[column.name])
+                            ),
                         )
                     ],
                     replace=True,
@@ -230,7 +234,9 @@ class DuckDBAdapter(SQLAdapter):
         return DuckDBConnectionManager.env().get_binding_char()
 
     @available
-    def external_write_options(self, write_location: str, rendered_options: dict) -> str:
+    def external_write_options(
+        self, write_location: str, rendered_options: dict
+    ) -> str:
         if "format" not in rendered_options:
             ext = os.path.splitext(write_location)[1].lower()
             if ext:
@@ -263,13 +269,19 @@ class DuckDBAdapter(SQLAdapter):
         return ", ".join(ret)
 
     @available
-    def external_read_location(self, write_location: str, rendered_options: dict) -> str:
-        if rendered_options.get("partition_by") or rendered_options.get("per_thread_output"):
+    def external_read_location(
+        self, write_location: str, rendered_options: dict
+    ) -> str:
+        if rendered_options.get("partition_by") or rendered_options.get(
+            "per_thread_output"
+        ):
             globs = [write_location, "*"]
             if rendered_options.get("partition_by"):
                 partition_by = str(rendered_options.get("partition_by"))
                 globs.extend(["*"] * len(partition_by.split(",")))
-            return ".".join(["/".join(globs), str(rendered_options.get("format", "parquet"))])
+            return ".".join(
+                ["/".join(globs), str(rendered_options.get("format", "parquet"))]
+            )
         return write_location
 
     @available
@@ -323,11 +335,15 @@ class DuckDBAdapter(SQLAdapter):
             self.connections.commit_if_has_connection()
         except DbtInternalError as e:
             # Log commit errors instead of silently swallowing them to aid debugging
-            logger.warning(f"Commit failed with DbtInternalError: {e}\n{traceback.format_exc()}")
+            logger.warning(
+                f"Commit failed with DbtInternalError: {e}\n{traceback.format_exc()}"
+            )
             # Still pass to maintain backward compatibility, but now with visibility
             pass
 
-    def submit_python_job(self, parsed_model: dict, compiled_code: str) -> AdapterResponse:
+    def submit_python_job(
+        self, parsed_model: dict, compiled_code: str
+    ) -> AdapterResponse:
         connection = self.connections.get_if_exists()
         if not connection:
             connection = self.connections.get_thread_connection()
@@ -382,7 +398,9 @@ class DuckDBAdapter(SQLAdapter):
         return flattened_columns
 
     @classmethod
-    def render_column_constraint(cls, constraint: ColumnLevelConstraint) -> Optional[str]:
+    def render_column_constraint(
+        cls, constraint: ColumnLevelConstraint
+    ) -> Optional[str]:
         """Render the given constraint as DDL text. Should be overriden by adapters which need custom constraint
         rendering."""
         if constraint.type == ConstraintType.foreign_key:
@@ -394,7 +412,9 @@ class DuckDBAdapter(SQLAdapter):
                     constraint_to = ".".join(pieces[1:])
                 else:
                     constraint_to = constraint.to
-                return f"references {constraint_to} ({', '.join(constraint.to_columns)})"
+                return (
+                    f"references {constraint_to} ({', '.join(constraint.to_columns)})"
+                )
             else:
                 return f"references {constraint.expression}"
         else:
