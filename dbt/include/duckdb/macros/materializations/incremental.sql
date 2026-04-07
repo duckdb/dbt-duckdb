@@ -103,12 +103,14 @@
     {% do create_indexes(target_relation) %}
   {% endif %}
 
-  {% do persist_docs(target_relation, model) %}
+  {% do duckdb_run_persist_docs(target_relation, model, inside_transaction=True) %}
 
   {{ run_hooks(post_hooks, inside_transaction=True) }}
 
   -- `COMMIT` happens here
   {% do adapter.commit() %}
+
+  {% do duckdb_run_persist_docs(target_relation, model, inside_transaction=False) %}
 
   {% for rel in to_drop %}
       {# On MotherDuck the temp relation is a real table; dropping it cascades indexes. Avoid extra ALTERs. #}

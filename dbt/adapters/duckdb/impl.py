@@ -152,6 +152,23 @@ class DuckDBAdapter(SQLAdapter):
         return relation.database in self.config.credentials._ducklake_dbs
 
     @available
+    def persist_docs_inside_transaction(self, relation: DuckDBRelation, persist_docs: dict[str, Any]) -> bool:
+        if "transaction" in persist_docs:
+            return persist_docs["transaction"]
+
+        # Preserve the branch's current compatibility behavior until DuckLake
+        # comment operations can safely move back into the main transaction.
+        return not self.is_ducklake(relation)
+
+    @available
+    def is_transaction_open(self) -> bool:
+        connection = self.connections.get_if_exists()
+        if connection is None:
+            return False
+
+        return connection.transaction_open
+
+    @available
     def convert_datetimes_to_strs(self, table: "agate.Table") -> "agate.Table":
         import agate
 

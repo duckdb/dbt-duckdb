@@ -12,6 +12,23 @@ class TestPersistDocs(BasePersistDocs):
 
 
 @pytest.mark.skip_profile("md")
+class TestPersistDocsTransactionFalse(BasePersistDocs):
+    @pytest.fixture(scope="class")
+    def project_config_update(self):
+        return {
+            "models": {
+                "test": {
+                    "+persist_docs": {
+                        "relation": True,
+                        "columns": True,
+                        "transaction": False,
+                    },
+                }
+            }
+        }
+
+
+@pytest.mark.skip_profile("md")
 class TestPersistDocsColumnMissing(BasePersistDocsColumnMissing):
     pass
 

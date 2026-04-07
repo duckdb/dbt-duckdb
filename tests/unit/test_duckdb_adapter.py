@@ -340,3 +340,50 @@ class TestDuckDBAdapterIsDucklake(unittest.TestCase):
         result = adapter.is_ducklake(relation)
         self.assertTrue(result)
 
+    def test_persist_docs_inside_transaction_defaults_true_for_non_ducklake(self):
+        adapter = self._get_adapter(self.base_profile_cfg)
+        relation = DuckDBRelation.create(database="regular_db", schema="test_schema", identifier="test_table")
+
+        result = adapter.persist_docs_inside_transaction(relation, {})
+
+        self.assertTrue(result)
+
+    def test_persist_docs_inside_transaction_defaults_false_for_ducklake(self):
+        profile_cfg = self.base_profile_cfg.copy()
+        profile_cfg["outputs"]["test"]["attach"] = [
+            {
+                "alias": "ducklake_db",
+                "path": "ducklake:sqlite:storage/metadata.sqlite"
+            }
+        ]
+
+        adapter = self._get_adapter(profile_cfg)
+        relation = DuckDBRelation.create(database="ducklake_db", schema="test_schema", identifier="test_table")
+
+        result = adapter.persist_docs_inside_transaction(relation, {})
+
+        self.assertFalse(result)
+
+    def test_persist_docs_inside_transaction_respects_explicit_true(self):
+        profile_cfg = self.base_profile_cfg.copy()
+        profile_cfg["outputs"]["test"]["attach"] = [
+            {
+                "alias": "ducklake_db",
+                "path": "ducklake:sqlite:storage/metadata.sqlite"
+            }
+        ]
+
+        adapter = self._get_adapter(profile_cfg)
+        relation = DuckDBRelation.create(database="ducklake_db", schema="test_schema", identifier="test_table")
+
+        result = adapter.persist_docs_inside_transaction(relation, {"transaction": True})
+
+        self.assertTrue(result)
+
+    def test_persist_docs_inside_transaction_respects_explicit_false(self):
+        adapter = self._get_adapter(self.base_profile_cfg)
+        relation = DuckDBRelation.create(database="regular_db", schema="test_schema", identifier="test_table")
+
+        result = adapter.persist_docs_inside_transaction(relation, {"transaction": False})
+
+        self.assertFalse(result)
