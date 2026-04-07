@@ -14,6 +14,7 @@ from dbt.adapters.contracts.connection import AdapterResponse
 from dbt.adapters.contracts.connection import Connection
 from dbt.adapters.contracts.connection import ConnectionState
 from dbt.adapters.events.logging import AdapterLogger
+from dbt.adapters.exceptions import FailedToConnectError
 from dbt.adapters.sql import SQLConnectionManager
 
 logger = AdapterLogger("DuckDB")
@@ -57,7 +58,7 @@ class DuckDBConnectionManager(SQLConnectionManager):
                 logger.debug("Got an error when attempting to connect to DuckDB: '{}'".format(e))
                 connection.handle = None
                 connection.state = ConnectionState.FAIL
-                raise dbt.adapters.exceptions.FailedToConnectError(str(e))
+                raise FailedToConnectError(str(e))
 
             return connection
 

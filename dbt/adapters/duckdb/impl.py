@@ -152,7 +152,9 @@ class DuckDBAdapter(SQLAdapter):
         return relation.database in self.config.credentials._ducklake_dbs
 
     @available
-    def persist_docs_inside_transaction(self, relation: DuckDBRelation, persist_docs: dict[str, Any]) -> bool:
+    def persist_docs_inside_transaction(
+        self, relation: DuckDBRelation, persist_docs: dict[str, Any]
+    ) -> bool:
         if "transaction" in persist_docs:
             return persist_docs["transaction"]
 
