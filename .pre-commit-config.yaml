@@ -5,7 +5,7 @@ exclude: "^tests/.*"
 
 
 default_language_version:
-  python: python3.11
+  python: python3
 
 repos:
 - repo: https://github.com/pre-commit/pre-commit-hooks
@@ -41,10 +41,8 @@ repos:
   - id: mypy
     args: [--show-error-codes, --ignore-missing-imports]
     files: ^dbt/adapters/.*
-    language: system
   - id: mypy
     alias: mypy-check
     stages: [manual]
     args: [--show-error-codes, --pretty, --ignore-missing-imports]
     files: ^dbt/adapters
-    language: system
