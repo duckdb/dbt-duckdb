@@ -58,6 +58,7 @@
 
   {% if post_commit_ducklake_docs %}
     {% do persist_docs(target_relation, model) %}
+    {{ adapter.commit() }}
   {% endif %}
 
   -- finally, drop the existing/backup relation after the commit
