@@ -101,6 +101,7 @@ def get_partition_columns(project, model_name, schema_name):
     return [row[0].lower() for row in project.run_sql(query, fetch="all")]
 
 
+@pytest.mark.requires_ducklake
 @pytest.mark.skip_profile("buenavista", "md")
 class BaseDucklakePartitionedBy:
     @pytest.fixture(scope="class")
