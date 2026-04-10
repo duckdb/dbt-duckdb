@@ -284,7 +284,7 @@ def materialize(df, con):
 {% endmacro %}
 
 {% macro write_to_file(relation, location, options) -%}
-  {% call statement('write_to_file') -%}
+  {% call statement('write_to_file', auto_begin=False) -%}
     copy {{ relation }} to '{{ location }}' ({{ options }})
   {%- endcall %}
 {% endmacro %}
