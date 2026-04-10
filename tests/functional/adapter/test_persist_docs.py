@@ -21,6 +21,7 @@ class TestPersistDocsColumnMissing(BasePersistDocsColumnMissing):
 class TestPersistDocsCommentOnQuotedColumn(BasePersistDocsCommentOnQuotedColumn):
     pass
 
+@pytest.mark.requires_ducklake
 @pytest.mark.skip_profile("md", "buenavista")
 class TestDuckLakePersistDocsTransactions:
     @pytest.fixture(scope="class")
