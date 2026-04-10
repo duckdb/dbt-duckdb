@@ -120,7 +120,20 @@ def pytest_collection_modifyitems(config, items):
         if "Failed to download extension \"httpfs\"" in str(e):
             skip_s3 = pytest.mark.skip(reason="httpfs not available and is needed for setting s3 credentials")
 
+    # Skip ducklake tests if the extension is unavailable
+    skip_ducklake = None
+    try:
+        duckdb.sql("install ducklake")
+    except duckdb.Error as e:
+        if "Failed to download extension" in str(e):
+            skip_ducklake = pytest.mark.skip(reason="ducklake extension not available")
+
     if skip_s3 is not None:
         for item in items:
             if "with_s3_creds" in item.keywords:
                 item.add_marker(skip_s3)
+
+    if skip_ducklake is not None:
+        for item in items:
+            if "requires_ducklake" in item.keywords:
+                item.add_marker(skip_ducklake)
