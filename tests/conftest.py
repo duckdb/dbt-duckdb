@@ -106,11 +106,21 @@ def test_data_path():
 
 
 def pytest_collection_modifyitems(config, items):
+    skip_s3 = None
     # Skip the S3 tests if the secrets are not available
     if not (
         os.getenv("S3_MD_ORG_KEY") and os.getenv("S3_MD_ORG_REGION") and os.getenv("S3_MD_ORG_SECRET")
     ):
         skip_s3 = pytest.mark.skip(reason="need S3 credentials to run this test")
+
+    # Skip s3 tests if httpfs extension is unavailable
+    try:
+        duckdb.sql("install httpfs")
+    except duckdb.Error as e:
+        if "Failed to download extension \"httpfs\"" in str(e):
+            skip_s3 = pytest.mark.skip(reason="httpfs not available and is needed for setting s3 credentials")
+
+    if skip_s3 is not None:
         for item in items:
             if "with_s3_creds" in item.keywords:
                 item.add_marker(skip_s3)

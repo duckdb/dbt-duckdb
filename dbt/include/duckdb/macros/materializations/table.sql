@@ -28,10 +28,12 @@
 
   -- `BEGIN` happens here:
   {{ run_hooks(pre_hooks, inside_transaction=True) }}
+  {%- set partitioned_by = duckdb__get_partitioned_by(target_relation, false) -%}
+  {%- set skip_auto_begin = partitioned_by and adapter.is_ducklake(target_relation) -%}
 
   -- build model
-  {% call statement('main', language=language) -%}
-    {{- create_table_as(False, intermediate_relation, compiled_code, language) }}
+  {% call statement('main', language=language, auto_begin=not skip_auto_begin) -%}
+    {{- create_table_as(False, intermediate_relation, compiled_code, language, partitioned_by=partitioned_by) }}
   {%- endcall %}
 
   -- cleanup
