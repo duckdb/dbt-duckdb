@@ -76,15 +76,7 @@
     {% endif %}
   {%- endcall %}
 
-  -- Commit the transaction before COPY so DuckDB can use multi-threaded writes.
-  -- Without this, COPY inside a transaction is forced to use a single thread,
-  -- making PER_THREAD_OUTPUT and partition_by writes ineffective for large data.
-  -- See: https://github.com/duckdb/duckdb/issues/18074
-  {% if not adapter.disable_transactions() %}
-    {{ adapter.commit() }}
-  {% endif %}
-
-  -- write a temp relation into file (runs outside transaction for multi-threaded I/O)
+  -- write a temp relation into file
   {{ write_to_file(temp_relation, location, write_options) }}
 
 -- create a view on top of the location
