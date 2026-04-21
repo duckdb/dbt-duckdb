@@ -30,15 +30,10 @@ config_write_partition_by_id_name = """
     {{ config(materialized="external", options={"partition_by": "id, name"}) }}
 """
 
-config_write_per_thread_output = """
-    {{ config(materialized="external", options={"per_thread_output": "true"}) }}
-"""
-
 csv_delim_options_sql = config_write_csv_delim_options + model_base
 write_codec_options = config_write_codec_options + model_base
 config_write_partition_by_id_sql = config_write_partition_by_id + model_base
 config_write_partition_by_id_name_sql = config_write_partition_by_id_name + model_base
-config_write_per_thread_output_sql = config_write_per_thread_output + model_base
 
 
 class BaseExternalMaterializations:
@@ -58,7 +53,6 @@ class BaseExternalMaterializations:
             "write_codec_options.sql": write_codec_options,
             "config_write_partition_by_id.sql": config_write_partition_by_id_sql,
             "config_write_partition_by_id_name.sql": config_write_partition_by_id_name_sql,
-            "config_write_per_thread_output.sql": config_write_per_thread_output_sql,
             "schema.yml": schema_base_yml,
         }
 
@@ -84,7 +78,7 @@ class BaseExternalMaterializations:
         # run command
         results = run_dbt()
         # run result length
-        assert len(results) == 6
+        assert len(results) == 5
 
         # names exist in result nodes
         check_result_nodes_by_name(
@@ -95,7 +89,6 @@ class BaseExternalMaterializations:
                 "write_codec_options",
                 "config_write_partition_by_id",
                 "config_write_partition_by_id_name",
-                "config_write_per_thread_output",
             ],
         )
 
@@ -107,7 +100,6 @@ class BaseExternalMaterializations:
             "write_codec_options": "view",
             "config_write_partition_by_id": "view",
             "config_write_partition_by_id_name": "view",
-            "config_write_per_thread_output": "view",
         }
         check_relation_types(project.adapter, expected)
 
@@ -125,13 +117,12 @@ class BaseExternalMaterializations:
                 "write_codec_options",
                 "config_write_partition_by_id",
                 "config_write_partition_by_id_name",
-                "config_write_per_thread_output",
             ],
         )
 
         # check relations in catalog
         catalog = run_dbt(["docs", "generate"])
-        assert len(catalog.nodes) == 7
+        assert len(catalog.nodes) == 6
         assert len(catalog.sources) == 1
 
 
