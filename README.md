@@ -165,3 +165,4 @@ Things that we would like to add in the near future:
 
 * Support for Delta and Iceberg external table formats (both as sources and destinations)
 * Make dbt's incremental models and snapshots work with external materializations
+
