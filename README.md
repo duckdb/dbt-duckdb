@@ -21,8 +21,8 @@ versions of DuckDB will continue to work with the adapter as they are released.
 
 Most user-facing setup and configuration documentation for `dbt-duckdb` now lives on docs.getdbt.com:
 
-- [connecting to DuckDB with dbt](https://docs.getdbt.com/docs/local/connect-data-platform/duckdb-setup)
-- [configuring DuckDB with dbt](https://docs.getdbt.com/reference/resource-configs/duckdb-configs)
+- [Connecting to DuckDB with dbt](https://docs.getdbt.com/docs/local/connect-data-platform/duckdb-setup)
+- [Configuring DuckDB with dbt](https://docs.getdbt.com/reference/resource-configs/duckdb-configs)
 
 Use this README for repository-specific topics that are better kept close to the adapter source.
 
