@@ -340,3 +340,35 @@ class TestDuckDBAdapterIsDucklake(unittest.TestCase):
         result = adapter.is_ducklake(relation)
         self.assertTrue(result)
 
+    def test_is_iceberg_with_attachment_type(self):
+        """Test is_iceberg returns True when relation database matches iceberg attachment."""
+        profile_cfg = self.base_profile_cfg.copy()
+        profile_cfg["outputs"]["test"]["attach"] = [
+            {
+                "alias": "iceberg_db",
+                "path": "http://localhost:8181",
+                "type": "iceberg",
+            }
+        ]
+
+        adapter = self._get_adapter(profile_cfg)
+        relation = DuckDBRelation.create(database="iceberg_db", schema="test_schema", identifier="test_table")
+
+        result = adapter.is_iceberg(relation)
+        self.assertTrue(result)
+
+    def test_is_iceberg_regular_attachment(self):
+        """Test is_iceberg returns False for non-iceberg attachments."""
+        profile_cfg = self.base_profile_cfg.copy()
+        profile_cfg["outputs"]["test"]["attach"] = [
+            {
+                "alias": "regular_db",
+                "path": "/path/to/regular.db",
+            }
+        ]
+
+        adapter = self._get_adapter(profile_cfg)
+        relation = DuckDBRelation.create(database="regular_db", schema="test_schema", identifier="test_table")
+
+        result = adapter.is_iceberg(relation)
+        self.assertFalse(result)
