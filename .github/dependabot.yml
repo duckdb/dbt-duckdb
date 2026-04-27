@@ -8,3 +8,7 @@ updates:
     directory: "/"
     schedule:
       interval: "weekly"
+    ignore:
+      # mypy 1.20+ requires pathspec>=1.0, but dbt-common pins pathspec<0.13.
+      # Re-enable once dbt-common loosens its pathspec range.
+      - dependency-name: "mypy"
