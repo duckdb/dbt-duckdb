@@ -7,7 +7,7 @@ dbt-tests-adapter==1.19.7
 boto3
 mypy-boto3-glue
 pandas
-pyarrow==23.0.1
+pyarrow==24.0.0
 buenavista==0.5.0
 bumpversion
 flaky
