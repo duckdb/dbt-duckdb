@@ -223,6 +223,14 @@ jobs:
     needs: [check-md-token]
     if: needs.check-md-token.outputs.exists == 'true'
 
+    # Tests share a single MotherDuck account/database (`md:test`), so concurrent
+    # runs across PRs/commits collide on catalog metadata and produce flaky
+    # failures. Serialize MotherDuck runs globally; queue rather than cancel so
+    # in-flight master runs aren't lost.
+    concurrency:
+      group: motherduck-functional-tests
+      cancel-in-progress: false
+
     runs-on: ubuntu-latest
 
     strategy:
