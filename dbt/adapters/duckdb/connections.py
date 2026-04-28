@@ -7,6 +7,7 @@ from typing import Set
 from typing import Tuple
 from typing import TYPE_CHECKING
 
+import dbt.adapters.exceptions
 import dbt.exceptions
 from . import environments
 from dbt.adapters.contracts.connection import AdapterRequiredConfig

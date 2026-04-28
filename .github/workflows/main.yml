@@ -55,8 +55,8 @@ jobs:
       - name: Install python dependencies
         run: |
           pip install pre-commit
-          pip install mypy==1.3.0
           pip install -r dev-requirements.txt
+          pip install mypy==1.19.1
           pip --version
           pre-commit --version
           mypy --version
