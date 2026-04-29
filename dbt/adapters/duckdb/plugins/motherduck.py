@@ -83,7 +83,14 @@ class Plugin(BasePlugin):
             user_agent = f"{user_agent} {custom_user_agent}"
         config[CUSTOM_USER_AGENT] = user_agent
 
-        # If a user specified MotherDuck config options via the plugin config,
-        # pass it to the config kwarg in duckdb.connect.
+        # Pass MotherDuck config options (from plugin config or settings) to
+        # the duckdb.connect config kwarg, and remove any MD keys from
+        # creds.settings so initialize_cursor doesn't re-apply them via SET
+        # post-init (which the MotherDuck extension rejects as init-only).
         if not creds.is_motherduck_attach:
-            config.update(self.get_md_config_settings(self._config))
+            merged = {**(self._config or {}), **settings}
+            md_settings = self.get_md_config_settings(merged)
+            config.update(md_settings)
+            if creds.settings is not None:
+                for key in md_settings:
+                    creds.settings.pop(key, None)
