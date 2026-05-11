@@ -513,23 +513,29 @@ models:
 > [!TIP]
 > Microbatching might not always be best option from a performance perspective. Consider that DuckDB operates on row groups, not physical partitions (unless you have explicitly partitioned data in a DuckLake). While you can do batch processing in parallel, more threads with more batches in parallel does not always equal better performance as row groups might not align 1-1 with the batches. Be sure to test different amounts of threads to match your use case.
 
-#### DuckLake Table Partitioning
+#### DuckLake Partitioning and Sort Order
 
-For DuckLake-backed tables (including MotherDuck-managed DuckLake), you can configure physical partitioning for `table` or `incremental` models using `partitioned_by`:
+For DuckLake-backed tables (including MotherDuck-managed DuckLake), you can configure the physical layout of `table` or `incremental` models with two settings:
+
+- `partitioned_by` (alias: `partition_by`) — physical partition keys
+- `sorted_by` (alias: `sort_by`) — sort keys applied at write time
+
+Either can be set on its own, or both together. Both settings only apply to DuckLake relations; on non-DuckLake targets they are ignored with a warning.
 
 ```sql
-{{ config(materialized='table', partitioned_by=['year', 'month']) }}
+{{ config(
+    materialized='table',
+    partitioned_by=['event_day'],
+    sorted_by=['event_time']
+) }}
 
 select
   *,
-  year(event_time) as year,
-  month(event_time) as month
+  date_trunc('day', event_time) as event_day
 from {{ ref('upstream_model') }}
 ```
 
-`partition_by` is accepted as an alias for `partitioned_by`. This setting is only applied for DuckLake relations; on non-DuckLake targets it is ignored with a warning.
-
-DuckLake applies partitioning via `ALTER TABLE ... SET PARTITIONED BY (...)`, and partitioning only affects new data. For first builds or full refreshes, dbt-duckdb creates an empty table, sets partitioning, then inserts data so the initial load is partitioned. For incremental runs that only insert/update, no ALTER is issued. See the DuckLake docs for details: [ducklake.select](https://ducklake.select/docs/stable/duckdb/advanced_features/partitioning).
+DuckLake applies these via `ALTER TABLE ... SET PARTITIONED BY (...)` and `ALTER TABLE ... SET SORTED BY (...)`, and they only affect new data. For first builds and full refreshes, dbt-duckdb creates an empty table, sets partitioning and/or sort order, then inserts data so the initial load is laid out as configured. For incremental runs that only insert/update, no ALTER is issued. See the DuckLake docs for [partitioning](https://ducklake.select/docs/stable/duckdb/advanced_features/partitioning) and [sorted tables](https://ducklake.select/docs/stable/duckdb/advanced_features/sorted_tables).
 
 Example partitions (day, month, year, hour):
 
@@ -542,33 +548,6 @@ select
   date_trunc('month', event_time) as event_month,
   date_trunc('year', event_time) as event_year,
   date_trunc('hour', event_time) as event_hour
-from {{ ref('upstream_model') }}
-```
-
-#### DuckLake Table Sort Order
-
-For DuckLake-backed tables (including MotherDuck-managed DuckLake), you can configure a physical sort order for `table` or `incremental` models using `sorted_by`:
-
-```sql
-{{ config(materialized='table', sorted_by=['event_time']) }}
-
-select * from {{ ref('upstream_model') }}
-```
-
-`sort_by` is accepted as an alias for `sorted_by`. The setting is only applied for DuckLake relations; on non-DuckLake targets it is ignored with a warning.
-
-DuckLake applies sorting via `ALTER TABLE ... SET SORTED BY (...)`, which means the sort order persists across compactions and is used for new writes. For first builds or full refreshes, dbt-duckdb creates an empty table, sets the sort order (and partitioning, if any), then inserts data. For incremental runs that only insert/update, no ALTER is issued. `sorted_by` can be combined with `partitioned_by`:
-
-```sql
-{{ config(
-    materialized='table',
-    partitioned_by=['event_day'],
-    sorted_by=['event_time']
-) }}
-
-select
-  *,
-  date_trunc('day', event_time) as event_day
 from {{ ref('upstream_model') }}
 ```
 
