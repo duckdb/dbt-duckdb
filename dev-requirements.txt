@@ -2,6 +2,13 @@
 # git+https://github.com/dbt-labs/dbt-core.git#egg=dbt-core&subdirectory=core
 # git+https://github.com/dbt-labs/dbt-adapters.git#subdirectory=dbt-tests-adapter
 
+# Pin dbt-core to a stable floor. dbt-tests-adapter 1.19.x's metadata declares
+# `dbt-core>=1.8.0a1`, which enables pre-release matching and lets pip's resolver
+# pick `dbt-core==1.8.0b1` (a 2024 beta) alongside the much newer dbt-common /
+# mashumaro it also resolves. The combination has an incompatible MRO between
+# `DataClassMessagePackMixin` and `dbtClassMixin`, so `import dbt` blows up at
+# the `Manifest` class definition. Pinning to a stable floor avoids the beta.
+dbt-core>=1.10,<2
 dbt-tests-adapter==1.19.7
 
 boto3
