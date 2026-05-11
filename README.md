@@ -545,6 +545,33 @@ select
 from {{ ref('upstream_model') }}
 ```
 
+#### DuckLake Table Sort Order
+
+For DuckLake-backed tables (including MotherDuck-managed DuckLake), you can configure a physical sort order for `table` or `incremental` models using `sorted_by`:
+
+```sql
+{{ config(materialized='table', sorted_by=['event_time']) }}
+
+select * from {{ ref('upstream_model') }}
+```
+
+`sort_by` is accepted as an alias for `sorted_by`. The setting is only applied for DuckLake relations; on non-DuckLake targets it is ignored with a warning.
+
+DuckLake applies sorting via `ALTER TABLE ... SET SORTED BY (...)`, which means the sort order persists across compactions and is used for new writes. For first builds or full refreshes, dbt-duckdb creates an empty table, sets the sort order (and partitioning, if any), then inserts data. For incremental runs that only insert/update, no ALTER is issued. `sorted_by` can be combined with `partitioned_by`:
+
+```sql
+{{ config(
+    materialized='table',
+    partitioned_by=['event_day'],
+    sorted_by=['event_time']
+) }}
+
+select
+  *,
+  date_trunc('day', event_time) as event_day
+from {{ ref('upstream_model') }}
+```
+
 
 **Merge Strategy (DuckDB >= 1.4.0):**
 
