@@ -131,6 +131,14 @@ class DuckDBAdapter(SQLAdapter):
     def debug_query(self):
         self.execute("select 1 as id")
 
+    def expand_column_types(self, goal, current):
+        # DuckDB has no VARCHAR(N) length constraint, so DuckDBColumn.can_expand_to is
+        # always False (string_size() returns 256 for every string column). The base
+        # implementation's get_columns_in_relation lookups are pure overhead -- and can
+        # be extremely slow against attached catalogs (e.g. DuckLake on Postgres) where
+        # an unfiltered information_schema.columns scan triggers a full metastore load.
+        return
+
     @available
     def parse_index(self, raw_index: Any) -> Optional[DuckDBIndexConfig]:
         return DuckDBIndexConfig.parse(raw_index)
