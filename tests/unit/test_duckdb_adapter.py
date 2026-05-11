@@ -65,6 +65,17 @@ class TestDuckDBAdapter(unittest.TestCase):
         self.adapter.connections.thread_connections[key] = mock_connection("main")
         self.assertEqual(len(list(self.adapter.cancel_open_connections())), 0)
 
+    def test_expand_column_types_is_noop(self):
+        # DuckDB has no VARCHAR(N), so the base SQLAdapter.expand_column_types is dead
+        # work -- and its unfiltered information_schema.columns lookup can be very slow
+        # against attached catalogs (e.g. DuckLake). Verify the override skips it.
+        with mock.patch.object(
+            self.adapter, "get_columns_in_relation"
+        ) as get_cols, mock.patch.object(self.adapter, "alter_column_type") as alter:
+            self.assertIsNone(self.adapter.expand_column_types(mock.MagicMock(), mock.MagicMock()))
+            get_cols.assert_not_called()
+            alter.assert_not_called()
+
 
 class TestDuckDBAdapterWithSecrets(unittest.TestCase):
     def setUp(self):
