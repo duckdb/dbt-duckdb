@@ -40,6 +40,9 @@ class DuckDBConnectionWrapper:
     def cursor(self):
         return self._cursor
 
+    def rollback(self):
+        return self._cursor.rollback()
+
 
 class LocalEnvironment(Environment):
     def __init__(self, credentials: credentials.DuckDBCredentials):
