@@ -336,7 +336,10 @@ def materialize(df, con):
 {%- endmacro %}
 
 {% macro drop_indexes_on_relation(relation) -%}
-  {% call statement('get_indexes_on_relation', fetch_result=True) %}
+  {#-- auto_begin=False on these reads so this macro can run safely after
+       adapter.commit() in a materialization cleanup without opening a new
+       transaction that would later get rolled back at connection release. #}
+  {% call statement('get_indexes_on_relation', fetch_result=True, auto_begin=False) %}
     SELECT index_name
     FROM duckdb_indexes()
     WHERE schema_name = '{{ relation.schema }}'
@@ -350,13 +353,4 @@ def materialize(df, con):
       DROP INDEX "{{ relation.schema }}"."{{ index_name }}"
     {% endcall %}
   {% endfor %}
-
-  {#-- Verify indexes were dropped --#}
-  {% call statement('verify_indexes_dropped', fetch_result=True) %}
-    SELECT COUNT(*) as remaining_indexes
-    FROM duckdb_indexes()
-    WHERE schema_name = '{{ relation.schema }}'
-      AND table_name = '{{ relation.identifier }}'
-  {% endcall %}
-  {% set verify_results = load_result('verify_indexes_dropped').table %}
 {%- endmacro %}
