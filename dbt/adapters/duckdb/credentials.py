@@ -227,6 +227,14 @@ class DuckDBCredentials(Credentials):
     # by networking issues)
     retries: Optional[Retries] = None
 
+    # Quack remote protocol configuration
+    # Authentication token for connecting to a Quack server
+    quack_token: Optional[str] = None
+
+    # Override SSL behavior for Quack connections
+    # None = auto (disabled for localhost, enabled for remote)
+    quack_disable_ssl: Optional[bool] = None
+
     # An optional flag to indicate whether the database is a ducklake database,
     # so that the adapter can generate queries that work for ducklake.
     # This is not always necessary when using a ducklake database, but
@@ -239,11 +247,35 @@ class DuckDBCredentials(Credentials):
         self.secrets = self.secrets or []
         self._secrets = []
 
-        # Build set of ducklake database names for efficient lookup
+        if self.path.startswith("quack:"):
+            self._is_quack_env = True
+
+        if self.is_quack:
+            if self.extensions is None:
+                self.extensions = []
+            ext_names = []
+            for ext in self.extensions:
+                if isinstance(ext, str):
+                    ext_names.append(ext)
+                elif isinstance(ext, dict):
+                    ext_names.append(ext.get("name", ""))
+            if "quack" not in ext_names:
+                self.extensions.append({"name": "quack", "repo": "core_nightly"})
+
+            if self.quack_token:
+                has_quack_secret = any(s.get("type") == "quack" for s in self.secrets)
+                if not has_quack_secret:
+                    quack_secret: Dict[str, Any] = {
+                        "type": "quack",
+                        "token": self.quack_token,
+                        "scope": self.path,
+                    }
+                    self.secrets.append(quack_secret)
+
         self._ducklake_dbs = set()
 
         if self.is_ducklake or "ducklake:" in self.path.lower():
-            self._ducklake_dbs.add(self.path_derived_database_name(self.path))
+            self._ducklake_dbs.add(self.database)
 
         if self.attach:
             for attachment in self.attach:
@@ -306,6 +338,10 @@ class DuckDBCredentials(Credentials):
         return len(self.motherduck_attach) > 0
 
     @property
+    def is_quack(self) -> bool:
+        return getattr(self, "_is_quack_env", False) or self.path.startswith("quack:")
+
+    @property
     def is_motherduck(self):
         parsed = urlparse(self.path)
         return self._is_motherduck(parsed.scheme) or self.is_motherduck_attach
@@ -313,6 +349,14 @@ class DuckDBCredentials(Credentials):
     @staticmethod
     def _is_motherduck(scheme: str) -> bool:
         return scheme in {"md", "motherduck"}
+
+    @staticmethod
+    def _quack_default_alias(path: str) -> str:
+        """Derive a default ATTACH alias from a quack URI.
+        Uses a fixed alias since hostnames with dots/hyphens make poor SQL identifiers.
+        Users can override via the 'database' field in their profile.
+        """
+        return "quack_duckdb"
 
     @staticmethod
     def path_derived_database_name(path: Optional[Any]) -> str:
@@ -334,6 +378,13 @@ class DuckDBCredentials(Credentials):
     def __pre_deserialize__(cls, data: Dict[Any, Any]) -> Dict[Any, Any]:
         data = super().__pre_deserialize__(data)
         path = data.get("path")
+
+        # For quack paths, derive database alias from default or use explicit database
+        if isinstance(path, str) and path.startswith("quack:"):
+            if "database" not in data:
+                data["database"] = cls._quack_default_alias(path)
+            return data
+
         path_db_name = cls.path_derived_database_name(path)
 
         # Check if the database field matches any attach alias
@@ -392,4 +443,6 @@ class DuckDBCredentials(Credentials):
             "remote",
             "plugins",
             "disable_transactions",
+            "quack_token",
+            "quack_disable_ssl",
         )

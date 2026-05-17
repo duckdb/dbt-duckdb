@@ -4,6 +4,38 @@
 
   {%- set existing_relation = load_cached_relation(this) -%}
   {%- set target_relation = this.incorporate(type='table') %}
+
+  {% if adapter.is_quack() %}
+    {# Quack beta: ALTER TABLE RENAME is not supported, so use DROP + CREATE pattern #}
+    {%- set partitioned_by = duckdb__get_partitioned_by(target_relation, false) -%}
+    {%- set post_commit_ducklake_docs = adapter.is_ducklake(target_relation) -%}
+
+    {{ run_hooks(pre_hooks, inside_transaction=False) }}
+    {{ run_hooks(pre_hooks, inside_transaction=True) }}
+
+    {{ drop_relation_if_exists(existing_relation) }}
+
+    {% call statement('main', language=language) -%}
+      {{- create_table_as(False, target_relation, compiled_code, language, partitioned_by=partitioned_by) }}
+    {%- endcall %}
+
+    {% if not post_commit_ducklake_docs %}
+      {% do persist_docs(target_relation, model) %}
+    {% endif %}
+
+    {{ run_hooks(post_hooks, inside_transaction=True) }}
+    {{ adapter.commit() }}
+
+    {% if post_commit_ducklake_docs %}
+      {% do persist_docs(target_relation, model) %}
+      {{ adapter.commit() }}
+    {% endif %}
+
+    {{ run_hooks(post_hooks, inside_transaction=False) }}
+
+    {{ return({'relations': [target_relation]}) }}
+  {% endif %}
+
   {%- set intermediate_relation =  make_intermediate_relation(target_relation) -%}
   -- the intermediate_relation should not already exist in the database; get_relation
   -- will return None in that case. Otherwise, we get a relation that we can drop

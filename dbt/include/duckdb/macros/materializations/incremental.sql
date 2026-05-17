@@ -1,12 +1,61 @@
 {% materialization incremental, adapter="duckdb", supported_languages=['sql', 'python'] -%}
 
   {%- set language = model['language'] -%}
+
+  {%- set existing_relation = load_cached_relation(this) -%}
+  {%- set target_relation = this.incorporate(type='table') -%}
+
+  {% if adapter.is_quack() %}
+    {# Quack beta: DELETE/MERGE/ALTER RENAME are not supported.
+       First run and full refresh use CREATE TABLE AS.
+       Incremental runs use INSERT INTO (append strategy). #}
+    {%- set partitioned_by = none -%}
+    {%- if existing_relation is none or should_full_refresh() -%}
+      {%- set partitioned_by = duckdb__get_partitioned_by(target_relation, false) -%}
+    {%- endif -%}
+    {%- set post_commit_ducklake_docs = adapter.is_ducklake(target_relation) -%}
+
+    {{ run_hooks(pre_hooks, inside_transaction=False) }}
+    {{ run_hooks(pre_hooks, inside_transaction=True) }}
+
+    {% if existing_relation is none %}
+      {% call statement('main', language=language) -%}
+        {{ create_table_as(False, target_relation, compiled_code, language, partitioned_by=partitioned_by) }}
+      {%- endcall %}
+    {% elif should_full_refresh() %}
+      {{ drop_relation_if_exists(existing_relation) }}
+      {% call statement('main', language=language) -%}
+        {{ create_table_as(False, target_relation, compiled_code, language, partitioned_by=partitioned_by) }}
+      {%- endcall %}
+    {% else %}
+      {# Incremental append: INSERT INTO keeps existing data, {{ this }} references work #}
+      {% call statement('main') -%}
+        insert into {{ target_relation }}
+        {{ compiled_code }}
+      {%- endcall %}
+    {% endif %}
+
+    {% if not post_commit_ducklake_docs %}
+      {% do persist_docs(target_relation, model) %}
+    {% endif %}
+
+    {{ run_hooks(post_hooks, inside_transaction=True) }}
+    {{ adapter.commit() }}
+
+    {% if post_commit_ducklake_docs %}
+      {% do persist_docs(target_relation, model) %}
+      {{ adapter.commit() }}
+    {% endif %}
+
+    {{ run_hooks(post_hooks, inside_transaction=False) }}
+
+    {{ return({'relations': [target_relation]}) }}
+  {% endif %}
+
   -- only create temp tables if using local duckdb, as it is not currently supported for remote databases
   {%- set temporary = not adapter.is_motherduck() -%}
 
   -- relations
-  {%- set existing_relation = load_cached_relation(this) -%}
-  {%- set target_relation = this.incorporate(type='table') -%}
   {%- set temp_relation = make_temp_relation(target_relation)-%}
   {%- set intermediate_relation = make_intermediate_relation(target_relation)-%}
   {%- set backup_relation_type = 'table' if existing_relation is none else existing_relation.type -%}

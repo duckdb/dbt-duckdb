@@ -19,6 +19,10 @@ pytest_plugins = ["dbt.tests.fixtures.project"]
 MOTHERDUCK_TOKEN = "MOTHERDUCK_TOKEN"
 TEST_MOTHERDUCK_TOKEN = "TEST_MOTHERDUCK_TOKEN"
 
+# Quack test server config
+QUACK_TEST_PORT = 19494
+QUACK_TEST_TOKEN = "dbt_quack_test_token"
+
 
 def pytest_addoption(parser):
     parser.addoption("--profile", action="store", default="memory", type=str)
@@ -55,13 +59,35 @@ def bv_server_process(profile_type):
         yield None
 
 
+@pytest.fixture(scope="session")
+def quack_server_process(profile_type):
+    if profile_type == "quack":
+        server_process = subprocess.Popen(["python3", "-m", "tests.quack_test_server"])
+
+        # Wait for quack extension install + server startup
+        time.sleep(8)
+
+        yield server_process
+
+        server_process.terminate()
+        server_process.wait()
+    else:
+        yield None
+
+
 # The profile dictionary, used to write out profiles.yml
 # dbt will supply a unique schema per test, so we do not specify 'schema' here
 @pytest.fixture(scope="session")
-def dbt_profile_target(profile_type, bv_server_process, tmpdir_factory):
+def dbt_profile_target(profile_type, bv_server_process, quack_server_process, tmpdir_factory):
     profile = {"type": "duckdb", "threads": 4}
 
-    if profile_type == "buenavista":
+    if profile_type == "quack":
+        profile["path"] = f"quack:localhost:{QUACK_TEST_PORT}"
+        profile["database"] = "quack_duckdb"
+        profile["schema"] = "main"
+        profile["quack_token"] = QUACK_TEST_TOKEN
+        profile["quack_disable_ssl"] = True
+    elif profile_type == "buenavista":
         profile["database"] = "memory"
         profile["remote"] = {
             "host": "127.0.0.1",
@@ -128,6 +154,15 @@ def pytest_collection_modifyitems(config, items):
         if "Failed to download extension" in str(e):
             skip_ducklake = pytest.mark.skip(reason="ducklake extension not available")
 
+    # Skip quack tests if the extension is unavailable
+    skip_quack = None
+    try:
+        conn = duckdb.connect()
+        conn.execute("INSTALL quack FROM core_nightly")
+        conn.close()
+    except duckdb.Error:
+        skip_quack = pytest.mark.skip(reason="quack extension not available")
+
     if skip_s3 is not None:
         for item in items:
             if "with_s3_creds" in item.keywords:
@@ -137,3 +172,8 @@ def pytest_collection_modifyitems(config, items):
         for item in items:
             if "requires_ducklake" in item.keywords:
                 item.add_marker(skip_ducklake)
+
+    if skip_quack is not None:
+        for item in items:
+            if "requires_quack" in item.keywords:
+                item.add_marker(skip_quack)

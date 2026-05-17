@@ -302,6 +302,10 @@ def create(creds: DuckDBCredentials) -> Environment:
         from .buenavista import BVEnvironment
 
         return BVEnvironment(creds)
+    elif creds.is_quack:
+        from .quack import QuackEnvironment
+
+        return QuackEnvironment(creds)
     elif creds.is_motherduck:
         from .motherduck import MotherDuckEnvironment
 

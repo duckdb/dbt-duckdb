@@ -24,6 +24,7 @@ from packaging.version import Version
 from .constants import DEFAULT_TEMP_SCHEMA_NAME
 from .constants import DUCKDB_BASE_INCREMENTAL_STRATEGIES
 from .constants import DUCKDB_MERGE_LOWEST_VERSION_POSSIBLE
+from .constants import DUCKDB_QUACK_LOWEST_VERSION_POSSIBLE
 from .constants import TEMP_SCHEMA_NAME
 from dbt.adapters.base import AdapterConfig
 from dbt.adapters.base import BaseRelation
@@ -146,6 +147,10 @@ class DuckDBAdapter(SQLAdapter):
     @available
     def is_motherduck(self):
         return self.config.credentials.is_motherduck
+
+    @available
+    def is_quack(self):
+        return self.config.credentials.is_quack
 
     @available
     def disable_transactions(self):
@@ -283,6 +288,15 @@ class DuckDBAdapter(SQLAdapter):
     @cached_property
     def duckdb_incremental_strategies(self) -> Sequence[str]:
         """Return valid incremental strategies for the current DuckDB connection (cached)."""
+        if self.config.credentials.is_quack:
+            if self.duckdb_version < Version(DUCKDB_QUACK_LOWEST_VERSION_POSSIBLE):
+                raise DbtRuntimeError(
+                    f"Quack requires DuckDB >= {DUCKDB_QUACK_LOWEST_VERSION_POSSIBLE}. "
+                    f"Current version: {self.duckdb_version}. "
+                    f"Please upgrade: pip install duckdb --upgrade"
+                )
+            return ["append"]
+
         if self.duckdb_version >= Version(DUCKDB_MERGE_LOWEST_VERSION_POSSIBLE):
             return DUCKDB_BASE_INCREMENTAL_STRATEGIES + ["merge", "microbatch"]
 
@@ -295,6 +309,13 @@ class DuckDBAdapter(SQLAdapter):
 
     @available.parse_none
     def get_incremental_strategy_macro(self, model_context, strategy: str):
+        if self.config.credentials.is_quack and strategy not in ("append", "default"):
+            raise DbtRuntimeError(
+                f"The '{strategy}' incremental strategy is not supported over the Quack protocol. "
+                f"Quack beta does not support DELETE, UPDATE, or MERGE on remote tables. "
+                f"Supported strategies: {self.duckdb_incremental_strategies}"
+            )
+
         if strategy == "merge" and self.duckdb_version < Version(
             DUCKDB_MERGE_LOWEST_VERSION_POSSIBLE
         ):
