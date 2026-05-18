@@ -8,7 +8,7 @@
 # mashumaro it also resolves. The combination has an incompatible MRO between
 # `DataClassMessagePackMixin` and `dbtClassMixin`, so `import dbt` blows up at
 # the `Manifest` class definition. Pinning to a stable floor avoids the beta.
-dbt-core>=1.10,<2
+dbt-core>=1.11.10,<2
 dbt-tests-adapter==1.19.7
 
 boto3
