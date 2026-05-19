@@ -104,11 +104,58 @@
   alter table {{ relation }} set partitioned by ({{ partitioned_by }});
 {%- endmacro %}
 
-{% macro create_table_as(temporary, relation, compiled_code, language='sql', partitioned_by=none) -%}
-  {{ return(adapter.dispatch('create_table_as', 'dbt')(temporary, relation, compiled_code, language, partitioned_by=partitioned_by)) }}
+
+{% macro duckdb__get_sorted_by(relation, temporary) -%}
+  {%- if temporary -%}
+    {{ return(none) }}
+  {%- endif -%}
+
+  {%- set raw = config.get('sorted_by', none) -%}
+  {%- if raw is none -%}
+    {%- set raw = config.get('sort_by', none) -%}
+  {%- endif -%}
+  {%- if raw is none -%}
+    {{ return(none) }}
+  {%- endif -%}
+
+  {%- set parts = normalize_string_or_list(raw, "sorted_by/sort_by") -%}
+
+  {%- if parts | length == 0 -%}
+    {% do exceptions.raise_compiler_error("sorted_by/sort_by must contain at least one column") %}
+  {%- endif -%}
+
+  {# Apply sorting only on the final target relation, not staging/intermediate relations. #}
+  {%- if this is defined and config.get('materialized') in ['table', 'incremental']
+      and relation.identifier and this.identifier and relation.identifier != this.identifier -%}
+    {{ return(none) }}
+  {%- endif -%}
+
+  {%- if not adapter.is_ducklake(relation) -%}
+    {% do adapter.warn_once(
+      "sorted_by/sort_by is only supported for DuckLake relations; ignoring for "
+      ~ relation
+    ) %}
+    {{ return(none) }}
+  {%- endif -%}
+
+  {%- set quoted = [] -%}
+  {%- for col in parts -%}
+    {%- set escaped = col | replace('"', '""') -%}
+    {%- do quoted.append(adapter.quote(escaped)) -%}
+  {%- endfor -%}
+  {{ return(quoted | join(', ')) }}
 {%- endmacro %}
 
-{% macro duckdb__create_table_as(temporary, relation, compiled_code, language='sql', partitioned_by=none) -%}
+
+{% macro duckdb__alter_table_set_sorted_by(relation, sorted_by) -%}
+  alter table {{ relation }} set sorted by ({{ sorted_by }});
+{%- endmacro %}
+
+{% macro create_table_as(temporary, relation, compiled_code, language='sql', partitioned_by=none, sorted_by=none) -%}
+  {{ return(adapter.dispatch('create_table_as', 'dbt')(temporary, relation, compiled_code, language, partitioned_by=partitioned_by, sorted_by=sorted_by)) }}
+{%- endmacro %}
+
+{% macro duckdb__create_table_as(temporary, relation, compiled_code, language='sql', partitioned_by=none, sorted_by=none) -%}
   {%- if language == 'sql' -%}
     {% set contract_config = config.get('contract') %}
     {% if contract_config.enforced %}
@@ -126,18 +173,26 @@
     {% if partitioned_by %}
       {{ duckdb__alter_table_set_partitioned_by(relation, partitioned_by) }}
     {% endif %}
+    {% if sorted_by %}
+      {{ duckdb__alter_table_set_sorted_by(relation, sorted_by) }}
+    {% endif %}
     insert into {{ relation }} {{ get_column_names() }} (
       {{ get_select_subquery(compiled_code) }}
     );
   {% else %}
-    {% if partitioned_by %}
+    {% if partitioned_by or sorted_by %}
     as (
       select * from (
         {{ compiled_code }}
       ) as model_subq
       limit 0
     );
+    {% if partitioned_by %}
     {{ duckdb__alter_table_set_partitioned_by(relation, partitioned_by) }}
+    {% endif %}
+    {% if sorted_by %}
+    {{ duckdb__alter_table_set_sorted_by(relation, sorted_by) }}
+    {% endif %}
     insert into {{ relation }}
       select * from (
         {{ compiled_code }}
@@ -149,13 +204,13 @@
     {% endif %}
   {% endif %}
   {%- elif language == 'python' -%}
-    {{ py_write_table(temporary=temporary, relation=relation, compiled_code=compiled_code, partitioned_by=partitioned_by) }}
+    {{ py_write_table(temporary=temporary, relation=relation, compiled_code=compiled_code, partitioned_by=partitioned_by, sorted_by=sorted_by) }}
   {%- else -%}
       {% do exceptions.raise_compiler_error("duckdb__create_table_as macro didn't get supported language, it got %s" % language) %}
   {%- endif -%}
 {% endmacro %}
 
-{% macro py_write_table(temporary, relation, compiled_code, partitioned_by=none) -%}
+{% macro py_write_table(temporary, relation, compiled_code, partitioned_by=none, sorted_by=none) -%}
 {{ compiled_code }}
 
 def materialize(df, con):
@@ -170,9 +225,14 @@ def materialize(df, con):
             import pyarrow.dataset
     tmp_name = '__dbt_python_model_df_' + '{{ relation.identifier }}'
     con.register(tmp_name, df)
-    {% if partitioned_by %}
+    {% if partitioned_by or sorted_by %}
     con.execute('create table {{ relation }} as select * from ' + tmp_name + ' limit 0')
+    {% if partitioned_by %}
     con.execute('alter table {{ relation }} set partitioned by ({{ partitioned_by }})')
+    {% endif %}
+    {% if sorted_by %}
+    con.execute('alter table {{ relation }} set sorted by ({{ sorted_by }})')
+    {% endif %}
     con.execute('insert into {{ relation }} select * from ' + tmp_name)
     {% else %}
     con.execute('create table {{ relation }} as select * from ' + tmp_name)
