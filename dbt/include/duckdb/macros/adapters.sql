@@ -307,6 +307,10 @@ def materialize(df, con):
 
 {% macro duckdb__rename_relation(from_relation, to_relation) -%}
   {% set target_name = adapter.quote_as_configured(to_relation.identifier, 'identifier') %}
+  {%- if adapter.is_iceberg(to_relation) -%}
+    {#-- Iceberg REST: CTAS and ALTER...RENAME cannot share a transaction; commit first --#}
+    {{ adapter.commit() }}
+  {%- endif -%}
   {% call statement('rename_relation') -%}
     alter {{ to_relation.type }} {{ from_relation }} rename to {{ target_name }}
   {%- endcall %}

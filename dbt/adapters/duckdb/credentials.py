@@ -241,6 +241,8 @@ class DuckDBCredentials(Credentials):
 
         # Build set of ducklake database names for efficient lookup
         self._ducklake_dbs = set()
+        # Build set of iceberg REST catalog database names for efficient lookup
+        self._iceberg_dbs = set()
 
         if self.is_ducklake or "ducklake:" in self.path.lower():
             self._ducklake_dbs.add(self.path_derived_database_name(self.path))
@@ -250,6 +252,7 @@ class DuckDBCredentials(Credentials):
                 is_ducklake_flag = getattr(attachment, "is_ducklake", None)
                 path = getattr(attachment, "path", None)
                 alias = getattr(attachment, "alias", None)
+                attachment_type = getattr(attachment, "type", None)
 
                 # Detect ducklake by explicit type, or by path scheme. Be lenient on case.
                 if (isinstance(is_ducklake_flag, bool) and is_ducklake_flag) or (
@@ -259,6 +262,12 @@ class DuckDBCredentials(Credentials):
                         self._ducklake_dbs.add(alias)
                     else:
                         self._ducklake_dbs.add(self.path_derived_database_name(path))
+
+                if isinstance(attachment_type, str) and attachment_type.lower() == "iceberg":
+                    if alias:
+                        self._iceberg_dbs.add(alias)
+                    else:
+                        self._iceberg_dbs.add(self.path_derived_database_name(path))
 
         # Add MotherDuck plugin if the path is a MotherDuck database
         # and plugin was not specified in profile.yml

@@ -351,3 +351,66 @@ class TestDuckDBAdapterIsDucklake(unittest.TestCase):
         result = adapter.is_ducklake(relation)
         self.assertTrue(result)
 
+    def test_is_iceberg_with_attachment_type(self):
+        profile_cfg = self.base_profile_cfg.copy()
+        profile_cfg["outputs"]["test"]["attach"] = [
+            {
+                "alias": "iceberg_db",
+                "path": "http://localhost:8181/catalog",
+                "type": "iceberg",
+            }
+        ]
+
+        adapter = self._get_adapter(profile_cfg)
+        relation = DuckDBRelation.create(database="iceberg_db", schema="ns", identifier="tbl")
+
+        self.assertTrue(adapter.is_iceberg(relation))
+
+    def test_is_iceberg_false_for_non_iceberg(self):
+        profile_cfg = self.base_profile_cfg.copy()
+        profile_cfg["outputs"]["test"]["attach"] = [
+            {
+                "alias": "regular_db",
+                "path": "/path/to/regular.db",
+            }
+        ]
+
+        adapter = self._get_adapter(profile_cfg)
+        relation = DuckDBRelation.create(database="regular_db", schema="ns", identifier="tbl")
+
+        self.assertFalse(adapter.is_iceberg(relation))
+
+    def test_is_iceberg_false_for_none_relation(self):
+        adapter = self._get_adapter(self.base_profile_cfg)
+        self.assertFalse(adapter.is_iceberg(None))
+
+    def test_is_iceberg_type_case_insensitive(self):
+        profile_cfg = self.base_profile_cfg.copy()
+        profile_cfg["outputs"]["test"]["attach"] = [
+            {
+                "alias": "ice_db",
+                "path": "http://localhost:8181/catalog",
+                "type": "ICEBERG",
+            }
+        ]
+
+        adapter = self._get_adapter(profile_cfg)
+        relation = DuckDBRelation.create(database="ice_db", schema="ns", identifier="tbl")
+
+        self.assertTrue(adapter.is_iceberg(relation))
+
+    def test_is_iceberg_false_for_ducklake(self):
+        """ducklake attachments must not be detected as iceberg."""
+        profile_cfg = self.base_profile_cfg.copy()
+        profile_cfg["outputs"]["test"]["attach"] = [
+            {
+                "alias": "lake_db",
+                "path": "ducklake:sqlite:/tmp/meta.sqlite",
+            }
+        ]
+
+        adapter = self._get_adapter(profile_cfg)
+        relation = DuckDBRelation.create(database="lake_db", schema="ns", identifier="tbl")
+
+        self.assertFalse(adapter.is_iceberg(relation))
+
