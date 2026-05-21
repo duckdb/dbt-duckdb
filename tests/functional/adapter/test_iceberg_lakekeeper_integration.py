@@ -184,13 +184,6 @@ class TestIcebergLakekeeperIncrementalMaterialization:
         )[0]
         assert row_count == 2
 
-    @pytest.mark.xfail(
-        reason=(
-            "DuckDB Iceberg: information_schema.columns returns '__' for Iceberg table "
-            "columns, breaking get_columns_in_relation. Tracked upstream in duckdb/duckdb-iceberg."
-        ),
-        strict=False,
-    )
     def test_incremental_second_run_appends(self, project):
         result = run_dbt(["run", "--select", "incremental_model"], expect_pass=True)
         assert len(result.results) == 1
