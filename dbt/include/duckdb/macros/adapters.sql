@@ -297,7 +297,7 @@ def materialize(df, con):
 
 {% macro duckdb__drop_relation(relation) -%}
   {% call statement('drop_relation', auto_begin=False) -%}
-    {% if adapter.is_ducklake(relation) %}
+    {% if adapter.is_ducklake(relation) or adapter.is_iceberg(relation) %}
       drop {{ relation.type }} if exists {{ relation }}
     {% else %}
       drop {{ relation.type }} if exists {{ relation }} cascade
