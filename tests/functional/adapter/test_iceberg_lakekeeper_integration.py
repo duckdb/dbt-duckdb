@@ -11,21 +11,20 @@ ALTER...RENAME into different transactions, which is required by DuckDB's Iceber
 extension — CTAS and ALTER RENAME cannot share a transaction against a REST catalog.
 """
 import os
+import urllib.error
+import urllib.request
 
 import pytest
 from dbt.tests.util import run_dbt
 
+_DEFAULT_LAKEKEEPER_URL = "http://localhost:8181"
+_DEFAULT_LAKEKEEPER_WAREHOUSE = "demo"
 
-_LAKEKEEPER_URL = os.environ.get("LAKEKEEPER_URL", "http://localhost:8181")
-_LAKEKEEPER_WAREHOUSE = os.environ.get("LAKEKEEPER_WAREHOUSE", "demo")
 
-
-def _lakekeeper_available() -> bool:
+def _lakekeeper_available(url: str) -> bool:
     try:
-        import requests
-
-        resp = requests.get(f"{_LAKEKEEPER_URL}/catalog/v1/config", timeout=3)
-        return resp.ok
+        urllib.request.urlopen(f"{url}/catalog/v1/config", timeout=3)
+        return True
     except Exception:
         return False
 
@@ -66,18 +65,20 @@ class TestIcebergLakekeeperTableMaterialization:
 
     @pytest.fixture(scope="class")
     def lakekeeper_url(self):
-        if not _lakekeeper_available():
-            pytest.skip(f"lakekeeper not reachable at {_LAKEKEEPER_URL}")
-        return _LAKEKEEPER_URL
+        url = os.environ.get("LAKEKEEPER_URL", _DEFAULT_LAKEKEEPER_URL)
+        if not _lakekeeper_available(url):
+            pytest.skip(f"lakekeeper not reachable at {url}")
+        return url
 
     @pytest.fixture(scope="class")
     def profiles_config_update(self, dbt_profile_target, lakekeeper_url):
+        warehouse = os.environ.get("LAKEKEEPER_WAREHOUSE", _DEFAULT_LAKEKEEPER_WAREHOUSE)
         target = dict(dbt_profile_target)
         target["path"] = target.get("path", ":memory:")
         target["attach"] = [
             {
                 "alias": "iceberg_catalog",
-                "path": _LAKEKEEPER_WAREHOUSE,
+                "path": warehouse,
                 "type": "iceberg",
                 "options": {
                     "endpoint": f"{lakekeeper_url}/catalog",
@@ -143,18 +144,20 @@ class TestIcebergLakekeeperIncrementalMaterialization:
 
     @pytest.fixture(scope="class")
     def lakekeeper_url(self):
-        if not _lakekeeper_available():
-            pytest.skip(f"lakekeeper not reachable at {_LAKEKEEPER_URL}")
-        return _LAKEKEEPER_URL
+        url = os.environ.get("LAKEKEEPER_URL", _DEFAULT_LAKEKEEPER_URL)
+        if not _lakekeeper_available(url):
+            pytest.skip(f"lakekeeper not reachable at {url}")
+        return url
 
     @pytest.fixture(scope="class")
     def profiles_config_update(self, dbt_profile_target, lakekeeper_url):
+        warehouse = os.environ.get("LAKEKEEPER_WAREHOUSE", _DEFAULT_LAKEKEEPER_WAREHOUSE)
         target = dict(dbt_profile_target)
         target["path"] = target.get("path", ":memory:")
         target["attach"] = [
             {
                 "alias": "iceberg_catalog",
-                "path": _LAKEKEEPER_WAREHOUSE,
+                "path": warehouse,
                 "type": "iceberg",
                 "options": {
                     "endpoint": f"{lakekeeper_url}/catalog",
