@@ -3,13 +3,14 @@
     {% set sql %}
         select type from duckdb_databases()
         where lower(database_name)='{{ relation.database | lower }}'
-        and type='sqlite'
+        and type != 'duckdb'
     {% endset %}
     {% set results = run_query(sql) %}
     {% if results|length == 0 %}
         create schema if not exists {{ relation.without_identifier() }}
     {% else %}
-        {% if relation.schema!='main' %}
+        {% set attached_type = results.columns[0].values()[0] %}
+        {% if attached_type == 'sqlite' and relation.schema != 'main' %}
             {{ exceptions.raise_compiler_error(
                 "Schema must be 'main' when writing to sqlite "
                 ~ "instead got " ~ relation.schema
