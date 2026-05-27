@@ -76,8 +76,18 @@ class DuckDBRelation(BaseRelation):
 
         return super().create_from(quoting, source, **kwargs)  # type: ignore
 
+    @staticmethod
+    def _is_quack_env() -> bool:
+        return DuckDBConnectionManager._ENV is not None and hasattr(
+            DuckDBConnectionManager._ENV, "_quack_uri"
+        )
+
     def render(self) -> str:
         if self.external:
             return self.external
+        # For Quack connections, strip the database prefix from relations
+        # because Quack beta does not support catalog-qualified names.
+        elif self.include_policy.database and self._is_quack_env():
+            return self.include(database=False).render()
         else:
             return super().render()

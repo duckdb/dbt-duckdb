@@ -1,4 +1,11 @@
 {% macro duckdb__snapshot_merge_sql(target, source, insert_cols) -%}
+    {% if adapter.is_quack() %}
+      {% do exceptions.raise_compiler_error(
+        "Snapshots are not supported over the Quack protocol. "
+        ~ "Quack beta does not support UPDATE or DELETE on remote tables. "
+        ~ "Consider using a local DuckDB or MotherDuck environment for snapshots."
+      ) %}
+    {% endif %}
     {%- set insert_cols_csv = insert_cols | join(', ') -%}
 
     {%- set columns = config.get("snapshot_table_column_names") or get_snapshot_table_column_names() -%}

@@ -63,6 +63,36 @@ CREATE DATABASE my_ducklake
 
 An example profile is show below under "Attaching Additional Databases". DuckLake must be identified so that safe DDL operations are applied by dbt.
 
+#### Using Quack (Beta)
+
+As of `dbt-duckdb` 1.10.x, you can connect to a remote DuckDB server via the [Quack protocol](https://duckdb.org/docs/current/quack/overview) — DuckDB's HTTP-based RPC protocol for remote database access. This requires DuckDB >= 1.5.2.
+
+Quack uses a local in-memory DuckDB as a driver that ATTACHes the remote server. All dbt operations are routed to the remote catalog automatically.
+
+```yaml
+default:
+  outputs:
+    dev:
+      type: duckdb
+      path: "quack:myhost:9494"
+      database: quack_duckdb          # optional alias for the attached database
+      quack_token: "{{ env_var('QUACK_TOKEN') }}"
+      quack_disable_ssl: false        # optional
+  target: dev
+```
+
+The `quack_token` is used for authentication and is automatically configured as a DuckDB secret scoped to the Quack URI. The `quack` extension is auto-installed and loaded. By default, SSL is enabled for Quack connections; set `quack_disable_ssl: true` to connect without SSL (e.g., for local development servers).
+
+**Supported materializations:** `table`, `view`, `seed`, and `incremental` (append strategy only).
+
+**Current known beta limitations:**
+- `DELETE`, `UPDATE`, and `MERGE` are not yet supported on remote tables, so only the `append` incremental strategy is available. Other strategies (`delete+insert`, `merge`, `microbatch`) will produce a clear error message.
+- `ALTER TABLE ... RENAME` is not supported, so materializations use DROP + CREATE instead of the rename pattern.
+- Snapshots are not supported (they require MERGE).
+- Python models are not supported (local DataFrames cannot be registered on the remote server).
+
+These are implementation gaps in the Quack extension's beta release, not fundamental limitations. As Quack adds full DML support, additional strategies will be enabled automatically.
+
 #### DuckDB Extensions, Settings, and Filesystems
 
 You can install and load any core [DuckDB extensions](https://duckdb.org/docs/extensions/overview) by listing them in

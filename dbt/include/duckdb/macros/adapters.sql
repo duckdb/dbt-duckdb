@@ -1,19 +1,25 @@
 {% macro duckdb__create_schema(relation) -%}
   {%- call statement('create_schema') -%}
-    {% set sql %}
-        select type from duckdb_databases()
-        where lower(database_name)='{{ relation.database | lower }}'
-        and type='sqlite'
-    {% endset %}
-    {% set results = run_query(sql) %}
-    {% if results|length == 0 %}
-        create schema if not exists {{ relation.without_identifier() }}
+    {% if adapter.is_quack() %}
+        {# Quack remotes: skip duckdb_databases() (not implemented) and use
+           unqualified schema name (catalog-qualified names not supported in quack beta) #}
+        create schema if not exists "{{ relation.schema }}"
     {% else %}
-        {% if relation.schema!='main' %}
-            {{ exceptions.raise_compiler_error(
-                "Schema must be 'main' when writing to sqlite "
-                ~ "instead got " ~ relation.schema
-            )}}
+        {% set sql %}
+            select type from duckdb_databases()
+            where lower(database_name)='{{ relation.database | lower }}'
+            and type='sqlite'
+        {% endset %}
+        {% set results = run_query(sql) %}
+        {% if results|length == 0 %}
+            create schema if not exists {{ relation.without_identifier() }}
+        {% else %}
+            {% if relation.schema!='main' %}
+                {{ exceptions.raise_compiler_error(
+                    "Schema must be 'main' when writing to sqlite "
+                    ~ "instead got " ~ relation.schema
+                )}}
+            {% endif %}
         {% endif %}
     {% endif %}
   {%- endcall -%}
@@ -21,7 +27,12 @@
 
 {% macro duckdb__drop_schema(relation) -%}
   {%- call statement('drop_schema') -%}
-    drop schema if exists {{ relation.without_identifier() }} cascade
+    {% if adapter.is_quack() %}
+        {{ adapter.warn_once('DROP SCHEMA is not supported over Quack; skipping schema cleanup') }}
+        select 1
+    {% else %}
+        drop schema if exists {{ relation.without_identifier() }} cascade
+    {% endif %}
   {%- endcall -%}
 {% endmacro %}
 
@@ -267,7 +278,7 @@ def materialize(df, con):
       {% if relation.schema %}
       and lower(table_schema) = '{{ relation.schema | lower }}'
       {% endif %}
-      {% if relation.database %}
+      {% if relation.database and not adapter.is_quack() %}
       and lower(table_catalog) = '{{ relation.database | lower }}'
       {% endif %}
       order by ordinal_position
@@ -279,18 +290,29 @@ def materialize(df, con):
 
 {% macro duckdb__list_relations_without_caching(schema_relation) %}
   {% call statement('list_relations_without_caching', fetch_result=True) -%}
-    select
-      '{{ schema_relation.database }}' as database,
-      table_name as name,
-      table_schema as schema,
-      CASE table_type
-        WHEN 'BASE TABLE' THEN 'table'
-        WHEN 'VIEW' THEN 'view'
-        WHEN 'LOCAL TEMPORARY' THEN 'table'
-        END as type
-    from system.information_schema.tables
-    where lower(table_schema) = '{{ schema_relation.schema | lower }}'
-    and lower(table_catalog) = '{{ schema_relation.database | lower }}'
+    {% if adapter.is_quack() %}
+      {# Quack beta: information_schema.tables is empty for remote tables.
+         Use sqlite_master which correctly lists tables and views. #}
+      select
+        '{{ schema_relation.database }}' as database,
+        name as name,
+        '{{ schema_relation.schema }}' as schema,
+        type as type
+      from sqlite_master
+    {% else %}
+      select
+        '{{ schema_relation.database }}' as database,
+        table_name as name,
+        table_schema as schema,
+        CASE table_type
+          WHEN 'BASE TABLE' THEN 'table'
+          WHEN 'VIEW' THEN 'view'
+          WHEN 'LOCAL TEMPORARY' THEN 'table'
+          END as type
+      from system.information_schema.tables
+      where lower(table_schema) = '{{ schema_relation.schema | lower }}'
+      and lower(table_catalog) = '{{ schema_relation.database | lower }}'
+    {% endif %}
   {% endcall %}
   {{ return(load_result('list_relations_without_caching').table) }}
 {% endmacro %}
