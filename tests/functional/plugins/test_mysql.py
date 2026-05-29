@@ -43,7 +43,7 @@ class TestMySQLPlugin:
     def models(self):
         return {
             "my_model.sql": """
-                {{ config(materialized='table', database='my_mysql') }}
+                {{ config(materialized='table', database='my_mysql', schema='mydb') }}
                 select 1 as id
             """,
         }
@@ -52,5 +52,14 @@ class TestMySQLPlugin:
         # Before #696 this would fail because duckdb__create_schema attempted
         # CREATE SCHEMA against the attached MySQL database. After the fix
         # the create_schema call is skipped for any non-duckdb attached type.
+        #
+        # Run once: exercises the initial schema-resolution path (where the
+        # schema does not yet exist in the dbt graph state).
+        results = run_dbt(["run"])
+        assert len(results) >= 1
+
+        # Run a second time: exercises the existing-schema path to confirm
+        # duckdb__create_schema is idempotent and does not raise on a
+        # second pass when the attached MySQL schema is already known.
         results = run_dbt(["run"])
         assert len(results) >= 1
