@@ -51,7 +51,8 @@ class TestMySQLPlugin:
     def test_mysql_attached_skips_create_schema(self, project):
         # Before #696 this would fail because duckdb__create_schema attempted
         # CREATE SCHEMA against the attached MySQL database. After the fix
-        # the create_schema call is skipped for any non-duckdb attached type.
+        # the create_schema call is skipped for attached MySQL databases
+        # (postgres and other attached engines keep CREATE SCHEMA IF NOT EXISTS).
         #
         # Run once: exercises the initial schema-resolution path (where the
         # schema does not yet exist in the dbt graph state).

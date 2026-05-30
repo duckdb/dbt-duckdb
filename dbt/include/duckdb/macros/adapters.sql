@@ -15,6 +15,8 @@
                 "Schema must be 'main' when writing to sqlite "
                 ~ "instead got " ~ relation.schema
             )}}
+        {% elif attached_type not in ['sqlite', 'mysql'] %}
+            create schema if not exists {{ relation.without_identifier() }}
         {% endif %}
     {% endif %}
   {%- endcall -%}
