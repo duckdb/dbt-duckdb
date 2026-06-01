@@ -39,7 +39,7 @@ testcontainers[postgres]
 pytz
 ruff
 sqlalchemy
-tox>=4.54.0
+tox>=4.55.0
 twine
 wheel
 deltalake
