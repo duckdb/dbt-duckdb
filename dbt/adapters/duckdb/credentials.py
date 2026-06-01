@@ -245,6 +245,9 @@ class DuckDBCredentials(Credentials):
         if self.is_ducklake or "ducklake:" in self.path.lower():
             self._ducklake_dbs.add(self.path_derived_database_name(self.path))
 
+        # Build set of Iceberg REST catalog database names for schema name generation
+        self._iceberg_catalog_dbs: set = set()
+
         if self.attach:
             for attachment in self.attach:
                 is_ducklake_flag = getattr(attachment, "is_ducklake", None)
@@ -259,6 +262,17 @@ class DuckDBCredentials(Credentials):
                         self._ducklake_dbs.add(alias)
                     else:
                         self._ducklake_dbs.add(self.path_derived_database_name(path))
+
+                # Detect Iceberg REST catalog via .type field or options dict
+                attachment_type = None
+                if attachment.type:
+                    attachment_type = attachment.type.lower()
+                elif attachment.options and "type" in attachment.options:
+                    attachment_type = str(attachment.options["type"]).lower()
+
+                if attachment_type == "iceberg":
+                    name = alias or self.path_derived_database_name(path)
+                    self._iceberg_catalog_dbs.add(name)
 
         # Add MotherDuck plugin if the path is a MotherDuck database
         # and plugin was not specified in profile.yml

@@ -46,6 +46,20 @@
   {{ return(run_query(sql)) }}
 {% endmacro %}
 
+{% macro duckdb__generate_schema_name(custom_schema_name, node) -%}
+  {%- set default_schema = target.schema -%}
+  {%- if custom_schema_name is none -%}
+    {{ default_schema }}
+  {%- else -%}
+    {%- set node_db = node.config.database if (node is not none and node.config is not none) else none -%}
+    {%- if node_db is not none and adapter.is_iceberg_catalog_db(node_db) -%}
+      {{ custom_schema_name | trim }}
+    {%- else -%}
+      {{ default_schema }}_{{ custom_schema_name | trim }}
+    {%- endif -%}
+  {%- endif -%}
+{%- endmacro %}
+
 {% macro get_column_names() %}
   {# loop through user_provided_columns to get column names #}
     {%- set user_provided_columns = model['columns'] -%}
