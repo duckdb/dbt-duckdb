@@ -61,7 +61,7 @@ CREATE DATABASE my_ducklake
   (TYPE ducklake, DATA_PATH 's3://...')
 ```
 
-An example profile is show below under "Attaching Additional Databases". DuckLake must be identified so that safe DDL operations are applied by dbt.
+An example profile is shown below under "Attaching Additional Databases". DuckLake must be identified so that safe DDL operations are applied by dbt.
 
 #### DuckDB Extensions, Settings, and Filesystems
 
