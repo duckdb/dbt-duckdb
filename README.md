@@ -317,6 +317,32 @@ of paths on the filesystem that contain additional Python modules that should be
 can be accessed by the running dbt process and used to define custom dbt-duckdb Plugins or library code that is
 helpful for creating dbt Python models.
 
+#### Retrying database operations
+
+DuckDB operations can occasionally fail for transient reasons — for example, an `IOException` caused by a networking blip while reading remote files, or the database file being temporarily locked by another process. To make these failures recoverable instead of fatal to your dbt run, you can configure the `retries` field in your profile:
+
+```
+default:
+  outputs:
+    dev:
+      type: duckdb
+      path: /tmp/dbt.duckdb
+      retries:
+        connect_attempts: 5
+        query_attempts: 3
+        retryable_exceptions:
+          - "IOException"
+  target: dev
+```
+
+The `retries` block supports the following settings:
+
+| Setting | Default | Description |
+| --- | --- | --- |
+| `connect_attempts` | `1` | The number of times to attempt the initial `duckdb.connect` call, which is useful for waiting for another process to release its lock on the database file. |
+| `query_attempts` | `None` | The number of times to retry a query that fails with one of the `retryable_exceptions`. |
+| `retryable_exceptions` | `["IOException"]` | The list of DuckDB exception types that should trigger a retry. |
+
 ### Reading and Writing External Files
 
 One of DuckDB's most powerful features is its ability to read and write CSV, JSON, and Parquet files directly, without needing to import/export
