@@ -139,6 +139,16 @@ class DuckDBAdapter(SQLAdapter):
         # an unfiltered information_schema.columns scan triggers a full metastore load.
         return
 
+    def get_columns_in_relation(self, relation: BaseRelation) -> List[BaseColumn]:
+        # DESCRIBE (see issue #762) raises on a missing relation; preserve the old
+        # information_schema behavior of returning [] for callers that probe existence.
+        try:
+            return super().get_columns_in_relation(relation)
+        except DbtRuntimeError as e:
+            if "does not exist" in str(e).lower():
+                return []
+            raise
+
     @available
     def parse_index(self, raw_index: Any) -> Optional[DuckDBIndexConfig]:
         return DuckDBIndexConfig.parse(raw_index)
