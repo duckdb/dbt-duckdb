@@ -219,6 +219,23 @@ class DuckDBAdapter(SQLAdapter):
         return DuckDBConnectionManager.env().get_binding_char()
 
     @available
+    def get_attachment_endpoints(self) -> Any:
+        """Return a mapping of attachment aliases to their endpoint URIs.
+
+        Enables OpenLineage and other external integrations to derive proper namespaces
+        for catalog lineage tracking. Each entry maps an attachment alias (or path)
+        to its configured endpoint.
+
+        Returns a dict where keys are attachment aliases (or paths) and values are endpoint URIs.
+        """
+        endpoints = {}
+        if self.config.credentials.attach:
+            for attachment in self.config.credentials.attach:
+                key = attachment.alias if attachment.alias else attachment.path
+                endpoints[key] = attachment.path
+        return endpoints
+
+    @available
     def external_write_options(self, write_location: str, rendered_options: dict) -> str:
         if "format" not in rendered_options:
             ext = os.path.splitext(write_location)[1].lower()

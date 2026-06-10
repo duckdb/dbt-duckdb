@@ -351,3 +351,69 @@ class TestDuckDBAdapterIsDucklake(unittest.TestCase):
         result = adapter.is_ducklake(relation)
         self.assertTrue(result)
 
+
+class TestDuckDBAdapterGetAttachmentEndpoints(unittest.TestCase):
+    def setUp(self):
+        set_from_args(Namespace(STRICT_MODE=True), {})
+
+        self.base_profile_cfg = {
+            "outputs": {
+                "test": {
+                    "type": "duckdb",
+                    "path": ":memory:",
+                }
+            },
+            "target": "test",
+        }
+
+        project_cfg = {
+            "name": "X",
+            "version": "0.1",
+            "profile": "test",
+            "project-root": "/tmp/dbt/does-not-exist",
+            "quoting": {
+                "identifier": False,
+                "schema": True,
+            },
+            "config-version": 2,
+        }
+
+        self.project_cfg = project_cfg
+        self.mock_mp_context = mock.MagicMock()
+
+    def _get_adapter(self, profile_cfg):
+        config = config_from_parts_or_dicts(self.project_cfg, profile_cfg, cli_vars={})
+        return DuckDBAdapter(config, self.mock_mp_context)
+
+    def test_get_attachment_endpoints_no_attachments(self):
+        """Test get_attachment_endpoints returns empty dict when no attachments configured."""
+        adapter = self._get_adapter(self.base_profile_cfg)
+        result = adapter.get_attachment_endpoints()
+        self.assertEqual(result, {})
+
+    def test_get_attachment_endpoints_with_attachments(self):
+        """Test get_attachment_endpoints returns correct mapping for attachments."""
+        profile_cfg = self.base_profile_cfg.copy()
+        profile_cfg["outputs"]["test"]["attach"] = [
+            {"alias": "polaris", "path": "iceberg://http://polaris:8181/api/catalog"},
+            {"alias": "postgres_db", "path": "postgresql://user@localhost/database"},
+            {"path": "s3://bucket/db.duckdb"},
+        ]
+        adapter = self._get_adapter(profile_cfg)
+        result = adapter.get_attachment_endpoints()
+
+        self.assertEqual(result, {
+            "polaris": "iceberg://http://polaris:8181/api/catalog",
+            "postgres_db": "postgresql://user@localhost/database",
+            "s3://bucket/db.duckdb": "s3://bucket/db.duckdb",
+        })
+
+    def test_get_attachment_endpoints_without_alias_uses_path(self):
+        """Test get_attachment_endpoints uses path as key when alias is missing."""
+        profile_cfg = self.base_profile_cfg.copy()
+        profile_cfg["outputs"]["test"]["attach"] = [
+            {"path": "s3://bucket/db.duckdb"}
+        ]
+        adapter = self._get_adapter(profile_cfg)
+        result = adapter.get_attachment_endpoints()
+        self.assertEqual(result, {"s3://bucket/db.duckdb": "s3://bucket/db.duckdb"})
