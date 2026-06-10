@@ -130,5 +130,10 @@ class DuckDBConnectionManager(SQLConnectionManager):
             auto_begin = False
         return super().execute(sql, auto_begin, fetch, limit)
 
+    def commit_if_has_connection(self) -> None:
+        connection = self.get_if_exists()
+        if connection and connection.transaction_open:
+            self.commit()
+
 
 atexit.register(DuckDBConnectionManager.close_all_connections)

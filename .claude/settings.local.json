@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "additionalDirectories": [
+      "/Users/dataders/Developer/dbt-adapters"
+    ]
+  }
+}

@@ -257,25 +257,39 @@ def materialize(df, con):
 {% endmacro %}
 
 {% macro duckdb__get_columns_in_relation(relation) -%}
-  {% call statement('get_columns_in_relation', fetch_result=True) %}
+  {% if adapter.is_iceberg(relation) %}
+    {#-- information_schema.columns returns incorrect metadata for Iceberg REST
+         catalog tables (column names come back as "__"). Use DESCRIBE instead. --#}
+    {% call statement('get_columns_in_relation', fetch_result=True) %}
       select
           column_name,
-          data_type,
-          character_maximum_length,
-          numeric_precision,
-          numeric_scale
+          column_type                as data_type,
+          null::integer              as character_maximum_length,
+          null::integer              as numeric_precision,
+          null::integer              as numeric_scale
+      from (describe {{ relation }})
+    {% endcall %}
+  {% else %}
+    {% call statement('get_columns_in_relation', fetch_result=True) %}
+        select
+            column_name,
+            data_type,
+            character_maximum_length,
+            numeric_precision,
+            numeric_scale
 
-      from system.information_schema.columns
-      where table_name = '{{ relation.identifier }}'
-      {% if relation.schema %}
-      and lower(table_schema) = '{{ relation.schema | lower }}'
-      {% endif %}
-      {% if relation.database %}
-      and lower(table_catalog) = '{{ relation.database | lower }}'
-      {% endif %}
-      order by ordinal_position
+        from system.information_schema.columns
+        where table_name = '{{ relation.identifier }}'
+        {% if relation.schema %}
+        and lower(table_schema) = '{{ relation.schema | lower }}'
+        {% endif %}
+        {% if relation.database %}
+        and lower(table_catalog) = '{{ relation.database | lower }}'
+        {% endif %}
+        order by ordinal_position
 
-  {% endcall %}
+    {% endcall %}
+  {% endif %}
   {% set table = load_result('get_columns_in_relation').table %}
   {{ return(sql_convert_columns_in_relation(table)) }}
 {% endmacro %}
@@ -300,7 +314,7 @@ def materialize(df, con):
 
 {% macro duckdb__drop_relation(relation) -%}
   {% call statement('drop_relation', auto_begin=False) -%}
-    {% if adapter.is_ducklake(relation) %}
+    {% if adapter.is_ducklake(relation) or adapter.is_iceberg(relation) %}
       drop {{ relation.type }} if exists {{ relation }}
     {% else %}
       drop {{ relation.type }} if exists {{ relation }} cascade
@@ -310,6 +324,10 @@ def materialize(df, con):
 
 {% macro duckdb__rename_relation(from_relation, to_relation) -%}
   {% set target_name = adapter.quote_as_configured(to_relation.identifier, 'identifier') %}
+  {%- if adapter.is_iceberg(from_relation) -%}
+    {#-- Iceberg REST: CTAS and ALTER...RENAME cannot share a transaction; commit first --#}
+    {{ adapter.commit() }}
+  {%- endif -%}
   {% call statement('rename_relation') -%}
     alter {{ to_relation.type }} {{ from_relation }} rename to {{ target_name }}
   {%- endcall %}
