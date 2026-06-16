@@ -257,24 +257,17 @@ def materialize(df, con):
 {% endmacro %}
 
 {% macro duckdb__get_columns_in_relation(relation) -%}
+  {# DESCRIBE avoids the global information_schema.columns scan, which forces a full
+     catalog load on attached catalogs like DuckLake (issue #762). DuckDB's column_type
+     carries precision/scale in the type string, so the null literals are safe. #}
   {% call statement('get_columns_in_relation', fetch_result=True) %}
       select
           column_name,
-          data_type,
-          character_maximum_length,
-          numeric_precision,
-          numeric_scale
-
-      from system.information_schema.columns
-      where table_name = '{{ relation.identifier }}'
-      {% if relation.schema %}
-      and lower(table_schema) = '{{ relation.schema | lower }}'
-      {% endif %}
-      {% if relation.database %}
-      and lower(table_catalog) = '{{ relation.database | lower }}'
-      {% endif %}
-      order by ordinal_position
-
+          column_type as data_type,
+          cast(null as bigint) as character_maximum_length,
+          cast(null as bigint) as numeric_precision,
+          cast(null as bigint) as numeric_scale
+      from (describe {{ relation.render() }})
   {% endcall %}
   {% set table = load_result('get_columns_in_relation').table %}
   {{ return(sql_convert_columns_in_relation(table)) }}
