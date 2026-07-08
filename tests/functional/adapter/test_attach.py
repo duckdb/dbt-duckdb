@@ -87,3 +87,59 @@ class TestAttachedDatabase:
         # check that everything works on a re-run of dbt
         rerun_results = run_dbt()
         assert len(rerun_results) == 2
+
+
+indexed_model_sql = """
+    {{ config(
+        materialized='table',
+        database='attach_test',
+        indexes=[{'columns': ['id']}],
+    ) }}
+    SELECT 1 as id
+"""
+
+
+@pytest.mark.skip_profile("memory", "buenavista", "md")
+class TestIndexOnAttachedDatabase:
+    """Regression test for #771: dropping indexes on a table in an attached
+    (non-default) catalog requires the full three-part database.schema.index
+    path. The second dbt run exercises the DROP INDEX path in
+    drop_indexes_on_relation."""
+
+    @pytest.fixture(scope="class")
+    def attach_test_db(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            path = os.path.join(temp_dir, "attach_test.duckdb")
+            db = duckdb.connect(path)
+            db.close()
+            yield path
+
+    @pytest.fixture(scope="class")
+    def profiles_config_update(self, dbt_profile_target, attach_test_db):
+        return {
+            "test": {
+                "outputs": {
+                    "dev": {
+                        "type": "duckdb",
+                        "path": dbt_profile_target.get("path", ":memory:"),
+                        "attach": [{"path": attach_test_db}],
+                    }
+                },
+                "target": "dev",
+            }
+        }
+
+    @pytest.fixture(scope="class")
+    def models(self):
+        return {"indexed_model.sql": indexed_model_sql}
+
+    def test_index_on_attached_database(self, project):
+        # First run creates the table + index (no DROP INDEX path).
+        results = run_dbt()
+        assert len(results) == 1
+
+        # Second run re-materializes the table, which drops the existing
+        # index first. Without the database_name prefix this fails with
+        # "Catalog Error: Index ... does not exist!".
+        rerun_results = run_dbt()
+        assert len(rerun_results) == 1
