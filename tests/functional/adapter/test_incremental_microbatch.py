@@ -264,8 +264,26 @@ class TestMicrobatchUniqueKeyNotSupported:
         }
 
     def test_unique_key_not_supported(self, project, capsys):
+        # Bound the run to two daily batches. The model config has a fixed
+        # begin='2025-01-01' and no end, so without explicit event-time bounds
+        # dbt expands the microbatch into one daily batch per day from that
+        # date to "now" -- a count that grows every day and, since each batch
+        # spins up a relation, made this test progressively slower (notably on
+        # MotherDuck, where every batch is a network round-trip). The
+        # unique_key rejection only fires on the incremental path, so we need
+        # the first batch to create the table and the second to trigger the
+        # error: a two-day window exercises the same validation with exactly
+        # two batches.
         run_dbt(
-            ["run", "--select", "microbatch_unique_key_not_supported"],
+            [
+                "run",
+                "--select",
+                "microbatch_unique_key_not_supported",
+                "--event-time-start",
+                "2025-01-01",
+                "--event-time-end",
+                "2025-01-03",
+            ],
             expect_pass=False,
         )
         captured = capsys.readouterr()
@@ -369,11 +387,20 @@ class TestMicrobatchScenarios:
         assert count[0] == 5
 
     def test_microbatch_supports_hour_batch_size(self, project):
+        # All data lives in the first three hours of 2025-01-01, so bound the
+        # run to a 3-hour window. The default day-granularity bounds
+        # (2025-01-01..2025-01-04) would fan out into 72 hourly batches per
+        # run for no added coverage -- a needless cost, especially on
+        # MotherDuck where every batch is a network round-trip.
+        hour_start = "2025-01-01 00:00:00"
+        hour_end = "2025-01-01 03:00:00"
         self._run_with_bounds(
             "microbatch_batch_hour_input microbatch_batch_hour",
             project,
             expect_pass=True,
             full_refresh=True,
+            start=hour_start,
+            end=hour_end,
         )
 
         relation = relation_from_name(project.adapter, "microbatch_batch_hour")
@@ -389,7 +416,13 @@ class TestMicrobatchScenarios:
             "(5, '2025-01-01 00:45:00'::timestamp)"
         )
 
-        self._run_with_bounds("microbatch_batch_hour", project, expect_pass=True)
+        self._run_with_bounds(
+            "microbatch_batch_hour",
+            project,
+            expect_pass=True,
+            start=hour_start,
+            end=hour_end,
+        )
         count = project.run_sql(
             f"SELECT COUNT(*) as count FROM {relation}", fetch="one"
         )
