@@ -296,6 +296,22 @@ modules may be initialized using an arbitrary set of key-value pairs that are de
 `config` dictionary. In this example, we initialize the `gsheet` plugin with the setting `method: oauth` and we
 initialize the `sqlalchemy` plugin (aliased as "sql") with a `connection_url` that is set via an environment variable.
 
+The `gsheet` plugin also accepts the following optional config keys when `method: service`:
+
+* `keyfile` — path to the service-account JSON key (defaults to gspread's `~/.config/gspread/service_account.json`).
+* `impersonate` — a Google Workspace user's email to impersonate via [domain-wide delegation](https://developers.google.com/identity/protocols/oauth2/service-account#delegatingauthority), so the service account can read sheets on that user's behalf without sharing each file with the service account. Requires DWD to be enabled for the service account's client id in the Workspace admin console.
+* `scopes` — the OAuth scopes granted to the impersonated credentials (defaults to read-only sheets + drive).
+
+```yaml
+      plugins:
+        - module: gsheet
+          config:
+            method: service
+            impersonate: analyst@your-workspace.com
+            scopes:
+              - https://www.googleapis.com/auth/drive.readonly
+```
+
 Please remember that using plugins may require you to add additional dependencies to the Python environment that your dbt-duckdb pipeline runs in:
 
 * `excel` depends on `pandas`, and `openpyxl` or `xlsxwriter` to perform writes
