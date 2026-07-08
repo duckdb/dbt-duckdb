@@ -398,7 +398,8 @@ def materialize(df, con):
   {% call statement('get_indexes_on_relation', fetch_result=True, auto_begin=False) %}
     SELECT index_name
     FROM duckdb_indexes()
-    WHERE schema_name = '{{ relation.schema }}'
+    WHERE database_name = '{{ relation.database }}'
+      AND schema_name = '{{ relation.schema }}'
       AND table_name = '{{ relation.identifier }}'
   {% endcall %}
 
@@ -406,7 +407,7 @@ def materialize(df, con):
   {% for row in results %}
     {% set index_name = row[0] %}
     {% call statement('drop_index_' + loop.index|string, auto_begin=false) %}
-      DROP INDEX "{{ relation.schema }}"."{{ index_name }}"
+      DROP INDEX "{{ relation.database }}"."{{ relation.schema }}"."{{ index_name }}"
     {% endcall %}
   {% endfor %}
 {%- endmacro %}
