@@ -264,8 +264,26 @@ class TestMicrobatchUniqueKeyNotSupported:
         }
 
     def test_unique_key_not_supported(self, project, capsys):
+        # Bound the run to two daily batches. The model config has a fixed
+        # begin='2025-01-01' and no end, so without explicit event-time bounds
+        # dbt expands the microbatch into one daily batch per day from that
+        # date to "now" -- a count that grows every day and, since each batch
+        # spins up a relation, made this test progressively slower (notably on
+        # MotherDuck, where every batch is a network round-trip). The
+        # unique_key rejection only fires on the incremental path, so we need
+        # the first batch to create the table and the second to trigger the
+        # error: a two-day window exercises the same validation with exactly
+        # two batches.
         run_dbt(
-            ["run", "--select", "microbatch_unique_key_not_supported"],
+            [
+                "run",
+                "--select",
+                "microbatch_unique_key_not_supported",
+                "--event-time-start",
+                "2025-01-01",
+                "--event-time-end",
+                "2025-01-03",
+            ],
             expect_pass=False,
         )
         captured = capsys.readouterr()
