@@ -1,5 +1,4 @@
 import os
-import traceback
 from collections import defaultdict
 from dataclasses import dataclass
 from datetime import datetime
@@ -16,7 +15,6 @@ from dbt_common.contracts.constraints import ConstraintType
 from dbt_common.dataclass_schema import dbtClassMixin
 from dbt_common.dataclass_schema import ValidationError
 from dbt_common.exceptions import DbtDatabaseError
-from dbt_common.exceptions import DbtInternalError
 from dbt_common.exceptions import DbtRuntimeError
 from dbt_common.utils import encoding as dbt_encoding
 from packaging.version import Version
@@ -317,14 +315,23 @@ class DuckDBAdapter(SQLAdapter):
         return super().get_incremental_strategy_macro(model_context, strategy)
 
     def commit_if_has_connection(self) -> None:
-        """This is just a quick-fix. Python models do not execute begin function so the transaction_open is always false."""
-        try:
-            self.connections.commit_if_has_connection()
-        except DbtInternalError as e:
-            # Log commit errors instead of silently swallowing them to aid debugging
-            logger.warning(f"Commit failed with DbtInternalError: {e}\n{traceback.format_exc()}")
-            # Still pass to maintain backward compatibility, but now with visibility
-            pass
+        """Commit the current transaction only if the connection has one open.
+
+        The connection can legitimately have no open transaction here: Python
+        models never issue BEGIN, and DuckDB autocommits statements against
+        some attached catalogs (e.g. DuckLake), closing the transaction before
+        dbt gets to commit it. Calling commit() in that state raises
+        DbtInternalError, which used to be caught and logged with a full
+        traceback on every affected node. Check the transaction state up front
+        instead, so a normal condition does not produce warning-level noise.
+        """
+        connection = self.connections.get_if_exists()
+        if connection is not None and not connection.transaction_open:
+            logger.debug(
+                f'Skipping commit on connection "{connection.name}": no transaction open'
+            )
+            return
+        self.connections.commit_if_has_connection()
 
     def submit_python_job(self, parsed_model: dict, compiled_code: str) -> AdapterResponse:
         connection = self.connections.get_if_exists()
