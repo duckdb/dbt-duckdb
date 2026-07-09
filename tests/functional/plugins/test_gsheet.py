@@ -83,3 +83,29 @@ class TestGSheetPlugin:
                 "source_model2",
             ],
         )
+
+
+def test_gsheet_config_service_impersonate_parsing():
+    from dbt.adapters.duckdb.plugins.gsheet import GSheetConfig
+
+    cfg = GSheetConfig.from_dict(
+        {
+            "method": "service",
+            "keyfile": "/tmp/sa.json",
+            "impersonate": "analyst@example.com",
+            "scopes": ["https://www.googleapis.com/auth/drive.readonly"],
+        }
+    )
+    assert cfg.method == "service"
+    assert cfg.keyfile == "/tmp/sa.json"
+    assert cfg.impersonate == "analyst@example.com"
+    assert cfg.scopes == ["https://www.googleapis.com/auth/drive.readonly"]
+
+
+def test_gsheet_config_defaults():
+    from dbt.adapters.duckdb.plugins.gsheet import GSheetConfig
+
+    cfg = GSheetConfig.from_dict({"method": "oauth"})
+    assert cfg.keyfile is None
+    assert cfg.impersonate is None
+    assert cfg.scopes is None

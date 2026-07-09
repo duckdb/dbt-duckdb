@@ -1,7 +1,10 @@
+import os
 from dataclasses import dataclass
 from typing import Any
 from typing import Dict
+from typing import List
 from typing import Literal
+from typing import Optional
 
 import gspread
 import pandas as pd
@@ -10,16 +13,38 @@ from . import BasePlugin
 from . import PluginConfig
 from ..utils import SourceConfig
 
+DEFAULT_IMPERSONATE_SCOPES = [
+    "https://www.googleapis.com/auth/spreadsheets.readonly",
+    "https://www.googleapis.com/auth/drive.readonly",
+]
+
 
 @dataclass
 class GSheetConfig(PluginConfig):
     method: Literal["service", "oauth"]
+    keyfile: Optional[str] = None
+    impersonate: Optional[str] = None
+    scopes: Optional[List[str]] = None
 
     def client(self):
-        if self.method == "service":
-            return gspread.service_account()
-        else:
+        if self.method == "oauth":
             return gspread.oauth()
+
+        if self.impersonate:
+            from google.oauth2.service_account import Credentials
+
+            keyfile = os.path.expanduser(
+                self.keyfile or gspread.auth.DEFAULT_SERVICE_ACCOUNT_FILENAME
+            )
+            scopes = self.scopes or DEFAULT_IMPERSONATE_SCOPES
+            creds = Credentials.from_service_account_file(keyfile, scopes=scopes).with_subject(
+                self.impersonate
+            )
+            return gspread.authorize(creds)
+
+        if self.keyfile:
+            return gspread.service_account(filename=os.path.expanduser(self.keyfile))
+        return gspread.service_account()
 
 
 class Plugin(BasePlugin):
