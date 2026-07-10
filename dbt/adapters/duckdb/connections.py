@@ -52,7 +52,7 @@ class DuckDBConnectionManager(SQLConnectionManager):
                 if not cls._ENV or cls._ENV.creds != credentials:
                     if cls._ENV is not None:
                         # Explicitly close the old environment's connection/duckdb instance
-                        # before replacing it. 
+                        # before replacing it.
                         cls._ENV.close()
                     cls._ENV = environments.create(credentials)
                 connection.handle = cls._ENV.handle()
