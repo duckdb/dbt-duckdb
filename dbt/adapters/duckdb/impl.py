@@ -158,6 +158,10 @@ class DuckDBAdapter(SQLAdapter):
         return self.config.credentials.is_motherduck
 
     @available
+    def use_motherduck_postgres_endpoint(self):
+        return self.config.credentials.use_motherduck_postgres_endpoint
+
+    @available
     def disable_transactions(self):
         return self.config.credentials.disable_transactions
 
