@@ -113,6 +113,9 @@ class Environment(abc.ABC):
     def get_binding_char(self) -> str:
         return "?"
 
+    def close(self):
+        pass
+
     @classmethod
     @abc.abstractmethod
     def is_cancelable(cls) -> bool:
@@ -128,6 +131,12 @@ class Environment(abc.ABC):
         cls, creds: DuckDBCredentials, plugins: Optional[Dict[str, BasePlugin]] = None
     ):
         config = creds.config_options or {}
+        if creds.is_motherduck_database:
+            # Only applies when the connection's *primary* database is MotherDuck
+            # (not a local connection with MotherDuck attached), since only
+            # instances registered with the instance cache support this setting,
+            # and it must be set before SaaS mode locks the config.
+            config.setdefault("motherduck_dbinstance_inactivity_ttl", "0s")
         plugins = plugins or {}
         for plugin in plugins.values():
             plugin.update_connection_config(creds, config)

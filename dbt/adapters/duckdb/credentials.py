@@ -306,9 +306,16 @@ class DuckDBCredentials(Credentials):
         return len(self.motherduck_attach) > 0
 
     @property
-    def is_motherduck(self):
+    def is_motherduck_database(self):
+        # Whether the *primary* connection (as opposed to an attached database)
+        # is a MotherDuck database; only these connections are registered with
+        # MotherDuck's instance cache.
         parsed = urlparse(self.path)
-        return self._is_motherduck(parsed.scheme) or self.is_motherduck_attach
+        return self._is_motherduck(parsed.scheme)
+
+    @property
+    def is_motherduck(self):
+        return self.is_motherduck_database or self.is_motherduck_attach
 
     @staticmethod
     def _is_motherduck(scheme: str) -> bool:

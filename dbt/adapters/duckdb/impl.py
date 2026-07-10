@@ -402,8 +402,24 @@ class DuckDBAdapter(SQLAdapter):
     def _clean_up_temp_relation_for_incremental(self, config):
         if self.is_motherduck() and hasattr(config, "model"):
             if "incremental" == config.model.get_materialization():
+                # Microbatch gives each batch its own temp table (see batch_id in
+                # get_temp_relation_path); include the same batch_id here so this
+                # matches the table that was actually created for this batch.
+                batch_ctx = getattr(config.model, "batch", None)
+                batch_id = ""
+                if batch_ctx and batch_ctx.event_time_start:
+                    # Keep in sync with the batch_id logic in
+                    # macros/materializations/incremental.sql -- both must derive
+                    # the same identifier from the same batch.event_time_start.
+                    batch_id = (
+                        str(batch_ctx.event_time_start)
+                        .replace("-", "")
+                        .replace(":", "")
+                        .replace(" ", "_")
+                        .replace("+", "")
+                    )
                 temp_relation = self.Relation(
-                    path=self.get_temp_relation_path(config.model),
+                    path=self.get_temp_relation_path(config.model, batch_id),
                     type=RelationType.Table,
                 )
                 self.drop_relation(temp_relation)

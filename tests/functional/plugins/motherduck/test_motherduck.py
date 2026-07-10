@@ -155,8 +155,10 @@ def test_motherduck_user_agent(dbt_profile_target, mock_plugins, mock_creds):
                 'read_only': False,
                 'config': {
                     'custom_user_agent': f'dbt/{__version__} dbt-duckdb/{plugin_version} downstream-dep',
-                    'motherduck_token': 'quack'
-                }
+                    'motherduck_token': 'quack',
+                    'motherduck_dbinstance_inactivity_ttl':'0s'
+
+                },
             }
             mock_connect.assert_called_with(path, **kwargs)
         else:

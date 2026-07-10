@@ -1,5 +1,7 @@
 import os
+import random
 import resource
+import string
 import subprocess
 import time
 from importlib import metadata
@@ -38,6 +40,35 @@ def profile_type(request):
 
 
 @pytest.fixture(scope="session")
+def test_database_name():
+    """Generate a unique database name for the entire MotherDuck test session
+
+    The suffix is deliberately letters-only (no digits): several functional
+    tests normalize compiled SQL by stripping numeric noise (e.g. `re.sub(r"\\d+", "")`)
+    before comparing it against an expected string built from the raw database
+    name, so a database name containing digits would get mangled on one side
+    of the comparison but not the other.
+    """
+    random_suffix = "".join(random.choices(string.ascii_lowercase, k=12))
+    db_name = f"test_db_{random_suffix}"
+
+    # Create the database once for all tests
+    token = os.environ.get(MOTHERDUCK_TOKEN) or os.environ.get(TEST_MOTHERDUCK_TOKEN)
+    if token:
+        conn = duckdb.connect(f"md:?motherduck_token={token}")
+        conn.execute(f"CREATE DATABASE IF NOT EXISTS {db_name}")
+        conn.close()
+
+    yield db_name
+
+    # Clean up: drop the database after all tests complete
+    if token:
+        conn = duckdb.connect(f"md:?motherduck_token={token}")
+        conn.execute(f"DROP DATABASE IF EXISTS {db_name}")
+        conn.close()
+
+
+@pytest.fixture(scope="session")
 def bv_server_process(profile_type):
     if profile_type == "buenavista":
         server_process = subprocess.Popen(["python3", "-m", "tests.bv_test_server"])
@@ -58,7 +89,7 @@ def bv_server_process(profile_type):
 # The profile dictionary, used to write out profiles.yml
 # dbt will supply a unique schema per test, so we do not specify 'schema' here
 @pytest.fixture(scope="session")
-def dbt_profile_target(profile_type, bv_server_process, tmpdir_factory):
+def dbt_profile_target(profile_type, bv_server_process, tmpdir_factory, request):
     profile = {"type": "duckdb", "threads": 4}
 
     if profile_type == "buenavista":
@@ -82,7 +113,8 @@ def dbt_profile_target(profile_type, bv_server_process, tmpdir_factory):
         else:
             profile["token"] = os.environ.get(MOTHERDUCK_TOKEN, os.environ.get(MOTHERDUCK_TOKEN.lower()))
         profile["disable_transactions"] = True
-        profile["path"] = "md:test"
+        db_name = request.getfixturevalue("test_database_name")
+        profile["path"] = f"md:{db_name}"
     elif profile_type in ["memory", "nightly"]:
         pass  # use the default path-less profile
     else:
