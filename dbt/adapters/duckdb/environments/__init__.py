@@ -298,7 +298,11 @@ class Environment(abc.ABC):
 def create(creds: DuckDBCredentials) -> Environment:
     """Create an Environment based on the credentials passed in."""
 
-    if creds.remote:
+    if creds.use_motherduck_postgres_endpoint:
+        from .motherduck_pg_endpoint import MotherDuckPgEndpointEnvironment
+
+        return MotherDuckPgEndpointEnvironment(creds)
+    elif creds.remote:
         from .buenavista import BVEnvironment
 
         return BVEnvironment(creds)

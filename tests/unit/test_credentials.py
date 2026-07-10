@@ -3,8 +3,13 @@ import pytest
 from unittest import mock
 
 from botocore.credentials import Credentials
+from dbt_common.exceptions import DbtRuntimeError
 
+from dbt.adapters.duckdb import environments
 from dbt.adapters.duckdb.credentials import Attachment, DuckDBCredentials
+from dbt.adapters.duckdb.environments.motherduck_pg_endpoint import (
+    MotherDuckPgEndpointEnvironment,
+)
 
 
 def test_load_basic_settings():
@@ -369,8 +374,6 @@ def test_database_mismatch_without_attach_alias():
 
 def test_database_matches_attach_alias_no_alias():
     """Test that attach entries without aliases don't affect validation"""
-    from dbt_common.exceptions import DbtRuntimeError
-    
     payload = {
         "path": "/tmp/primary.db",
         "database": "nonexistent_alias",
@@ -381,6 +384,111 @@ def test_database_matches_attach_alias_no_alias():
     with pytest.raises(DbtRuntimeError) as exc:
         DuckDBCredentials.from_dict(payload)
     assert "Inconsistency detected between 'path' and 'database' fields" in str(exc.value)
+
+
+def test_motherduck_pg_endpoint_config():
+    payload = {
+        "path": "md:jaffle_shop",
+        "token": "quack",
+        "use_motherduck_postgres_endpoint": True,
+    }
+    creds = DuckDBCredentials.from_dict(payload)
+
+    assert creds.use_motherduck_postgres_endpoint is True
+    assert creds.motherduck_pg_endpoint_host == "pg.us-east-1-aws.motherduck.com"
+    assert creds.motherduck_pg_endpoint_port == 5432
+    assert creds.motherduck_pg_endpoint_user == "postgres"
+    assert creds.motherduck_pg_endpoint_sslmode == "require"
+    assert creds.motherduck_pg_endpoint_sslrootcert is None
+    assert creds.token == "quack"
+    assert creds.plugins is None
+
+
+def test_motherduck_pg_endpoint_region_derives_host():
+    payload = {
+        "path": "md:jaffle_shop",
+        "token": "quack",
+        "use_motherduck_postgres_endpoint": True,
+        "motherduck_pg_endpoint_region": "eu-west-1",
+    }
+    creds = DuckDBCredentials.from_dict(payload)
+
+    assert creds.motherduck_pg_endpoint_host == "pg.eu-west-1-aws.motherduck.com"
+
+
+def test_motherduck_pg_endpoint_explicit_host_wins():
+    payload = {
+        "path": "md:jaffle_shop",
+        "token": "quack",
+        "use_motherduck_postgres_endpoint": True,
+        "motherduck_pg_endpoint_region": "eu-west-1",
+        "motherduck_pg_endpoint_host": "pg.custom.motherduck.com",
+    }
+    creds = DuckDBCredentials.from_dict(payload)
+
+    assert creds.motherduck_pg_endpoint_host == "pg.custom.motherduck.com"
+
+
+def test_motherduck_pg_endpoint_requires_motherduck():
+    payload = {
+        "path": ":memory:",
+        "use_motherduck_postgres_endpoint": True,
+    }
+    with pytest.raises(DbtRuntimeError) as exc:
+        DuckDBCredentials.from_dict(payload)
+
+    assert "requires a MotherDuck path or attachment" in str(exc.value)
+
+
+def test_motherduck_pg_endpoint_rejects_remote():
+    payload = {
+        "path": "md:jaffle_shop",
+        "use_motherduck_postgres_endpoint": True,
+        "remote": {"host": "localhost", "port": 5433, "user": "test"},
+    }
+    with pytest.raises(DbtRuntimeError) as exc:
+        DuckDBCredentials.from_dict(payload)
+
+    assert "cannot be used with remote" in str(exc.value)
+
+
+def test_motherduck_pg_endpoint_rejects_plugins():
+    payload = {
+        "path": "md:jaffle_shop",
+        "use_motherduck_postgres_endpoint": True,
+        "plugins": [{"module": "gsheet"}],
+    }
+    with pytest.raises(DbtRuntimeError) as exc:
+        DuckDBCredentials.from_dict(payload)
+
+    assert "plugins are not supported" in str(exc.value)
+
+
+def test_motherduck_pg_endpoint_rejects_non_motherduck_attach():
+    payload = {
+        "path": "md:jaffle_shop",
+        "use_motherduck_postgres_endpoint": True,
+        "attach": [{"path": "/tmp/local.duckdb"}],
+    }
+    with pytest.raises(DbtRuntimeError) as exc:
+        DuckDBCredentials.from_dict(payload)
+
+    assert "only supports attaching other MotherDuck databases" in str(exc.value)
+
+
+def test_motherduck_pg_endpoint_routes_to_pg_endpoint_environment():
+    creds = DuckDBCredentials.from_dict(
+        {
+            "path": "md:jaffle_shop",
+            "token": "quack",
+            "use_motherduck_postgres_endpoint": True,
+        }
+    )
+
+    env = environments.create(creds)
+
+    assert isinstance(env, MotherDuckPgEndpointEnvironment)
+    assert env.get_binding_char() == "%s"
 
 
 def test_add_ducklake_secret_with_map():
