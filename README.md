@@ -63,6 +63,32 @@ CREATE DATABASE my_ducklake
 
 An example profile is shown below under "Attaching Additional Databases". DuckLake must be identified so that safe DDL operations are applied by dbt.
 
+##### MotherDuck PostgreSQL Endpoint
+
+You can also connect to MotherDuck through its [PostgreSQL endpoint](https://motherduck.com/docs/key-tasks/authenticating-and-connecting-to-motherduck/postgres-endpoint/) by enabling `use_motherduck_postgres_endpoint` on the target. In this mode, dbt still compiles DuckDB SQL, but sends queries through `psycopg` to MotherDuck's PostgreSQL-compatible endpoint instead of using the DuckDB Python client and MotherDuck extension.
+
+```yaml
+default:
+  outputs:
+    dev:
+      type: duckdb
+      path: md:my_database
+      token: "{{ env_var('MOTHERDUCK_TOKEN') }}"
+      use_motherduck_postgres_endpoint: true
+      motherduck_pg_endpoint_region: us-east-1
+  target: dev
+```
+
+The endpoint password is your MotherDuck access token. By default, dbt-duckdb connects to `pg.us-east-1-aws.motherduck.com` as user `postgres` on port `5432` with `sslmode=require`. Set `motherduck_pg_endpoint_region` to use another MotherDuck region, or set `motherduck_pg_endpoint_host` to override the host directly. To opt into full certificate verification, set `motherduck_pg_endpoint_sslmode: verify-full` and `motherduck_pg_endpoint_sslrootcert: system`, or provide a local root certificate path supported by your `psycopg`/`libpq` installation.
+
+Install the optional dependency for this mode with:
+
+```shell
+python -m pip install "dbt-duckdb[md-postgres]"
+```
+
+This mode is intended for normal SQL model execution against MotherDuck. Local dbt-duckdb plugins, local filesystems, and Python models are not supported because there is no local DuckDB Python connection. DuckDB extensions listed in `extensions` are installed and loaded on the endpoint side when MotherDuck supports them. Any configured `attach` entries must point to other MotherDuck databases.
+
 #### DuckDB Extensions, Settings, and Filesystems
 
 You can install and load any core [DuckDB extensions](https://duckdb.org/docs/extensions/overview) by listing them in

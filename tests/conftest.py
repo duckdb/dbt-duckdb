@@ -70,7 +70,7 @@ def dbt_profile_target(profile_type, bv_server_process, tmpdir_factory):
         }
     elif profile_type == "file":
         profile["path"] = str(tmpdir_factory.mktemp("dbs") / "tmp.db")
-    elif profile_type == "md":
+    elif profile_type in ["md", "md-pg"]:
         # Test against MotherDuck
         if MOTHERDUCK_TOKEN not in os.environ and MOTHERDUCK_TOKEN.lower() not in os.environ:
             if TEST_MOTHERDUCK_TOKEN not in os.environ:
@@ -83,6 +83,24 @@ def dbt_profile_target(profile_type, bv_server_process, tmpdir_factory):
             profile["token"] = os.environ.get(MOTHERDUCK_TOKEN, os.environ.get(MOTHERDUCK_TOKEN.lower()))
         profile["disable_transactions"] = True
         profile["path"] = "md:test"
+        if profile_type == "md-pg":
+            profile["use_motherduck_postgres_endpoint"] = True
+            if os.environ.get("MOTHERDUCK_PG_ENDPOINT_REGION"):
+                profile["motherduck_pg_endpoint_region"] = os.environ.get(
+                    "MOTHERDUCK_PG_ENDPOINT_REGION"
+                )
+            if os.environ.get("MOTHERDUCK_PG_ENDPOINT_HOST"):
+                profile["motherduck_pg_endpoint_host"] = os.environ.get(
+                    "MOTHERDUCK_PG_ENDPOINT_HOST"
+                )
+            if os.environ.get("MOTHERDUCK_PG_ENDPOINT_SSLMODE"):
+                profile["motherduck_pg_endpoint_sslmode"] = os.environ.get(
+                    "MOTHERDUCK_PG_ENDPOINT_SSLMODE"
+                )
+            if os.environ.get("MOTHERDUCK_PG_ENDPOINT_SSLROOTCERT"):
+                profile["motherduck_pg_endpoint_sslrootcert"] = os.environ.get(
+                    "MOTHERDUCK_PG_ENDPOINT_SSLROOTCERT"
+                )
     elif profile_type in ["memory", "nightly"]:
         pass  # use the default path-less profile
     else:
