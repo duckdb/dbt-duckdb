@@ -64,6 +64,7 @@ class TestMDPlugin:
                         "type": "duckdb",
                         "path": f"md:{test_database_name}",
                         "plugins": plugins,
+                        "config_options": dbt_profile_target.get("config_options"),
                     }
                 },
                 "target": "dev",
@@ -133,7 +134,11 @@ def mock_creds(dbt_profile_target, mock_plugin_config):
     path = dbt_profile_target.get("path", ":memory:")
     plugin_config = PluginConfig(module="motherduck", config=mock_plugin_config)
     if "md:" in path:
-        return DuckDBCredentials(path=path, plugins=[plugin_config])
+        return DuckDBCredentials(
+            path=path,
+            plugins=[plugin_config],
+            config_options=dbt_profile_target.get("config_options"),
+        )
     return DuckDBCredentials(path=path)
 
 

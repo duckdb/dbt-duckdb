@@ -130,13 +130,10 @@ class Environment(abc.ABC):
     def initialize_db(
         cls, creds: DuckDBCredentials, plugins: Optional[Dict[str, BasePlugin]] = None
     ):
-        config = creds.config_options or {}
-        if creds.is_motherduck_database:
-            # Only applies when the connection's *primary* database is MotherDuck
-            # (not a local connection with MotherDuck attached), since only
-            # instances registered with the instance cache support this setting,
-            # and it must be set before SaaS mode locks the config.
-            config.setdefault("motherduck_dbinstance_inactivity_ttl", "0s")
+        # Copy so plugin mutations (e.g. custom_user_agent) don't leak into the
+        # credentials and change the config on subsequent connections, which
+        # DuckDB rejects for an already-open database.
+        config = dict(creds.config_options or {})
         plugins = plugins or {}
         for plugin in plugins.values():
             plugin.update_connection_config(creds, config)
