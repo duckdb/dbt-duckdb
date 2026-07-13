@@ -52,8 +52,16 @@ class DuckDBConnectionManager(SQLConnectionManager):
                 if not cls._ENV or cls._ENV.creds != credentials:
                     if cls._ENV is not None:
                         # Explicitly close the old environment's connection/duckdb instance
-                        # before replacing it.
-                        cls._ENV.close()
+                        # before replacing it. This helps prevent the "Can't open a 
+                        # connection to same database file with a different configuration 
+                        # than existing connections" error that occurs when the recreated 
+                        # environment tries to create a duckdb with the same exact connection 
+                        # string but with different configurations, but is not strictly necessary.
+                        # So if .close() errors out, log the error but let the environment creation proceed.
+                        try:
+                            cls._ENV.close()
+                        except Exception as e:
+                            logger.debug(f"Ignoring error while closing previous DuckDB environment: {e}")
                     cls._ENV = environments.create(credentials)
                 connection.handle = cls._ENV.handle()
                 connection.state = ConnectionState.OPEN
