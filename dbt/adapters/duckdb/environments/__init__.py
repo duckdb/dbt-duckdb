@@ -130,9 +130,7 @@ class Environment(abc.ABC):
     def initialize_db(
         cls, creds: DuckDBCredentials, plugins: Optional[Dict[str, BasePlugin]] = None
     ):
-        # Copy so plugin mutations (e.g. custom_user_agent) don't leak into the
-        # credentials and change the config on subsequent connections, which
-        # DuckDB rejects for an already-open database.
+        # copy the config so creds.config is not accidentally modified.
         config = dict(creds.config_options or {})
         plugins = plugins or {}
         for plugin in plugins.values():

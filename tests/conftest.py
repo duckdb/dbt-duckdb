@@ -21,14 +21,14 @@ pytest_plugins = ["dbt.tests.fixtures.project"]
 MOTHERDUCK_TOKEN = "MOTHERDUCK_TOKEN"
 TEST_MOTHERDUCK_TOKEN = "TEST_MOTHERDUCK_TOKEN"
 
-# Only registered/cached MotherDuck instances support this setting. Setting it to 0s
-# lets each test's instance shut down as soon as its last connection closes instead of
-# lingering, so we don't leave a growing pile of idle test instances behind. This is a
-# test-only setting, not something we want to force on real users.
-# Every test profile whose *primary* database is MotherDuck must include this in its
-# config_options: a lingering instance from a profile without it makes the next test's
-# connection to the same md: path fail with "Can't open a connection to same database
-# file with a different configuration than existing connections".
+# This option cleans up each test's duckdb instance as soon as the duckdbPyConnection
+# closes instead of allowing it to live in the instance cache for reuse on the next
+# `duckdb.connect(<same path>)`.
+# Every test profile whose *primary* database is `md:{database_name}` must include 
+# this in its config_options: a lingering instance from a profile without it makes
+# the next test's connection to the same `md:{database_name}`` path fail with
+# "Can't open a connection to same database file with a different configuration
+# than existing connections".
 MD_TEST_CONFIG_OPTIONS = {"motherduck_dbinstance_inactivity_ttl": "0s"}
 
 
