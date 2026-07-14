@@ -64,6 +64,7 @@ class TestMDPlugin:
                         "type": "duckdb",
                         "path": f"md:{test_database_name}",
                         "plugins": plugins,
+                        "config_options": dbt_profile_target.get("config_options"),
                     }
                 },
                 "target": "dev",
@@ -133,7 +134,11 @@ def mock_creds(dbt_profile_target, mock_plugin_config):
     path = dbt_profile_target.get("path", ":memory:")
     plugin_config = PluginConfig(module="motherduck", config=mock_plugin_config)
     if "md:" in path:
-        return DuckDBCredentials(path=path, plugins=[plugin_config])
+        return DuckDBCredentials(
+            path=path,
+            plugins=[plugin_config],
+            config_options=dbt_profile_target.get("config_options"),
+        )
     return DuckDBCredentials(path=path)
 
 
@@ -155,8 +160,10 @@ def test_motherduck_user_agent(dbt_profile_target, mock_plugins, mock_creds):
                 'read_only': False,
                 'config': {
                     'custom_user_agent': f'dbt/{__version__} dbt-duckdb/{plugin_version} downstream-dep',
-                    'motherduck_token': 'quack'
-                }
+                    'motherduck_token': 'quack',
+                    'motherduck_dbinstance_inactivity_ttl':'0s'
+
+                },
             }
             mock_connect.assert_called_with(path, **kwargs)
         else:

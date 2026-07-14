@@ -39,11 +39,7 @@
   {% if not temporary %}
     -- if not using a temporary table we will update the temp relation to use a different temp schema ("dbt_temp" by default)
     -- for microbatch with concurrent batches, include batch timestamps in the identifier to avoid collisions
-    {%- set batch_id = '' -%}
-    {%- set batch_ctx = model.get('batch') -%}
-    {%- if batch_ctx and batch_ctx.get('event_time_start') -%}
-        {%- set batch_id = batch_ctx.get('event_time_start') | string | replace('-', '') | replace(':', '') | replace(' ', '_') | replace('+', '') -%}
-    {%- endif -%}
+    {%- set batch_id = adapter.batch_id_for_model(model) -%}
     {% set temp_relation = temp_relation.incorporate(path=adapter.get_temp_relation_path(this, batch_id)) %}
     {% do run_query(create_schema(temp_relation)) %}
     {% if not adapter.disable_transactions() %}

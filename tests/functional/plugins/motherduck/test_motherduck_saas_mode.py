@@ -49,7 +49,11 @@ def model(dbt, con):
 class TestMDPluginSaaSMode:
     @pytest.fixture(scope="class")
     def profiles_config_update(self, dbt_profile_target, test_database_name):
-        md_config = {"motherduck_token": dbt_profile_target.get("token"), "motherduck_saas_mode": True}
+        md_config = {
+            "motherduck_token": dbt_profile_target.get("token"),
+            "motherduck_saas_mode": True,
+            "motherduck_dbinstance_inactivity_ttl": "0s",
+        }
         return {
             "test": {
                 "outputs": {

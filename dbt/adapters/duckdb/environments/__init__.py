@@ -113,6 +113,9 @@ class Environment(abc.ABC):
     def get_binding_char(self) -> str:
         return "?"
 
+    def close(self):
+        pass
+
     @classmethod
     @abc.abstractmethod
     def is_cancelable(cls) -> bool:
@@ -127,7 +130,8 @@ class Environment(abc.ABC):
     def initialize_db(
         cls, creds: DuckDBCredentials, plugins: Optional[Dict[str, BasePlugin]] = None
     ):
-        config = creds.config_options or {}
+        # copy the config so creds.config is not accidentally modified.
+        config = dict(creds.config_options or {})
         plugins = plugins or {}
         for plugin in plugins.values():
             plugin.update_connection_config(creds, config)

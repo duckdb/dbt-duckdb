@@ -1,5 +1,7 @@
 import os
+import random
 import resource
+import string
 import subprocess
 import time
 from importlib import metadata
@@ -19,6 +21,16 @@ pytest_plugins = ["dbt.tests.fixtures.project"]
 MOTHERDUCK_TOKEN = "MOTHERDUCK_TOKEN"
 TEST_MOTHERDUCK_TOKEN = "TEST_MOTHERDUCK_TOKEN"
 
+# This option cleans up each test's duckdb instance as soon as the duckdbPyConnection
+# closes instead of allowing it to live in the instance cache for reuse on the next
+# `duckdb.connect(<same path>)`.
+# Every test profile whose *primary* database is `md:{database_name}` must include 
+# this in its config_options: a lingering instance from a profile without it makes
+# the next test's connection to the same `md:{database_name}`` path fail with
+# "Can't open a connection to same database file with a different configuration
+# than existing connections".
+MD_TEST_CONFIG_OPTIONS = {"motherduck_dbinstance_inactivity_ttl": "0s"}
+
 
 def pytest_addoption(parser):
     parser.addoption("--profile", action="store", default="memory", type=str)
@@ -35,6 +47,35 @@ def pytest_report_header() -> list[str]:
 @pytest.fixture(scope="session")
 def profile_type(request):
     return request.config.getoption("--profile")
+
+
+@pytest.fixture(scope="session")
+def test_database_name():
+    """Generate a unique database name for the entire MotherDuck test session
+
+    The suffix is deliberately letters-only (no digits): several functional
+    tests normalize compiled SQL by stripping numeric noise (e.g. `re.sub(r"\\d+", "")`)
+    before comparing it against an expected string built from the raw database
+    name, so a database name containing digits would get mangled on one side
+    of the comparison but not the other.
+    """
+    random_suffix = "".join(random.choices(string.ascii_lowercase, k=12))
+    db_name = f"test_db_{random_suffix}"
+
+    # Create the database once for all tests
+    token = os.environ.get(MOTHERDUCK_TOKEN) or os.environ.get(TEST_MOTHERDUCK_TOKEN)
+    if token:
+        conn = duckdb.connect(f"md:?motherduck_token={token}")
+        conn.execute(f"CREATE DATABASE IF NOT EXISTS {db_name}")
+        conn.close()
+
+    yield db_name
+
+    # Clean up: drop the database after all tests complete
+    if token:
+        conn = duckdb.connect(f"md:?motherduck_token={token}")
+        conn.execute(f"DROP DATABASE IF EXISTS {db_name}")
+        conn.close()
 
 
 @pytest.fixture(scope="session")
@@ -58,7 +99,7 @@ def bv_server_process(profile_type):
 # The profile dictionary, used to write out profiles.yml
 # dbt will supply a unique schema per test, so we do not specify 'schema' here
 @pytest.fixture(scope="session")
-def dbt_profile_target(profile_type, bv_server_process, tmpdir_factory):
+def dbt_profile_target(profile_type, bv_server_process, tmpdir_factory, request):
     profile = {"type": "duckdb", "threads": 4}
 
     if profile_type == "buenavista":
@@ -82,7 +123,9 @@ def dbt_profile_target(profile_type, bv_server_process, tmpdir_factory):
         else:
             profile["token"] = os.environ.get(MOTHERDUCK_TOKEN, os.environ.get(MOTHERDUCK_TOKEN.lower()))
         profile["disable_transactions"] = True
-        profile["path"] = "md:test"
+        db_name = request.getfixturevalue("test_database_name")
+        profile["path"] = f"md:{db_name}"
+        profile["config_options"] = dict(MD_TEST_CONFIG_OPTIONS)
     elif profile_type in ["memory", "nightly"]:
         pass  # use the default path-less profile
     else:

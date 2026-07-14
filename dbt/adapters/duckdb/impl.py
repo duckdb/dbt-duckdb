@@ -402,8 +402,12 @@ class DuckDBAdapter(SQLAdapter):
     def _clean_up_temp_relation_for_incremental(self, config):
         if self.is_motherduck() and hasattr(config, "model"):
             if "incremental" == config.model.get_materialization():
+                # Microbatch gives each batch its own temp table; derive the same
+                # batch_id here so this matches the table that was actually created
+                # for this batch (see batch_id_for_model / get_temp_relation_path).
+                batch_id = self.batch_id_for_model(config.model)
                 temp_relation = self.Relation(
-                    path=self.get_temp_relation_path(config.model),
+                    path=self.get_temp_relation_path(config.model, batch_id),
                     type=RelationType.Table,
                 )
                 self.drop_relation(temp_relation)
@@ -419,6 +423,32 @@ class DuckDBAdapter(SQLAdapter):
             )
             self._clean_up_temp_relation_for_incremental(config)
         super().pre_model_hook(config)
+
+    @available
+    def batch_id_for_model(self, model: Any) -> str:
+        """Derive the batch_id suffix used to give each microbatch run its own
+        temp table (see get_temp_relation_path). Called both from Python
+        (pre/post-model hooks, where `model` exposes `.batch` as an attribute)
+        and from the incremental materialization macro (where `model` is the
+        serialized node dict), so both attribute and dict access are handled.
+        """
+        batch_ctx = getattr(model, "batch", None)
+        if batch_ctx is None and hasattr(model, "get"):
+            batch_ctx = model.get("batch")
+        if not batch_ctx:
+            return ""
+        event_time_start = getattr(batch_ctx, "event_time_start", None)
+        if event_time_start is None and hasattr(batch_ctx, "get"):
+            event_time_start = batch_ctx.get("event_time_start")
+        if not event_time_start:
+            return ""
+        return (
+            str(event_time_start)
+            .replace("-", "")
+            .replace(":", "")
+            .replace(" ", "_")
+            .replace("+", "")
+        )
 
     @available
     def get_temp_relation_path(self, model: Any, batch_id: str = ""):
