@@ -64,6 +64,7 @@ class LocalEnvironment(Environment):
             if self.handle_count == 0 and not self._keep_open:
                 self.close()
 
+    @classmethod
     def is_cancelable(cls):
         return True
 
