@@ -51,6 +51,7 @@ jobs:
         uses: actions/setup-python@v6
         with:
           python-version: '3.11'
+          cache: pip
 
       - name: Install python dependencies
         run: |
@@ -89,6 +90,7 @@ jobs:
         uses: actions/setup-python@v6
         with:
           python-version: ${{ matrix.python-version }}
+          cache: pip
 
       - name: Install python dependencies
         run: |
@@ -137,6 +139,7 @@ jobs:
         uses: actions/setup-python@v6
         with:
           python-version: ${{ matrix.python-version }}
+          cache: pip
 
       - name: Install python dependencies
         run: |
@@ -185,6 +188,7 @@ jobs:
         uses: actions/setup-python@v6
         with:
           python-version: ${{ matrix.python-version }}
+          cache: pip
 
       - name: Install python dependencies
         run: |
@@ -216,7 +220,7 @@ jobs:
           env:
               MOTHERDUCK_TOKEN: ${{ secrets.MOTHERDUCK_TOKEN_10 }}
           if: ${{ env.MOTHERDUCK_TOKEN != '' }}
-          run: echo "::set-output name=exists::true"
+          run: echo "exists=true" >> $GITHUB_OUTPUT
 
   motherduck:
     name: MotherDuck functional test / python ${{ matrix.python-version }}
@@ -256,6 +260,7 @@ jobs:
         uses: actions/setup-python@v6
         with:
           python-version: ${{ matrix.python-version }}
+          cache: pip
 
       - name: Install python dependencies
         run: |
@@ -301,6 +306,7 @@ jobs:
         uses: actions/setup-python@v6
         with:
           python-version: ${{ matrix.python-version }}
+          cache: pip
 
       - name: Install python dependencies
         run: |
@@ -346,6 +352,7 @@ jobs:
         uses: actions/setup-python@v6
         with:
           python-version: ${{ matrix.python-version }}
+          cache: pip
 
       - name: Install python dependencies
         run: |
@@ -392,6 +399,7 @@ jobs:
         uses: actions/setup-python@v6
         with:
           python-version: ${{ matrix.python-version }}
+          cache: pip
 
       - name: Install python dependencies
         run: |
@@ -428,6 +436,7 @@ jobs:
         uses: actions/setup-python@v6
         with:
           python-version: '3.11'
+          cache: pip
 
       - name: Install python dependencies
         run: |
@@ -469,6 +478,7 @@ jobs:
         uses: actions/setup-python@v6
         with:
           python-version: ${{ matrix.python-version }}
+          cache: pip
 
       - name: Install python dependencies
         run: |

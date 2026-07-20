@@ -12,7 +12,7 @@ name: Tests and Code Checks (DuckDB nightly)
 
 on:
   schedule:
-    - cron: '0 0 * * *' # every 24 hours, top of the hour
+    - cron: '17 3 * * *' # daily at 03:17 UTC, avoids midnight congestion
   workflow_dispatch:
 
 permissions: read-all
@@ -49,6 +49,7 @@ jobs:
         uses: actions/setup-python@v6
         with:
           python-version: ${{ matrix.python-version }}
+          cache: pip
 
       - name: Install python dependencies
         run: |
