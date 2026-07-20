@@ -43,13 +43,23 @@ class Attachment(dbtClassMixin):
     # which is the case in fully managed ducklake in MotherDuck.
     is_ducklake: Optional[bool] = None
 
+    @staticmethod
+    def _escape_sql_string(value: str) -> str:
+        """Escape single quotes for use inside a SQL single-quoted string literal."""
+        return value.replace("'", "''")
+
+    @staticmethod
+    def _quote_identifier(name: str) -> str:
+        """Quote a DuckDB identifier with double quotes, escaping embedded double quotes."""
+        return '"' + name.replace('"', '""') + '"'
+
     def to_sql(self) -> str:
         # remove query parameters (not supported in ATTACH)
         parsed = urlparse(self.path)
         path = self.path.replace(f"?{parsed.query}", "")
-        base = f"ATTACH IF NOT EXISTS '{path}'"
+        base = f"ATTACH IF NOT EXISTS '{self._escape_sql_string(path)}'"
         if self.alias:
-            base += f" AS {self.alias}"
+            base += f" AS {self._quote_identifier(self.alias)}"
 
         # Check for conflicts between legacy fields and options dict
         if self.options:
@@ -107,7 +117,9 @@ class Attachment(dbtClassMixin):
                         ):
                             all_options.append(f"{key.upper()} {value}")
                         else:
-                            all_options.append(f"{key.upper()} '{value}'")
+                            all_options.append(
+                                f"{key.upper()} '{self._escape_sql_string(value)}'"
+                            )
                     else:
                         all_options.append(f"{key.upper()} {value}")
 
