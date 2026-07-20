@@ -222,8 +222,11 @@ class Environment(abc.ABC):
         if creds.settings is not None:
             for key, value in creds.settings.items():
                 # Okay to set these as strings because DuckDB will cast them
-                # to the correct type
-                cursor.execute(f"SET {key} = '{value}'")
+                # to the correct type.
+                # Sanitize: quote key as identifier, escape single quotes in value.
+                safe_key = '"' + key.replace('"', '""') + '"'
+                safe_value = str(value).replace("'", "''")
+                cursor.execute(f"SET {safe_key} = '{safe_value}'")
 
         # update cursor if something is lost in the copy
         # of the parent connection
