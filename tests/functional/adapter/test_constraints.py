@@ -12,6 +12,11 @@ from dbt.tests.adapter.constraints.test_constraints import (
 )
 
 
+pytestmark = pytest.mark.skip_database_type(
+    "ducklake", reason="DuckLake does not support primary or unique constraints"
+)
+
+
 class DuckDBColumnEqualSetup:
     @pytest.fixture
     def int_type(self):

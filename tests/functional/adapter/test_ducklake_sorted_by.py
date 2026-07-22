@@ -173,6 +173,9 @@ class TestDucklakeSortedByCompile(BaseSortedByCompile):
         )
 
 
+@pytest.mark.skip_database_type(
+    "ducklake", reason="This test validates behavior on a non-DuckLake database"
+)
 class TestNonDucklakeSortedByCompile(BaseSortedByCompile):
     @pytest.fixture(scope="class")
     def dbt_profile_target(self, dbt_profile_target):

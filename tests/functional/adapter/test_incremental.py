@@ -570,6 +570,7 @@ class TestIncrementalMerge:
         assert alice[0] == 2  # version should be incremented
         assert alice[1] is not None  # updated_at should be set
 
+    @pytest.mark.skip_database_type("ducklake", reason="DuckLake does not support RETURNING")
     def test_merge_with_returning(self, project):
         """Test merge with returning columns"""
         run_dbt(["run", "--select", "merge_with_returning"], expect_pass=True)
@@ -580,6 +581,9 @@ class TestIncrementalMerge:
         result = project.run_sql(f"SELECT COUNT(*) as count FROM {relation}", fetch="one")
         assert result[0] == 4
 
+    @pytest.mark.skip_database_type(
+        "ducklake", reason="DuckLake supports only one MERGE update or delete action"
+    )
     def test_merge_custom_clauses(self, project):
         """Test merge with custom when_matched and when_not_matched clauses"""
         run_dbt(["run", "--select", "merge_custom_clauses"], expect_pass=True)

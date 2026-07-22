@@ -126,6 +126,7 @@ class TestEphemeralDuckDB(BaseEphemeral):
 class TestIncrementalDuckDB(BaseIncremental):
     pass
 
+
 class TestBaseIncrementalNotSchemaChange(BaseIncrementalNotSchemaChange):
     pass
 
@@ -134,10 +135,18 @@ class TestGenericTestsDuckDB(BaseGenericTests):
     pass
 
 
+@pytest.mark.skip_database_type(
+    "ducklake",
+    reason="dbt snapshot execution still reaches a CASCADE drop that DuckLake rejects",
+)
 class TestSnapshotCheckColsDuckDB(BaseSnapshotCheckCols):
     pass
 
 
+@pytest.mark.skip_database_type(
+    "ducklake",
+    reason="dbt snapshot execution still reaches a CASCADE drop that DuckLake rejects",
+)
 class TestSnapshotTimestampDuckDB(BaseSnapshotTimestamp):
     pass
 

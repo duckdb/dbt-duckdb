@@ -65,6 +65,7 @@ class TestMDPlugin:
                         "path": f"md:{test_database_name}",
                         "plugins": plugins,
                         "config_options": dbt_profile_target.get("config_options"),
+                        "is_ducklake": dbt_profile_target.get("is_ducklake"),
                     }
                 },
                 "target": "dev",

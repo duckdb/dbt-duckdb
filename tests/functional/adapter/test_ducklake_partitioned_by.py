@@ -169,6 +169,9 @@ class TestDucklakePartitionedByCompile(BasePartitionedByCompile):
         )
 
 
+@pytest.mark.skip_database_type(
+    "ducklake", reason="This test validates behavior on a non-DuckLake database"
+)
 class TestNonDucklakePartitionedByCompile(BasePartitionedByCompile):
     @pytest.fixture(scope="class")
     def dbt_profile_target(self, dbt_profile_target):
