@@ -318,6 +318,24 @@ def materialize(df, con):
                                   })) -%}
 {% endmacro %}
 
+{% macro duckdb__make_temporary_relation(target_relation, batch_id='') %}
+    {% set temporary = not adapter.is_motherduck() %}
+    {% set temporary_relation = make_temp_relation(target_relation) %}
+
+    {# MotherDuck requires a qualified regular table because it does not support remote temp tables. #}
+    {% if not temporary %}
+        {% set temporary_relation = temporary_relation.incorporate(
+            path=adapter.get_temp_relation_path(target_relation, batch_id)
+        ) %}
+        {% do run_query(create_schema(temporary_relation)) %}
+        {% if not adapter.disable_transactions() %}
+            {% do adapter.commit() %}
+        {% endif %}
+    {% endif %}
+
+    {% do return({'relation': temporary_relation, 'temporary': temporary}) %}
+{% endmacro %}
+
 {% macro duckdb__current_timestamp() -%}
   now()
 {%- endmacro %}
