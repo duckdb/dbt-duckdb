@@ -24,12 +24,22 @@
 {% endmacro %}
 
 {% macro build_snapshot_staging_table(strategy, sql, target_relation) %}
+    {% set temporary = not adapter.is_motherduck() %}
     {% set temp_relation = make_temp_relation(target_relation) %}
+
+    {# MotherDuck requires a qualified regular table because it does not support remote temp tables. #}
+    {% if not temporary %}
+        {% set temp_relation = temp_relation.incorporate(path=adapter.get_temp_relation_path(target_relation)) %}
+        {% do run_query(create_schema(temp_relation)) %}
+        {% if not adapter.disable_transactions() %}
+            {% do adapter.commit() %}
+        {% endif %}
+    {% endif %}
 
     {% set select = snapshot_staging_table(strategy, sql, target_relation) %}
 
     {% call statement('build_snapshot_staging_relation') %}
-        {{ create_table_as(False, temp_relation, select) }}
+        {{ create_table_as(temporary, temp_relation, select) }}
     {% endcall %}
 
     {% do return(temp_relation) %}
