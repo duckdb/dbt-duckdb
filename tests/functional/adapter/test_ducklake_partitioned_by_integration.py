@@ -171,6 +171,9 @@ class TestDucklakePartitionedByIntegration(BaseDucklakePartitionedBy):
 
 
 @pytest.mark.skip_profile("buenavista")
+@pytest.mark.skip_database_type(
+    "ducklake", reason="This test validates behavior on a non-DuckLake database"
+)
 class TestNonDucklakePartitionedBy:
     @pytest.fixture(scope="class")
     def models(self):
@@ -215,4 +218,3 @@ class TestPartitionedByValidation(BaseDucklakePartitionedBy):
         """Invalid identifier is quoted and DuckDB rejects it as a nonexistent column."""
         result = run_dbt(["run", "--select", "invalid_partitioned_by_string"], expect_pass=False)
         assert "does not exist" in str(result.results[0].message)
-

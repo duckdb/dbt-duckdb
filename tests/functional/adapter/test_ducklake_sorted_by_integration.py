@@ -185,6 +185,9 @@ class TestDucklakeSortedByIntegration(BaseDucklakeSortedBy):
 
 
 @pytest.mark.skip_profile("buenavista")
+@pytest.mark.skip_database_type(
+    "ducklake", reason="This test validates behavior on a non-DuckLake database"
+)
 class TestNonDucklakeSortedBy:
     @pytest.fixture(scope="class")
     def models(self):
