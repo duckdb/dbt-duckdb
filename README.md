@@ -43,6 +43,21 @@ If the database doesn't exist at the specified `path`, DuckDB will automatically
 to the basename of the file in the `path` argument with the suffix removed. For example, if the `path` is `/tmp/a/dbfile.duckdb`, the `database`
 field will be set to `dbfile`. If you are running in in-memory mode, then the `database` property will be automatically set to `memory`.
 
+#### Persisting dbt Docs as Comments
+
+dbt model and column descriptions are not persisted to the database by default. If your project documents models in schema YAML files, enable
+`persist_docs` so dbt-duckdb writes those descriptions as DuckDB relation and column comments:
+
+```
+models:
+  +persist_docs:
+    relation: true
+    columns: true
+```
+
+Persisted comments are useful context for anyone exploring the database. They also help AI agents and other automated tools understand table
+purpose, column meaning, and expected grain before they generate queries.
+
 #### Using MotherDuck
 
 As of `dbt-duckdb` 1.5.2, you can connect to a DuckDB instance running on [MotherDuck](http://www.motherduck.com) by setting your `path` to use a [md:<database> connection string](https://motherduck.com/docs/getting-started/connect-query-from-python/installation-authentication), just as you would with the DuckDB CLI
