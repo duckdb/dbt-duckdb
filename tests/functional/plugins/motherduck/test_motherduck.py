@@ -124,6 +124,25 @@ class TestMDPlugin:
         assert res == (70,)
 
 
+@pytest.mark.skip_profile("buenavista", "file", "memory")
+class TestMDPluginWithSettings(TestMDPlugin):
+    @pytest.fixture(scope="class")
+    def profiles_config_update(self, dbt_profile_target, test_database_name):
+        md_setting = {"motherduck_token": dbt_profile_target.get("token")}
+        return {
+            "test": {
+                "outputs": {
+                    "dev": {
+                        "type": "duckdb",
+                        "path": f"md:{test_database_name}",
+                        "settings": md_setting,
+                    }
+                },
+                "target": "dev",
+            }
+        }
+
+
 @pytest.fixture
 def mock_plugin_config():
     return {"token": "quack"}
