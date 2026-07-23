@@ -327,9 +327,7 @@ class DuckDBAdapter(SQLAdapter):
         """
         connection = self.connections.get_if_exists()
         if connection is not None and not connection.transaction_open:
-            logger.debug(
-                f'Skipping commit on connection "{connection.name}": no transaction open'
-            )
+            logger.debug(f'Skipping commit on connection "{connection.name}": no transaction open')
             return
         self.connections.commit_if_has_connection()
 
