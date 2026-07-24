@@ -90,8 +90,7 @@ class Plugin(BasePlugin):
                         f"Number of configured headers ({len(headers)}) does not match number of columns in fetched range ({len(df.columns)})."
                     )
             else:
-                df.rename(columns=df.iloc[0]).drop(df.index[0]).reset_index(drop=True)
-                return df
+                return df.rename(columns=df.iloc[0]).drop(df.index[0]).reset_index(drop=True)
 
         else:
             return pd.DataFrame(sheet.get_all_records())
