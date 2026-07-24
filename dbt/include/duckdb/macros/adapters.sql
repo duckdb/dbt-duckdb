@@ -60,6 +60,18 @@
   )
 {% endmacro %}
 
+{% macro duckdb__column_definitions(columns) %}
+  {% for column in columns %}
+    {{ api.Relation.create(identifier=column.name) }} {{ column.data_type }}{{ "," if not loop.last }}
+  {% endfor %}
+{% endmacro %}
+
+{% macro duckdb__column_names(columns) %}
+  {% for column in columns %}
+    {{ api.Relation.create(identifier=column.name) }}{{ "," if not loop.last }}
+  {% endfor %}
+{% endmacro %}
+
 
 {% macro duckdb__get_partitioned_by(relation, temporary) -%}
   {%- if temporary -%}
@@ -161,6 +173,7 @@
 {% macro duckdb__create_table_as(temporary, relation, compiled_code, language='sql', partitioned_by=none, sorted_by=none) -%}
   {%- if language == 'sql' -%}
     {% set contract_config = config.get('contract') %}
+    {% set is_iceberg = adapter.is_iceberg(relation) %}
     {% if contract_config.enforced %}
       {{ get_assert_columns_equivalent(compiled_code) }}
     {% endif %}
@@ -170,7 +183,25 @@
 
     create {% if temporary: -%}temporary{%- endif %} table
       {{ relation.include(database=(not temporary), schema=(not temporary)) }}
-  {% if contract_config.enforced and not temporary %}
+  {% if is_iceberg and not temporary %}
+    {% if contract_config.enforced %}
+      {{ get_table_columns_and_constraints() }} ;
+      insert into {{ relation }} {{ get_column_names() }} (
+        {{ get_select_subquery(compiled_code) }}
+      );
+    {% else %}
+      {% set columns = adapter.get_column_schema_from_query(compiled_code) %}
+      (
+        {{ duckdb__column_definitions(columns) }}
+      );
+      insert into {{ relation }} (
+        {{ duckdb__column_names(columns) }}
+      )
+      select * from (
+        {{ compiled_code }}
+      ) as __dbt_iceberg_ctas;
+    {% endif %}
+  {% elif contract_config.enforced and not temporary %}
     {#-- DuckDB doesnt support constraints on temp tables --#}
     {{ get_table_columns_and_constraints() }} ;
     {% if partitioned_by %}
@@ -304,7 +335,20 @@ def materialize(df, con):
 {% macro duckdb__rename_relation(from_relation, to_relation) -%}
   {% set target_name = adapter.quote_as_configured(to_relation.identifier, 'identifier') %}
   {% call statement('rename_relation') -%}
-    alter {{ to_relation.type }} {{ from_relation }} rename to {{ target_name }}
+    {% if adapter.is_iceberg(to_relation) %}
+      {% set columns = adapter.get_column_schema_from_query('select * from ' ~ from_relation) %}
+      drop table if exists {{ to_relation }};
+      create table {{ to_relation }} (
+        {{ duckdb__column_definitions(columns) }}
+      );
+      insert into {{ to_relation }} (
+        {{ duckdb__column_names(columns) }}
+      )
+      select * from {{ from_relation }};
+      drop table if exists {{ from_relation }}
+    {% else %}
+      alter {{ to_relation.type }} {{ from_relation }} rename to {{ target_name }}
+    {% endif %}
   {%- endcall %}
 {% endmacro %}
 

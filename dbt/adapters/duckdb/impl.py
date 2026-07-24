@@ -170,6 +170,14 @@ class DuckDBAdapter(SQLAdapter):
         return relation.database in self.config.credentials._ducklake_dbs
 
     @available
+    def is_iceberg(self, relation: DuckDBRelation) -> bool:
+        """Check if a relation's database is backed by an iceberg attachment."""
+        if not relation or not relation.database:
+            return False
+
+        return relation.database in self.config.credentials._iceberg_dbs
+
+    @available
     def convert_datetimes_to_strs(self, table: "agate.Table") -> "agate.Table":
         import agate
 

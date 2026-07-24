@@ -4,6 +4,34 @@
 
   {%- set existing_relation = load_cached_relation(this) -%}
   {%- set target_relation = this.incorporate(type='table') %}
+  {%- set is_iceberg = adapter.is_iceberg(target_relation) -%}
+  {% if is_iceberg %}
+    {% set grant_config = config.get('grants') %}
+
+    {{ drop_relation_if_exists(existing_relation) }}
+    {% call statement('drop_existing_relation') -%}
+      drop table if exists {{ target_relation }}
+    {%- endcall %}
+
+    {{ run_hooks(pre_hooks, inside_transaction=False) }}
+    {{ run_hooks(pre_hooks, inside_transaction=True) }}
+
+    {% call statement('main', language=language) -%}
+      {{- create_table_as(False, target_relation, compiled_code, language) }}
+    {%- endcall %}
+
+    {{ run_hooks(post_hooks, inside_transaction=True) }}
+
+    {% set should_revoke = should_revoke(existing_relation, full_refresh_mode=True) %}
+    {% do apply_grants(target_relation, grant_config, should_revoke=should_revoke) %}
+    {% do persist_docs(target_relation, model) %}
+
+    {{ adapter.commit() }}
+    {{ run_hooks(post_hooks, inside_transaction=False) }}
+
+    {{ return({'relations': [target_relation]}) }}
+  {% endif %}
+
   {%- set intermediate_relation =  make_intermediate_relation(target_relation) -%}
   -- the intermediate_relation should not already exist in the database; get_relation
   -- will return None in that case. Otherwise, we get a relation that we can drop
