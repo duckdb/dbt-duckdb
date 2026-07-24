@@ -10,6 +10,35 @@ from dbt_common.dataclass_schema import dbtClassMixin
 
 DEFAULT_SECRET_PREFIX = "_dbt_secret_"
 
+# Characters allowed in a DuckDB SQL identifier (unquoted).
+# Used to validate secret names against injection.
+_VALID_IDENTIFIER_RE = None
+
+
+def _escape_sql_string(value: str) -> str:
+    """Escape single quotes in a SQL string literal by doubling them."""
+    return str(value).replace("'", "''")
+
+
+def _validate_identifier(name: str) -> str:
+    """Validate that *name* is a safe SQL identifier.
+
+    Raises ValueError if the name contains characters that could allow
+    SQL injection (semicolons, quotes, comments, etc.).
+    """
+    import re
+
+    global _VALID_IDENTIFIER_RE
+    if _VALID_IDENTIFIER_RE is None:
+        _VALID_IDENTIFIER_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
+
+    if not _VALID_IDENTIFIER_RE.match(name):
+        raise ValueError(
+            f"Invalid secret name {name!r}: must be a simple SQL identifier "
+            "(letters, digits, underscores; must start with a letter or underscore)."
+        )
+    return name
+
 
 @dataclass
 class Secret(dbtClassMixin):
@@ -47,19 +76,22 @@ class Secret(dbtClassMixin):
 
         if isinstance(value, dict):
             # Format as DuckDB map: map {'key1': 'value1', 'key2': 'value2'}
-            items = [f"'{k}': '{v}'" for k, v in value.items()]
+            items = [
+                f"'{_escape_sql_string(k)}': '{_escape_sql_string(v)}'"
+                for k, v in value.items()
+            ]
             return f"{key} map {{{', '.join(items)}}}"
         elif isinstance(value, list):
             # Format as DuckDB array: array ['item1', 'item2']
-            items = [f"'{item}'" for item in value]
+            items = [f"'{_escape_sql_string(item)}'" for item in value]
             return f"{key} array [{', '.join(items)}]"
         elif key in unquoted_keys:
             return f"{key} {value}"
         else:
-            return f"{key} '{value}'"
+            return f"{key} '{_escape_sql_string(value)}'"
 
     def to_sql(self) -> str:
-        name = f" {self.name}" if self.name else ""
+        name = f" {_validate_identifier(self.name)}" if self.name else ""
         or_replace = " OR REPLACE" if name else ""
         persistent = " PERSISTENT" if self.persistent is True else ""
         tab = "    "
@@ -80,7 +112,7 @@ class Secret(dbtClassMixin):
                 if value is not None and key not in ["name", "persistent"]:
                     params_sql.append(self._format_value(key, value))
             for s in scope_value:
-                params_sql.append(f"scope '{s}'")
+                params_sql.append(f"scope '{_escape_sql_string(s)}'")
 
             params_sql_str = f",\n{tab}".join(params_sql)
         else:
