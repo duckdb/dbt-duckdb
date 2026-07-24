@@ -99,7 +99,10 @@ class DuckDBAdapter(SQLAdapter):
     AdapterSpecificConfigs = DuckDBConfig
 
     _capabilities: CapabilityDict = CapabilityDict(
-        {Capability.SchemaMetadataByRelations: CapabilitySupport(support=Support.Full)}
+        {
+            Capability.SchemaMetadataByRelations: CapabilitySupport(support=Support.Full),
+            Capability.MicrobatchConcurrency: CapabilitySupport(support=Support.Full),
+        }
     )
 
     CONSTRAINT_SUPPORT = {
@@ -109,12 +112,6 @@ class DuckDBAdapter(SQLAdapter):
         ConstraintType.primary_key: ConstraintSupport.ENFORCED,
         ConstraintType.foreign_key: ConstraintSupport.ENFORCED,
     }
-
-    _capabilities = CapabilityDict(
-        {
-            Capability.MicrobatchConcurrency: CapabilitySupport(support=Support.Full),
-        }
-    )
 
     # can be overridden via the model config metadata
     _temp_schema_name = DEFAULT_TEMP_SCHEMA_NAME
