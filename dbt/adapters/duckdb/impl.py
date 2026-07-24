@@ -170,6 +170,13 @@ class DuckDBAdapter(SQLAdapter):
         return relation.database in self.config.credentials._ducklake_dbs
 
     @available
+    def is_iceberg_catalog_db(self, database_name: Optional[str]) -> bool:
+        """Return True if database_name is an attached Iceberg REST catalog."""
+        if not database_name:
+            return False
+        return database_name in self.config.credentials._iceberg_catalog_dbs
+
+    @available
     def convert_datetimes_to_strs(self, table: "agate.Table") -> "agate.Table":
         import agate
 

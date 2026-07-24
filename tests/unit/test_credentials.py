@@ -418,10 +418,64 @@ def test_add_secret_with_list():
             )
         ]
     )
-    
+
     sql = creds.secrets_sql()[0]
     expected = """CREATE OR REPLACE SECRET test_secret (
     type custom,
     allowed_hosts array ['host1', 'host2', 'host3']
 )"""
     assert sql == expected
+
+
+def test_iceberg_catalog_dbs_populated_via_options():
+    """Iceberg attach detected when type is in the options dict."""
+    creds = DuckDBCredentials(
+        attach=[
+            Attachment(
+                path="lakehouse",
+                alias="polaris",
+                options={"type": "iceberg", "endpoint": "http://polaris:8181/api/catalog"},
+            )
+        ]
+    )
+    assert "polaris" in creds._iceberg_catalog_dbs
+
+
+def test_iceberg_catalog_dbs_populated_via_type_field():
+    """Iceberg attach detected when type is the direct .type field."""
+    creds = DuckDBCredentials(
+        attach=[Attachment(path="lakehouse", alias="polaris", type="iceberg")]
+    )
+    assert "polaris" in creds._iceberg_catalog_dbs
+
+
+def test_iceberg_catalog_dbs_uses_path_when_no_alias():
+    """Falls back to path-derived name when attachment has no alias."""
+    creds = DuckDBCredentials(
+        attach=[Attachment(path="/tmp/catalog.duckdb", options={"type": "iceberg"})]
+    )
+    assert "catalog" in creds._iceberg_catalog_dbs
+
+
+def test_iceberg_catalog_dbs_empty_for_regular_attach():
+    """Regular DuckDB attach must not appear in _iceberg_catalog_dbs."""
+    creds = DuckDBCredentials(
+        attach=[Attachment(path="/tmp/other.duckdb", alias="other")]
+    )
+    assert len(creds._iceberg_catalog_dbs) == 0
+
+
+def test_iceberg_catalog_dbs_empty_for_sqlite_attach():
+    """SQLite attach must not appear in _iceberg_catalog_dbs."""
+    creds = DuckDBCredentials(
+        attach=[Attachment(path="/tmp/other.db", alias="other", type="sqlite")]
+    )
+    assert len(creds._iceberg_catalog_dbs) == 0
+
+
+def test_iceberg_catalog_dbs_type_case_insensitive():
+    """Type matching is case-insensitive (e.g., 'ICEBERG' or 'Iceberg')."""
+    creds = DuckDBCredentials(
+        attach=[Attachment(path="lh", alias="cat", options={"type": "ICEBERG"})]
+    )
+    assert "cat" in creds._iceberg_catalog_dbs
