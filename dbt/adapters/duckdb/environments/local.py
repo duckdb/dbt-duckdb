@@ -103,7 +103,8 @@ class LocalEnvironment(Environment):
         cursor = handle.cursor()
 
         if source_config.schema:
-            cursor.execute(f"CREATE SCHEMA IF NOT EXISTS {source_config.schema}")
+            safe_schema = '"' + source_config.schema.replace('"', '""') + '"'
+            cursor.execute(f"CREATE SCHEMA IF NOT EXISTS {safe_schema}")
 
         save_mode = source_config.get("save_mode", "overwrite")
         if save_mode in ("ignore", "error_if_exists"):

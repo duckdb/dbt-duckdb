@@ -30,11 +30,17 @@ class SourceConfig:
     def __contains__(self, key):
         return key in self.meta
 
+    @staticmethod
+    def _quote_identifier(name: str) -> str:
+        """Quote a SQL identifier to prevent injection."""
+        return '"' + name.replace('"', '""') + '"'
+
     def table_name(self) -> str:
+        q = self._quote_identifier
         if self.database:
-            return ".".join([self.database, self.schema, self.identifier])
+            return ".".join([q(self.database), q(self.schema), q(self.identifier)])
         else:
-            return ".".join([self.schema, self.identifier])
+            return ".".join([q(self.schema), q(self.identifier)])
 
     def as_dict(self) -> Dict[str, Any]:
         base = {
