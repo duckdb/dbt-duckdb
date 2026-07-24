@@ -14,7 +14,7 @@ This project is hosted on PyPI, so you should be able to install it and the nece
 
 `pip3 install dbt-duckdb`
 
-The latest supported version targets `dbt-core` versions >= 1.8.x and `duckdb` version 1.1.x, but we work hard to ensure that newer
+The latest supported version targets `dbt-core` versions >= 1.8.x and `duckdb` version >= 1.0.0, but we work hard to ensure that newer
 versions of DuckDB will continue to work with the adapter as they are released.
 
 ### Configuring Your Profile
@@ -65,7 +65,7 @@ or the Python API.
 
 MotherDuck databases generally work the same way as local DuckDB databases from the perspective of dbt, but
 there are a [few differences to be aware of](https://motherduck.com/docs/architecture-and-capabilities#considerations-and-limitations):
-1. MotherDuck is compatible with client DuckDB versions 0.10.2 and older.
+1. MotherDuck is compatible with client DuckDB versions 0.10.2 and newer.
 1. MotherDuck preloads a set of the most common DuckDB extensions for you, but does not support loading custom extensions or user-defined functions.
 
 As of `dbt-duckdb` 1.9.6, you can also connect to a DuckDB instance running [hosted DuckLake on MotherDuck](https://motherduck.com/blog/ducklake-motherduck/) by creating a DuckLake on MotherDuck and then setting `is_ducklake: true` in your `profiles.yml`.
@@ -461,7 +461,7 @@ to parse the source in a dbt model. The `formatter` configuration option for the
 we should use `newstyle` string formatting (the default), `oldstyle` string formatting, or `template` string
 formatting. You can read up on the strategies the various string formatting techniques use at this
 [Stack Overflow answer](https://stackoverflow.com/questions/13451989/pythons-many-ways-of-string-formatting-are-the-older-ones-going-to-be-depre) and see examples of their use
-in this [dbt-duckdb integration test](https://github.com/jwills/dbt-duckdb/blob/master/tests/functional/adapter/test_sources.py).
+in this [dbt-duckdb integration test](https://github.com/duckdb/dbt-duckdb/blob/master/tests/functional/adapter/test_sources.py).
 
 #### Writing to external files
 
