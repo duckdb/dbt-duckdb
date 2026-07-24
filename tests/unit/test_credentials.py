@@ -226,10 +226,10 @@ def test_attachments():
 
     expected_sql = [
         "ATTACH IF NOT EXISTS '/tmp/f1234.db'",
-        "ATTACH IF NOT EXISTS '/tmp/g1234.db' AS g",
+        'ATTACH IF NOT EXISTS \'/tmp/g1234.db\' AS "g"',
         "ATTACH IF NOT EXISTS '/tmp/h5678.db' (READ_ONLY)",
         "ATTACH IF NOT EXISTS '/tmp/i9101.db' (TYPE sqlite)",
-        "ATTACH IF NOT EXISTS '/tmp/jklm.db' AS jk (TYPE sqlite, READ_ONLY)",
+        'ATTACH IF NOT EXISTS \'/tmp/jklm.db\' AS "jk" (TYPE sqlite, READ_ONLY)',
     ]
 
     for i, a in enumerate(creds.attach):
@@ -250,7 +250,7 @@ def test_attachments_with_options():
         }
     )
     sql = attachment.to_sql()
-    assert "ATTACH IF NOT EXISTS '/tmp/test.db' AS test_db (CACHE_SIZE '1GB', THREADS 4, ENABLE_FSST)" == sql
+    assert 'ATTACH IF NOT EXISTS \'/tmp/test.db\' AS "test_db" (CACHE_SIZE \'1GB\', THREADS 4, ENABLE_FSST)' == sql
 
     # Test options dict with legacy options (no conflicts)
     attachment = Attachment(
@@ -425,3 +425,38 @@ def test_add_secret_with_list():
     allowed_hosts array ['host1', 'host2', 'host3']
 )"""
     assert sql == expected
+
+
+class TestAttachmentSQLInjection:
+    """Verify that user-supplied values are escaped to prevent SQL injection."""
+
+    def test_path_single_quote_escaped(self):
+        attachment = Attachment(path="/tmp/it's.db")
+        sql = attachment.to_sql()
+        assert "ATTACH IF NOT EXISTS '/tmp/it''s.db'" == sql
+
+    def test_path_injection_via_single_quote(self):
+        attachment = Attachment(path="'; DROP TABLE students; --")
+        sql = attachment.to_sql()
+        # The quote must be doubled, not left bare
+        assert "'';" in sql
+        assert "ATTACH IF NOT EXISTS '''; DROP TABLE students; --'" == sql
+
+    def test_alias_quoted_as_identifier(self):
+        attachment = Attachment(path="/tmp/test.db", alias="my_alias")
+        sql = attachment.to_sql()
+        assert 'AS "my_alias"' in sql
+
+    def test_alias_injection_via_double_quote(self):
+        attachment = Attachment(path="/tmp/test.db", alias='x"; DROP TABLE t; --')
+        sql = attachment.to_sql()
+        # Embedded double quote must be doubled inside the identifier
+        assert 'AS "x""; DROP TABLE t; --"' in sql
+
+    def test_option_string_value_escaped(self):
+        attachment = Attachment(
+            path="/tmp/test.db",
+            options={"data_path": "s3://bucket/it's-here"},
+        )
+        sql = attachment.to_sql()
+        assert "DATA_PATH 's3://bucket/it''s-here'" in sql
