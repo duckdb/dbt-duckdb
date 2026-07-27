@@ -23,10 +23,6 @@ pip install -r dev-requirements.txt
 pre-commit install
 ```
 
-### Using the Dev Container
-
-The repo includes a [dev container](.devcontainer/) configuration for VS Code / GitHub Codespaces. Open the project in VS Code and select **Reopen in Container** (or launch a Codespace on GitHub). The container automatically runs `pip install -e . && pip install -r dev-requirements.txt` on creation.
-
 ## Running Tests
 
 Tests use [pytest](https://docs.pytest.org/) and [tox](https://tox.wiki/). The test suite is organized into unit tests and several functional test profiles.
