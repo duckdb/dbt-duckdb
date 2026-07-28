@@ -223,7 +223,7 @@ class Environment(abc.ABC):
             for key, value in creds.settings.items():
                 # Okay to set these as strings because DuckDB will cast them
                 # to the correct type
-                cursor.execute(f"SET {key} = '{value}'")
+                cursor.execute(f"SET {key} = '{str(value).replace(chr(39), chr(39)*2)}'")
 
         # update cursor if something is lost in the copy
         # of the parent connection

@@ -47,16 +47,16 @@ class Secret(dbtClassMixin):
 
         if isinstance(value, dict):
             # Format as DuckDB map: map {'key1': 'value1', 'key2': 'value2'}
-            items = [f"'{k}': '{v}'" for k, v in value.items()]
+            items = [f"'{str(k).replace(chr(39), chr(39)*2)}': '{str(v).replace(chr(39), chr(39)*2)}'" for k, v in value.items()]
             return f"{key} map {{{', '.join(items)}}}"
         elif isinstance(value, list):
             # Format as DuckDB array: array ['item1', 'item2']
-            items = [f"'{item}'" for item in value]
+            items = [f"'{str(item).replace(chr(39), chr(39)*2)}'" for item in value]
             return f"{key} array [{', '.join(items)}]"
         elif key in unquoted_keys:
             return f"{key} {value}"
         else:
-            return f"{key} '{value}'"
+            return f"{key} '{str(value).replace(chr(39), chr(39)*2)}'"
 
     def to_sql(self) -> str:
         name = f" {self.name}" if self.name else ""
@@ -80,7 +80,7 @@ class Secret(dbtClassMixin):
                 if value is not None and key not in ["name", "persistent"]:
                     params_sql.append(self._format_value(key, value))
             for s in scope_value:
-                params_sql.append(f"scope '{s}'")
+                params_sql.append(f"scope '{str(s).replace(chr(39), chr(39)*2)}'")
 
             params_sql_str = f",\n{tab}".join(params_sql)
         else:
