@@ -3,7 +3,6 @@
 from unittest.mock import MagicMock
 
 import duckdb
-import pytest
 
 from dbt.adapters.duckdb.credentials import Attachment
 from dbt.adapters.duckdb.secrets import Secret
