@@ -15,6 +15,6 @@ rm -rf "$DBT_PATH"/build
 mkdir -p "$DBT_PATH"/dist
 
 cd "$DBT_PATH"
-$PYTHON_BIN setup.py sdist bdist_wheel
+uv build
 
 set +x

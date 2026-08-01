@@ -46,14 +46,13 @@ jobs:
           persist-credentials: false
 
       - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v7
+        uses: astral-sh/setup-uv@v7
         with:
           python-version: ${{ matrix.python-version }}
 
       - name: Install python dependencies
         run: |
-          python -m pip install tox
-          python -m pip --version
+          uv tool install tox --with tox-uv
           tox --version
 
       - name: Run tox

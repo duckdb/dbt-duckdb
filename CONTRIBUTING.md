@@ -17,7 +17,7 @@ source venv/bin/activate  # or `venv\Scripts\activate` on Windows
 
 # Install the package in editable mode with dev dependencies
 pip install -e .
-pip install -r dev-requirements.txt
+uv sync --group dev
 
 # Install pre-commit hooks
 pre-commit install

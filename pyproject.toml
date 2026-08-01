@@ -1,0 +1,96 @@
+[build-system]
+requires = ["hatchling", "hatch-vcs"]
+build-backend = "hatchling.build"
+
+[project]
+name = "dbt-duckdb"
+description = "The duckdb adapter plugin for dbt (data build tool)"
+readme = "README.md"
+license = { text = "Apache-2.0" }
+authors = [{ name = "Josh Wills", email = "joshwills+dbt@gmail.com" }]
+requires-python = ">=3.10"
+dynamic = ["version"]
+keywords = ["dbt", "duckdb"]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "License :: OSI Approved :: Apache Software License",
+    "Operating System :: Microsoft :: Windows",
+    "Operating System :: MacOS :: MacOS X",
+    "Operating System :: POSIX :: Linux",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+]
+dependencies = [
+    "dbt-common>=1,<2",
+    "dbt-adapters>=1,<2",
+    "duckdb>=1.0.0",
+    # ensure backwards compatibility of installation, not a functional dependency
+    "dbt-core>=1.8.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/duckdb/dbt-duckdb"
+
+[project.optional-dependencies]
+glue = ["boto3", "mypy-boto3-glue"]
+md = ["duckdb==1.5.4"]
+
+[dependency-groups]
+dev = [
+    "dbt-core>=1.12.0,<2",
+    "dbt-tests-adapter==1.20.0",
+    "boto3",
+    "mypy-boto3-glue",
+    "pandas",
+    "pyarrow==24.0.0",
+    "buenavista==0.5.0",
+    "flaky",
+    "freezegun==1.5.5",
+    "fsspec",
+    "gspread",
+    "ipdb",
+    "openpyxl",
+    "pre-commit",
+    "psycopg2-binary",
+    "psycopg[binary]",
+    "pyiceberg",
+    "pytest",
+    "pytest-cov",
+    "pytest-dotenv",
+    "logbook<1.9",
+    "pytest-logbook",
+    "pytest-csv",
+    "pytest-xdist",
+    "pytest-mock",
+    "testcontainers[postgres]",
+    "pytz",
+    "ruff",
+    "sqlalchemy",
+    "deltalake",
+]
+
+[tool.hatch.version]
+source = "vcs"
+
+[tool.hatch.version.raw-options]
+local_scheme = "no-local-version"
+# CI jobs that install the package from a shallow, tagless checkout still need a version
+fallback_version = "0.0.0"
+
+[tool.hatch.build.targets.wheel]
+packages = ["dbt"]
+
+[tool.hatch.build.targets.sdist]
+include = ["dbt", "tests", "README.md", "LICENSE", "CHANGELOG.md"]
+
+[tool.pytest.ini_options]
+markers = [
+    "with_s3_creds: marks tests that require S3 credentials",
+    "requires_ducklake: marks tests that require the ducklake extension",
+    "skip_profile: marks tests to skip for a given profile type",
+]
+
+[tool.mypy]
+namespace_packages = true
