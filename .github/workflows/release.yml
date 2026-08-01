@@ -19,6 +19,11 @@ jobs:
       uses: astral-sh/setup-uv@v9.0.0
     - name: Build a binary wheel and a source tarball
       run: uv build
+    # hatch-vcs falls back to version 0.0.0 on a tagless checkout; never publish that
+    - name: Verify built version matches the release tag
+      env:
+        TAG: ${{ github.ref_name }}
+      run: ls "dist/dbt_duckdb-${TAG}-py3-none-any.whl"
     - name: Store the distribution packages
       uses: actions/upload-artifact@v7
       with:

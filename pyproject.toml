@@ -51,6 +51,8 @@ dev = [
     "fsspec",
     "gspread",
     "ipdb",
+    # pre-commit's mypy hooks use `language: system`, so mypy must be in the env
+    "mypy",
     "openpyxl",
     "pre-commit",
     "psycopg2-binary",
@@ -86,6 +88,14 @@ packages = ["dbt"]
 include = ["dbt", "tests", "README.md", "LICENSE", "CHANGELOG.md"]
 
 [tool.pytest.ini_options]
+testpaths = [
+    "tests/functional",
+    "tests/unit",
+]
+filterwarnings = [
+    "ignore:.*'soft_unicode' has been renamed to 'soft_str'*:DeprecationWarning",
+    "ignore:unclosed file .*:ResourceWarning",
+]
 markers = [
     "with_s3_creds: marks tests that require S3 credentials",
     "requires_ducklake: marks tests that require the ducklake extension",

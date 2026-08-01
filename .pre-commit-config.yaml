@@ -35,7 +35,12 @@ repos:
       args:
       - "--line-length=99"
 - repo: https://github.com/pre-commit/mirrors-mypy
-  rev: v1.19.1
+  # `language: system` runs mypy from the project venv (see the dev dependency
+  # group) so it can resolve dbt-common/dbt-adapters/duckdb types. In an
+  # isolated pre-commit env those imports degrade to Any and the check is much
+  # weaker. This rev therefore only selects the hook definition; keep it in
+  # step with the mypy actually installed.
+  rev: v2.3.0
   hooks:
   - id: mypy
     args: [--show-error-codes, --ignore-missing-imports]

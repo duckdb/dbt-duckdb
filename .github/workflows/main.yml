@@ -56,7 +56,6 @@ jobs:
       - name: Install python dependencies
         run: |
           uv sync --locked --group dev
-          uv pip install mypy==1.19.1
           uv run pre-commit --version
           uv run mypy --version
           uv run dbt --version
