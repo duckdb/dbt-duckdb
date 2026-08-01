@@ -48,7 +48,7 @@ jobs:
           persist-credentials: false
 
       - name: Set up uv
-        uses: astral-sh/setup-uv@v7
+        uses: astral-sh/setup-uv@v9.0.0
         with:
           enable-cache: true
           python-version: '3.11'
@@ -85,7 +85,7 @@ jobs:
           persist-credentials: false
 
       - name: Set up uv (python ${{ matrix.python-version }})
-        uses: astral-sh/setup-uv@v7
+        uses: astral-sh/setup-uv@v9.0.0
         with:
           enable-cache: true
           python-version: ${{ matrix.python-version }}
@@ -140,7 +140,7 @@ jobs:
           persist-credentials: false
 
       - name: Set up uv (python ${{ matrix.python-version }})
-        uses: astral-sh/setup-uv@v7
+        uses: astral-sh/setup-uv@v9.0.0
         with:
           enable-cache: true
           python-version: ${{ matrix.python-version }}
@@ -188,7 +188,7 @@ jobs:
           persist-credentials: false
 
       - name: Set up uv (python ${{ matrix.python-version }})
-        uses: astral-sh/setup-uv@v7
+        uses: astral-sh/setup-uv@v9.0.0
         with:
           enable-cache: true
           python-version: ${{ matrix.python-version }}
@@ -259,7 +259,7 @@ jobs:
           persist-credentials: false
 
       - name: Set up uv (python ${{ matrix.python-version }})
-        uses: astral-sh/setup-uv@v7
+        uses: astral-sh/setup-uv@v9.0.0
         with:
           enable-cache: true
           python-version: ${{ matrix.python-version }}
@@ -304,7 +304,7 @@ jobs:
           persist-credentials: false
 
       - name: Set up uv (python ${{ matrix.python-version }})
-        uses: astral-sh/setup-uv@v7
+        uses: astral-sh/setup-uv@v9.0.0
         with:
           enable-cache: true
           python-version: ${{ matrix.python-version }}
@@ -349,7 +349,7 @@ jobs:
           persist-credentials: false
 
       - name: Set up uv (python ${{ matrix.python-version }})
-        uses: astral-sh/setup-uv@v7
+        uses: astral-sh/setup-uv@v9.0.0
         with:
           enable-cache: true
           python-version: ${{ matrix.python-version }}
@@ -395,7 +395,7 @@ jobs:
           persist-credentials: false
 
       - name: Set up uv (python ${{ matrix.python-version }})
-        uses: astral-sh/setup-uv@v7
+        uses: astral-sh/setup-uv@v9.0.0
         with:
           enable-cache: true
           python-version: ${{ matrix.python-version }}
@@ -433,7 +433,7 @@ jobs:
           fetch-depth: 0
 
       - name: Set up uv
-        uses: astral-sh/setup-uv@v7
+        uses: astral-sh/setup-uv@v9.0.0
         with:
           enable-cache: true
           python-version: '3.11'
@@ -471,7 +471,7 @@ jobs:
 
     steps:
       - name: Set up uv (python ${{ matrix.python-version }})
-        uses: astral-sh/setup-uv@v7
+        uses: astral-sh/setup-uv@v9.0.0
         with:
           enable-cache: true
           python-version: ${{ matrix.python-version }}

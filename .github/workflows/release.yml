@@ -16,7 +16,7 @@ jobs:
         # hatch-vcs derives the release version from the pushed tag
         fetch-depth: 0
     - name: Set up uv
-      uses: astral-sh/setup-uv@v7
+      uses: astral-sh/setup-uv@v9.0.0
     - name: Build a binary wheel and a source tarball
       run: uv build
     - name: Store the distribution packages
