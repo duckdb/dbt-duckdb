@@ -4,32 +4,31 @@ Thanks for your interest in contributing to dbt-duckdb! This guide covers everyt
 
 ## Development Setup
 
-**Requirements:** Python 3.10+
+**Requirements:** [uv](https://docs.astral.sh/uv/). uv manages the virtual environment and Python interpreters for you, so no system Python or pyenv setup is needed.
 
 ```bash
 # Clone the repo
 git clone https://github.com/duckdb/dbt-duckdb.git
 cd dbt-duckdb
 
-# Create and activate a virtual environment
-python -m venv venv
-source venv/bin/activate  # or `venv\Scripts\activate` on Windows
-
-# Install the package in editable mode with dev dependencies
-pip install -e .
+# Create .venv, install the package in editable mode with dev dependencies
 uv sync --group dev
 
 # Install pre-commit hooks
-pre-commit install
+uv run pre-commit install
 ```
+
+Prefix commands with `uv run` (for example `uv run pytest tests/unit`), or activate the environment with `source .venv/bin/activate` and run them directly.
 
 ## Running Tests
 
 Tests use [pytest](https://docs.pytest.org/) and [tox](https://tox.wiki/). The test suite is organized into unit tests and several functional test profiles.
 
+Install tox once with `uv tool install tox --with tox-uv`; tox environments will auto-provision any Python version they need.
+
 ```bash
 # Run unit tests directly
-pytest tests/unit
+uv run pytest tests/unit
 
 # Run unit tests via tox (across Python versions)
 tox -e unit
@@ -66,7 +65,7 @@ Code style is enforced automatically via [pre-commit](https://pre-commit.com/) h
 Run the hooks manually against all files:
 
 ```bash
-pre-commit run --all-files
+uv run pre-commit run --all-files
 ```
 
 ## Project Structure
