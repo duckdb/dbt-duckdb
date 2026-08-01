@@ -483,18 +483,21 @@ jobs:
       - name: Show distributions
         run: ls -lh dist/
 
+      - name: Create the verification environment
+        run: uv venv
+
       - name: Install wheel distributions
         run: |
-          uv pip install --system --force-reinstall dist/*.whl
+          uv pip install --force-reinstall dist/*.whl
       - name: Check wheel distributions
         run: |
-          dbt --version
+          uv run --no-project dbt --version
       - name: Install source distributions
         run: |
-          uv pip install --system --force-reinstall dist/*.gz
+          uv pip install --force-reinstall dist/*.gz
       - name: Check source distributions
         run: |
-          dbt --version
+          uv run --no-project dbt --version
 
   notify-failure:
     name: Send Slack notification on failure
