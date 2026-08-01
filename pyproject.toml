@@ -6,14 +6,14 @@ build-backend = "hatchling.build"
 name = "dbt-duckdb"
 description = "The duckdb adapter plugin for dbt (data build tool)"
 readme = "README.md"
-license = { text = "Apache-2.0" }
+license = "Apache-2.0"
+license-files = ["LICENSE"]
 authors = [{ name = "Josh Wills", email = "joshwills+dbt@gmail.com" }]
 requires-python = ">=3.10"
 dynamic = ["version"]
 keywords = ["dbt", "duckdb"]
 classifiers = [
     "Development Status :: 5 - Production/Stable",
-    "License :: OSI Approved :: Apache Software License",
     "Operating System :: Microsoft :: Windows",
     "Operating System :: MacOS :: MacOS X",
     "Operating System :: POSIX :: Linux",
