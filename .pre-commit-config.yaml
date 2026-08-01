@@ -39,7 +39,7 @@ repos:
     name: mypy
     entry: uv run mypy --show-error-codes --ignore-missing-imports
     language: system
-    types: [python]
+    types_or: [python, pyi]
     files: ^dbt/adapters/.*
     require_serial: true
   - id: mypy-check
@@ -47,6 +47,6 @@ repos:
     stages: [manual]
     entry: uv run mypy --show-error-codes --pretty --ignore-missing-imports
     language: system
-    types: [python]
+    types_or: [python, pyi]
     files: ^dbt/adapters
     require_serial: true
