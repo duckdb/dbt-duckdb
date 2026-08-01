@@ -21,34 +21,32 @@ repos:
   rev: v3.16.0
   hooks:
   -  id: reorder-python-imports
-- repo: https://github.com/astral-sh/ruff-pre-commit
-  # Ruff version.
-  rev: v0.14.10
+- repo: local
   hooks:
-    # Run the linter.
-    - id: ruff
-      args:
-      - "--line-length=99"
-      - "--fix"
-    # Run the formatter.
-    - id: ruff-format
-      args:
-      - "--line-length=99"
-- repo: https://github.com/pre-commit/mirrors-mypy
-  # `language: system` runs mypy from the project venv (see the dev dependency
-  # group) so it can resolve dbt-common/dbt-adapters/duckdb types. In an
-  # isolated pre-commit env those imports degrade to Any and the check is much
-  # weaker. This rev therefore only selects the hook definition; keep it in
-  # step with the mypy actually installed.
-  rev: v2.3.0
-  hooks:
+  - id: ruff
+    name: ruff
+    entry: uv run ruff check --force-exclude --fix
+    language: system
+    types_or: [python, pyi]
+    require_serial: true
+  - id: ruff-format
+    name: ruff-format
+    entry: uv run ruff format --force-exclude
+    language: system
+    types_or: [python, pyi]
+    require_serial: true
   - id: mypy
-    args: [--show-error-codes, --ignore-missing-imports]
+    name: mypy
+    entry: uv run mypy --show-error-codes --ignore-missing-imports
+    language: system
+    types: [python]
     files: ^dbt/adapters/.*
-    language: system
-  - id: mypy
-    alias: mypy-check
+    require_serial: true
+  - id: mypy-check
+    name: mypy (pretty)
     stages: [manual]
-    args: [--show-error-codes, --pretty, --ignore-missing-imports]
-    files: ^dbt/adapters
+    entry: uv run mypy --show-error-codes --pretty --ignore-missing-imports
     language: system
+    types: [python]
+    files: ^dbt/adapters
+    require_serial: true
