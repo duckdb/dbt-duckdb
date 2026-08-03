@@ -16,9 +16,9 @@ from ..constants import DEFAULT_TEMP_SCHEMA_NAME
 from ..credentials import DuckDBCredentials
 from ..credentials import Extension
 from ..plugins import BasePlugin
+from ..utils import escape_sql_string
 from ..utils import SourceConfig
 from ..utils import TargetConfig
-from ..utils import escape_sql_string
 from dbt.adapters.contracts.connection import AdapterResponse
 from dbt.adapters.contracts.connection import Connection
 
