@@ -14,6 +14,7 @@ from dbt_common.exceptions import DbtRuntimeError
 from dbt.adapters.contracts.connection import Credentials
 from dbt.adapters.duckdb.secrets import DEFAULT_SECRET_PREFIX
 from dbt.adapters.duckdb.secrets import Secret
+from dbt.adapters.duckdb.utils import escape_sql_string
 
 
 @dataclass
@@ -47,7 +48,7 @@ class Attachment(dbtClassMixin):
         # remove query parameters (not supported in ATTACH)
         parsed = urlparse(self.path)
         path = self.path.replace(f"?{parsed.query}", "")
-        base = f"ATTACH IF NOT EXISTS '{path}'"
+        base = f"ATTACH IF NOT EXISTS '{escape_sql_string(path)}'"
         if self.alias:
             base += f" AS {self.alias}"
 
@@ -102,12 +103,13 @@ class Attachment(dbtClassMixin):
                     if isinstance(value, str):
                         # Only quote if not already quoted (single or double quotes)
                         stripped_value = value.strip()
-                        if (stripped_value.startswith("'") and stripped_value.endswith("'")) or (
-                            stripped_value.startswith('"') and stripped_value.endswith('"')
+                        if len(stripped_value) >= 2 and (
+                            (stripped_value.startswith("'") and stripped_value.endswith("'"))
+                            or (stripped_value.startswith('"') and stripped_value.endswith('"'))
                         ):
                             all_options.append(f"{key.upper()} {value}")
                         else:
-                            all_options.append(f"{key.upper()} '{value}'")
+                            all_options.append(f"{key.upper()} '{escape_sql_string(value)}'")
                     else:
                         all_options.append(f"{key.upper()} {value}")
 
