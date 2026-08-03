@@ -237,6 +237,36 @@ def test_attachments():
         assert expected_sql[i] == attachment.to_sql()
 
 
+def test_attachment_strips_query_parameters_from_motherduck_paths():
+    assert (
+        Attachment(path="md:my_db?motherduck_token=abc123&user=1").to_sql()
+        == "ATTACH IF NOT EXISTS 'md:my_db'"
+    )
+    assert (
+        Attachment(path="motherduck:my_db?motherduck_token=abc123").to_sql()
+        == "ATTACH IF NOT EXISTS 'motherduck:my_db'"
+    )
+    assert (
+        Attachment(path="md:my_db?motherduck_token=ab#cd").to_sql()
+        == "ATTACH IF NOT EXISTS 'md:my_db'"
+    )
+    assert Attachment(path="md:my_db").to_sql() == "ATTACH IF NOT EXISTS 'md:my_db'"
+
+
+@pytest.mark.parametrize(
+    "path",
+    [
+        "postgresql://user@hostname/dbname?sslmode=require",
+        "https://example.com/db.duckdb?token=abc123",
+        "dbname=db host=h user=u password=aa?bb sslmode=require",
+        "dbname=db host=h user=u password=a#b?c sslmode=require",
+        "ducklake:postgres:dbname=meta host=h password=x?y",
+    ],
+)
+def test_attachment_preserves_query_parameters_for_non_motherduck_paths(path):
+    assert Attachment(path=path).to_sql() == f"ATTACH IF NOT EXISTS '{path}'"
+
+
 def test_attachments_with_options():
     # Test arbitrary options in options dict
     attachment = Attachment(
