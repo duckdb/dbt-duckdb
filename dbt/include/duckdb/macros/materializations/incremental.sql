@@ -32,6 +32,8 @@
   {{ drop_relation_if_exists(preexisting_backup_relation) }}
 
   {% set to_drop = [] %}
+   -- if not using a temporary table we will update the temp relation to use a different temp schema ("dbt_temp" by default)
+   -- for microbatch with concurrent batches, include batch timestamps in the identifier to avoid collisions
   {%- set batch_id = adapter.batch_id_for_model(model) -%}
   {% set temporary_relation = duckdb__make_temporary_relation(target_relation, batch_id) %}
   {% set temp_relation = temporary_relation.relation %}
