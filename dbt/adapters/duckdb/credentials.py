@@ -16,6 +16,8 @@ from dbt.adapters.duckdb.secrets import DEFAULT_SECRET_PREFIX
 from dbt.adapters.duckdb.secrets import Secret
 from dbt.adapters.duckdb.utils import escape_sql_string
 
+MOTHERDUCK_SCHEMES = {"md", "motherduck"}
+
 
 @dataclass
 class Attachment(dbtClassMixin):
@@ -45,9 +47,11 @@ class Attachment(dbtClassMixin):
     is_ducklake: Optional[bool] = None
 
     def to_sql(self) -> str:
-        # remove query parameters (not supported in ATTACH)
-        parsed = urlparse(self.path)
-        path = self.path.replace(f"?{parsed.query}", "")
+        # remove query parameters from MotherDuck paths (not supported in ATTACH)
+        path = self.path
+        parsed = urlparse(path)
+        if parsed.scheme in MOTHERDUCK_SCHEMES:
+            path = path.split("?", 1)[0]
         base = f"ATTACH IF NOT EXISTS '{escape_sql_string(path)}'"
         if self.alias:
             base += f" AS {self.alias}"
@@ -321,7 +325,7 @@ class DuckDBCredentials(Credentials):
 
     @staticmethod
     def _is_motherduck(scheme: str) -> bool:
-        return scheme in {"md", "motherduck"}
+        return scheme in MOTHERDUCK_SCHEMES
 
     @staticmethod
     def path_derived_database_name(path: Optional[Any]) -> str:
