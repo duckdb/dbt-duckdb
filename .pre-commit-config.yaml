@@ -21,29 +21,32 @@ repos:
   rev: v3.16.0
   hooks:
   -  id: reorder-python-imports
-- repo: https://github.com/astral-sh/ruff-pre-commit
-  # Ruff version.
-  rev: v0.14.10
+- repo: local
   hooks:
-    # Run the linter.
-    - id: ruff
-      args:
-      - "--line-length=99"
-      - "--fix"
-    # Run the formatter.
-    - id: ruff-format
-      args:
-      - "--line-length=99"
-- repo: https://github.com/pre-commit/mirrors-mypy
-  rev: v1.19.1
-  hooks:
+  - id: ruff
+    name: ruff
+    entry: uv run ruff check --force-exclude --fix
+    language: system
+    types_or: [python, pyi]
+    require_serial: true
+  - id: ruff-format
+    name: ruff-format
+    entry: uv run ruff format --force-exclude
+    language: system
+    types_or: [python, pyi]
+    require_serial: true
   - id: mypy
-    args: [--show-error-codes, --ignore-missing-imports]
+    name: mypy
+    entry: uv run mypy --show-error-codes --ignore-missing-imports
+    language: system
+    types_or: [python, pyi]
     files: ^dbt/adapters/.*
-    language: system
-  - id: mypy
-    alias: mypy-check
+    require_serial: true
+  - id: mypy-check
+    name: mypy (pretty)
     stages: [manual]
-    args: [--show-error-codes, --pretty, --ignore-missing-imports]
-    files: ^dbt/adapters
+    entry: uv run mypy --show-error-codes --pretty --ignore-missing-imports
     language: system
+    types_or: [python, pyi]
+    files: ^dbt/adapters
+    require_serial: true

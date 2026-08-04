@@ -47,23 +47,21 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Set up Python
-        uses: actions/setup-python@v7
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v9.0.0
         with:
+          enable-cache: true
           python-version: '3.11'
 
       - name: Install python dependencies
         run: |
-          pip install pre-commit
-          pip install -r dev-requirements.txt
-          pip install mypy==1.19.1
-          pip --version
-          pre-commit --version
-          mypy --version
-          dbt --version
+          uv sync --locked --group dev
+          uv run pre-commit --version
+          uv run mypy --version
+          uv run dbt --version
 
       - name: Run pre-commit hooks
-        run: pre-commit run --all-files --show-diff-on-failure
+        run: uv run pre-commit run --all-files --show-diff-on-failure
 
   unit:
     name: unit test / python ${{ matrix.python-version }}
@@ -85,15 +83,15 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v7
+      - name: Set up uv (python ${{ matrix.python-version }})
+        uses: astral-sh/setup-uv@v9.0.0
         with:
+          enable-cache: true
           python-version: ${{ matrix.python-version }}
 
       - name: Install python dependencies
         run: |
-          python -m pip install tox
-          python -m pip --version
+          uv tool install tox --with tox-uv
           tox --version
 
       - name: Run tox
@@ -140,15 +138,15 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v7
+      - name: Set up uv (python ${{ matrix.python-version }})
+        uses: astral-sh/setup-uv@v9.0.0
         with:
+          enable-cache: true
           python-version: ${{ matrix.python-version }}
 
       - name: Install python dependencies
         run: |
-          python -m pip install tox
-          python -m pip --version
+          uv tool install tox --with tox-uv
           tox --version
 
       - name: Run tox
@@ -188,15 +186,15 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v7
+      - name: Set up uv (python ${{ matrix.python-version }})
+        uses: astral-sh/setup-uv@v9.0.0
         with:
+          enable-cache: true
           python-version: ${{ matrix.python-version }}
 
       - name: Install python dependencies
         run: |
-          python -m pip install tox
-          python -m pip --version
+          uv tool install tox --with tox-uv
           tox --version
 
       - name: Run tox
@@ -259,15 +257,15 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v7
+      - name: Set up uv (python ${{ matrix.python-version }})
+        uses: astral-sh/setup-uv@v9.0.0
         with:
+          enable-cache: true
           python-version: ${{ matrix.python-version }}
 
       - name: Install python dependencies
         run: |
-          python -m pip install tox
-          python -m pip --version
+          uv tool install tox --with tox-uv
           tox --version
 
       - name: Run tox
@@ -304,15 +302,15 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v7
+      - name: Set up uv (python ${{ matrix.python-version }})
+        uses: astral-sh/setup-uv@v9.0.0
         with:
+          enable-cache: true
           python-version: ${{ matrix.python-version }}
 
       - name: Install python dependencies
         run: |
-          python -m pip install tox
-          python -m pip --version
+          uv tool install tox --with tox-uv
           tox --version
 
       - name: Run tox
@@ -349,15 +347,15 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v7
+      - name: Set up uv (python ${{ matrix.python-version }})
+        uses: astral-sh/setup-uv@v9.0.0
         with:
+          enable-cache: true
           python-version: ${{ matrix.python-version }}
 
       - name: Install python dependencies
         run: |
-          python -m pip install tox
-          python -m pip --version
+          uv tool install tox --with tox-uv
           tox --version
 
       - name: Run tox
@@ -395,15 +393,15 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v7
+      - name: Set up uv (python ${{ matrix.python-version }})
+        uses: astral-sh/setup-uv@v9.0.0
         with:
+          enable-cache: true
           python-version: ${{ matrix.python-version }}
 
       - name: Install python dependencies
         run: |
-          python -m pip install tox
-          python -m pip --version
+          uv tool install tox --with tox-uv
           tox --version
 
       - name: Run tox
@@ -430,16 +428,15 @@ jobs:
         uses: actions/checkout@v7
         with:
           persist-credentials: false
+          # hatch-vcs derives the version from git tags
+          fetch-depth: 0
 
-      - name: Set up Python
-        uses: actions/setup-python@v7
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v9.0.0
         with:
+          enable-cache: true
           python-version: '3.11'
 
-      - name: Install python dependencies
-        run: |
-          pip install --upgrade setuptools wheel twine check-wheel-contents
-          pip --version
       - name: Build distributions
         run: ./scripts/build-dist.sh
 
@@ -448,10 +445,10 @@ jobs:
 
       - name: Check distribution descriptions
         run: |
-          twine check dist/*
+          uvx twine check dist/*
       - name: Check wheel contents
         run: |
-          check-wheel-contents dist/*.whl --ignore W002,W007,W008
+          uvx check-wheel-contents dist/*.whl --ignore W002,W007,W008
 
       - uses: actions/upload-artifact@v7
         with:
@@ -472,15 +469,12 @@ jobs:
         python-version: ['3.10', '3.11', '3.12', '3.13']
 
     steps:
-      - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v7
+      - name: Set up uv (python ${{ matrix.python-version }})
+        uses: astral-sh/setup-uv@v9.0.0
         with:
+          enable-cache: true
           python-version: ${{ matrix.python-version }}
 
-      - name: Install python dependencies
-        run: |
-          pip install --upgrade wheel
-          pip --version
       - uses: actions/download-artifact@v8
         with:
           name: dist
@@ -489,18 +483,21 @@ jobs:
       - name: Show distributions
         run: ls -lh dist/
 
+      - name: Create the verification environment
+        run: uv venv
+
       - name: Install wheel distributions
         run: |
-          find ./dist/*.whl -maxdepth 1 -type f | xargs pip install --force-reinstall --find-links=dist/
+          uv pip install --force-reinstall dist/*.whl
       - name: Check wheel distributions
         run: |
-          dbt --version
+          uv run --no-project dbt --version
       - name: Install source distributions
         run: |
-          find ./dist/*.gz -maxdepth 1 -type f | xargs pip install --force-reinstall --find-links=dist/
+          uv pip install --force-reinstall dist/*.gz
       - name: Check source distributions
         run: |
-          dbt --version
+          uv run --no-project dbt --version
 
   notify-failure:
     name: Send Slack notification on failure
