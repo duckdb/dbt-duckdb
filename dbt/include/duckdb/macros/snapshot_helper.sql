@@ -24,7 +24,7 @@
 {% endmacro %}
 
 {% macro build_snapshot_staging_table(strategy, sql, target_relation) %}
-    {% set temporary_relation = duckdb__make_temporary_relation(target_relation) %}
+    {% set temporary_relation = duckdb__dispatch_temporary_relation(target_relation) %}
     {% set temp_relation = temporary_relation.relation %}
     {% set temporary = temporary_relation.temporary %}
 

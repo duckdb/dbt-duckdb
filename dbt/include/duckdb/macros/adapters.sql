@@ -309,6 +309,9 @@ def materialize(df, con):
 {% endmacro %}
 
 {% macro duckdb__make_temp_relation(base_relation, suffix) %}
+    {# Creates duckdb temporary tables, i.e. ephemeral per connection and on the temp.main schema.
+    Temporary tables are always allocated in the DuckdDB client's memory, even when called from a MotherDuck connection. #}
+
     {% set tmp_identifier = base_relation.identifier ~ suffix ~ py_current_timestring() %}
     {% do return(base_relation.incorporate(
                                   path={
@@ -318,22 +321,31 @@ def materialize(df, con):
                                   })) -%}
 {% endmacro %}
 
-{% macro duckdb__make_temporary_relation(target_relation, batch_id='') %}
-    {% set temporary = not adapter.is_motherduck() %}
-    {% set temporary_relation = make_temp_relation(target_relation) %}
+{% macro duckdb__dispatch_temporary_relation(target_relation, batch_id='') %}
+    {# Prepares a relation that is meant to be temporary.
 
-    {# MotherDuck requires a qualified regular table because it does not support remote temp tables. #}
-    {% if not temporary %}
-        {% set temporary_relation = temporary_relation.incorporate(
+     This macro is called when creating the temporary relations needed for incremental models and snapshots.
+
+     When running against duckdb,
+     it dispatches to standard dbt-core machinery to create a temporary table.
+     However, MotherDuck doesn't support server-side temporary tables,
+     so it dispatches to a fully qualified unique table relation under a temporary schema. #}
+
+    {% if adapter.is_motherduck() %}
+        {% set relation = target_relation.incorporate(
             path=adapter.get_temp_relation_path(target_relation, batch_id)
         ) %}
-        {% do run_query(create_schema(temporary_relation)) %}
+        {% do run_query(create_schema(relation)) %}
         {% if not adapter.disable_transactions() %}
             {% do adapter.commit() %}
         {% endif %}
+        {% do return({'relation': relation, 'temporary': false}) %}
+    {% else %}
+        {% do return({
+            'relation': make_temp_relation(target_relation),
+            'temporary': true
+        }) %}
     {% endif %}
-
-    {% do return({'relation': temporary_relation, 'temporary': temporary}) %}
 {% endmacro %}
 
 {% macro duckdb__current_timestamp() -%}
