@@ -1,14 +1,20 @@
 def test_requested_database_type(project, database_type, profile_type):
     """
-    Sanity check the target database type.
-    DuckLake's are declared differently on MotherDuck targets than on vanilla DuckDB.
-    """
-    if database_type != "ducklake":
-        return
+    Sanity check the physical and adapter-level target database types.
 
-    # DuckLake on motherduck has type = 'motherduck' on duckdb_databases()
-    if profile_type == "md":
-        assert project.adapter.config.credentials.is_ducklake is True
+    DuckLake databases are declared differently on MotherDuck targets than on
+    local DuckDB targets.
+    """
+    database_name = project.run_sql("select current_database()", fetch="one")[0]
+    relation = project.adapter.Relation.create(
+        database=database_name,
+        schema="main",
+        identifier="test_relation",
+    )
+
+    assert project.adapter.is_ducklake(relation) is (database_type == "ducklake")
+
+    if database_type != "ducklake" or profile_type == "md":
         return
 
     database_storage_type = project.run_sql(
