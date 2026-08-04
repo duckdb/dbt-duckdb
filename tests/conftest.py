@@ -10,7 +10,6 @@ import duckdb
 import pytest
 
 from tests.ducklake import configure_ducklake_profile
-from tests.ducklake import create_motherduck_database_sql
 
 # Increase the number of open files allowed
 # Hack for https://github.com/dbt-labs/dbt-core/issues/7316
@@ -33,6 +32,12 @@ TEST_MOTHERDUCK_TOKEN = "TEST_MOTHERDUCK_TOKEN"
 # "Can't open a connection to same database file with a different configuration
 # than existing connections".
 MD_TEST_CONFIG_OPTIONS = {"motherduck_dbinstance_inactivity_ttl": "0s"}
+
+
+def create_motherduck_database_sql(database_name: str, database_type: str) -> str:
+    if database_type == "ducklake":
+        return f"CREATE OR REPLACE DATABASE {database_name} (TYPE ducklake)"
+    return f"CREATE OR REPLACE DATABASE {database_name}"
 
 
 def pytest_addoption(parser):

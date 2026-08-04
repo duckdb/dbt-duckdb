@@ -21,9 +21,3 @@ def configure_ducklake_profile(
         profile["path"] = f"ducklake:{root / 'catalog.ducklake'}"
     else:
         profile["is_ducklake"] = True
-
-
-def create_motherduck_database_sql(database_name: str, database_type: str) -> str:
-    if database_type == "ducklake":
-        return f"CREATE DATABASE {database_name} (TYPE ducklake)"
-    return f"CREATE DATABASE IF NOT EXISTS {database_name}"
