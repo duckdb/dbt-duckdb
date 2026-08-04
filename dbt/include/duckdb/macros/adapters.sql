@@ -292,11 +292,12 @@ def materialize(df, con):
 {% endmacro %}
 
 {% macro duckdb__drop_relation(relation) -%}
-{# DuckDB does not track dependencies from views to tables, so CASCADE has no
-   effect. Omit it because DuckLake rejects the syntax; revisit this if DuckDB
-   starts tracking those dependencies. #}
   {% call statement('drop_relation', auto_begin=False) -%}
-    drop {{ relation.type }} if exists {{ relation }}
+    {% if adapter.is_ducklake(relation) %}
+      drop {{ relation.type }} if exists {{ relation }}
+    {% else %}
+      drop {{ relation.type }} if exists {{ relation }} cascade
+    {% endif %}
   {%- endcall %}
 {% endmacro %}
 
