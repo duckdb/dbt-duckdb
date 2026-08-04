@@ -67,10 +67,12 @@ models__empty_partitioned_by_list = """
 select 1 as ds, 'a' as value
 """
 
-models__invalid_partitioned_by_string = """
-{{ config(materialized='table', database='ducklake_db', partitioned_by='ds); drop table x; --') }}
+models__transform_partitioned_model = """
+{{ config(materialized='table', database='ducklake_db', partitioned_by=['day(ts)', 'region']) }}
 
-select 1 as ds, 'a' as value
+select TIMESTAMP '2025-01-01 00:00:00' as ts, 'us' as region, 1 as id
+union all
+select TIMESTAMP '2025-01-02 00:00:00' as ts, 'eu' as region, 2 as id
 """
 
 
@@ -99,6 +101,33 @@ def get_partition_columns(project, model_name, schema_name):
         order by c.column_id
     """
     return [row[0].lower() for row in project.run_sql(query, fetch="all")]
+
+
+def get_partition_columns_with_transforms(project, model_name, schema_name):
+    relation = project.adapter.Relation.create(
+        database="ducklake_db",
+        schema=schema_name,
+        identifier=model_name,
+    )
+    metadata_schema = "__ducklake_metadata_ducklake_db"
+    query = f"""
+        select c.column_name, pc.transform
+        from {metadata_schema}.ducklake_partition_column pc
+        join {metadata_schema}.ducklake_column c
+          on c.table_id = pc.table_id
+         and c.column_id = pc.column_id
+        join {metadata_schema}.ducklake_table t
+          on t.table_id = c.table_id
+        join {metadata_schema}.ducklake_schema s
+          on s.schema_id = t.schema_id
+        where lower(t.table_name) = lower('{relation.identifier}')
+          and lower(s.schema_name) = lower('{relation.schema}')
+          and t.end_snapshot is null
+          and c.end_snapshot is null
+          and s.end_snapshot is null
+        order by c.column_id
+    """
+    return [(row[0].lower(), row[1]) for row in project.run_sql(query, fetch="all")]
 
 
 @pytest.mark.requires_ducklake
@@ -137,6 +166,7 @@ class TestDucklakePartitionedByIntegration(BaseDucklakePartitionedBy):
             "table_partitioned_model.sql": models__table_partitioned_model,
             "incremental_partitioned_model.sql": models__incremental_partitioned_model,
             "python_partitioned_model.py": models__python_partitioned_model,
+            "transform_partitioned_model.sql": models__transform_partitioned_model,
         }
 
     def test_table_partitioned_by_sets_partition_columns(self, project):
@@ -154,7 +184,10 @@ class TestDucklakePartitionedByIntegration(BaseDucklakePartitionedBy):
         run_dbt(["run", "--select", "incremental_partitioned_model"], expect_pass=True)
         result = run_dbt(["run", "--select", "incremental_partitioned_model"], expect_pass=True)
         schema = result.results[0].node.schema
-        assert get_partition_columns(project, "incremental_partitioned_model", schema) == ["ds", "region"]
+        assert get_partition_columns(project, "incremental_partitioned_model", schema) == [
+            "ds",
+            "region",
+        ]
 
     def test_incremental_partition_by_full_refresh_sets_partition_columns(self, project):
         result = run_dbt(
@@ -162,12 +195,27 @@ class TestDucklakePartitionedByIntegration(BaseDucklakePartitionedBy):
             expect_pass=True,
         )
         schema = result.results[0].node.schema
-        assert get_partition_columns(project, "incremental_partitioned_model", schema) == ["ds", "region"]
+        assert get_partition_columns(project, "incremental_partitioned_model", schema) == [
+            "ds",
+            "region",
+        ]
 
     def test_python_partitioned_by_sets_partition_columns(self, project):
         result = run_dbt(["run", "--select", "python_partitioned_model"], expect_pass=True)
         schema = result.results[0].node.schema
         assert get_partition_columns(project, "python_partitioned_model", schema) == ["ds"]
+
+    def test_table_partitioned_by_transform_sets_partition_columns(self, project):
+        result = run_dbt(["run", "--select", "transform_partitioned_model"], expect_pass=True)
+        schema = result.results[0].node.schema
+        partitions = get_partition_columns_with_transforms(
+            project, "transform_partitioned_model", schema
+        )
+        column_names = [partition[0] for partition in partitions]
+        transforms = [str(partition[1]).lower() for partition in partitions]
+        assert column_names == ["ts", "region"]
+        assert "day" in transforms[0]
+        assert transforms[1] in ("identity", "none", "")
 
 
 @pytest.mark.skip_profile("buenavista")
@@ -198,14 +246,12 @@ class TestPartitionedByValidation(BaseDucklakePartitionedBy):
         return {
             "invalid_partitioned_by.sql": models__invalid_partitioned_by,
             "empty_partitioned_by_list.sql": models__empty_partitioned_by_list,
-            "invalid_partitioned_by_string.sql": models__invalid_partitioned_by_string,
         }
 
     def test_partitioned_by_list_values_must_be_strings(self, project):
         result = run_dbt(["run", "--select", "invalid_partitioned_by"], expect_pass=False)
-        assert (
-            "partitioned_by/partition_by list values must be non-empty strings"
-            in str(result.results[0].message)
+        assert "partitioned_by/partition_by list values must be non-empty strings" in str(
+            result.results[0].message
         )
 
     def test_partitioned_by_empty_list_is_invalid(self, project):
@@ -213,8 +259,3 @@ class TestPartitionedByValidation(BaseDucklakePartitionedBy):
         assert "partitioned_by/partition_by must contain at least one column" in str(
             result.results[0].message
         )
-
-    def test_partitioned_by_invalid_string_rejected_by_duckdb(self, project):
-        """Invalid identifier is quoted and DuckDB rejects it as a nonexistent column."""
-        result = run_dbt(["run", "--select", "invalid_partitioned_by_string"], expect_pass=False)
-        assert "does not exist" in str(result.results[0].message)

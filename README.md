@@ -592,6 +592,8 @@ select
 from {{ ref('upstream_model') }}
 ```
 
+Each `partitioned_by` entry is rendered as written, so quote identifiers in the config when needed, for example `partitioned_by=['"field name"', 'day("event time")']`. DuckDB/DuckLake validates which partition functions and arguments are supported.
+
 DuckLake applies these via `ALTER TABLE ... SET PARTITIONED BY (...)` and `ALTER TABLE ... SET SORTED BY (...)`, and they only affect new data. For first builds and full refreshes, dbt-duckdb creates an empty table, sets partitioning and/or sort order, then inserts data so the initial load is laid out as configured. For incremental runs that only insert/update, no ALTER is issued. See the DuckLake docs for [partitioning](https://ducklake.select/docs/stable/duckdb/advanced_features/partitioning) and [sorted tables](https://ducklake.select/docs/stable/duckdb/advanced_features/sorted_tables).
 
 Example partitions (day, month, year, hour):

@@ -94,8 +94,29 @@ def read_compiled_file(project, model_name, extension):
         if named_matches:
             matches = named_matches
 
-    assert len(matches) == 1, f"Expected one compiled file for '{model_name}', found {len(matches)}"
+    assert len(matches) == 1, (
+        f"Expected one compiled file for '{model_name}', found {len(matches)}"
+    )
     return matches[0].read_text()
+
+
+def normalize_sql(sql):
+    return " ".join(sql.split())
+
+
+def assert_set_sorted_by(sql, expected):
+    assert re.search(
+        f"alter table(.*)set sorted by \\({re.escape(expected)}\\)",
+        normalize_sql(sql),
+    )
+
+
+def assert_partitioned_before_sorted(sql, partitioned_by, sorted_by):
+    assert re.search(
+        f"alter table(.*)set partitioned by \\({re.escape(partitioned_by)}\\)"
+        f"(.*)alter table(.*)set sorted by \\({re.escape(sorted_by)}\\)",
+        normalize_sql(sql),
+    )
 
 
 class BaseSortedByCompile:
@@ -136,41 +157,27 @@ class TestDucklakeSortedByCompile(BaseSortedByCompile):
     def test_sorted_by_string(self, project):
         run_dbt(["compile"])
         sql = read_compiled_file(project, "sorted_by_table", "sql")
-        assert re.search(r'alter\s+table.*set\s+sorted\s+by\s*\(\s*"ds"\s*\)', sql, re.IGNORECASE | re.DOTALL)
+        assert_set_sorted_by(sql, '"ds"')
 
     def test_sort_by_list(self, project):
         run_dbt(["compile"])
         sql = read_compiled_file(project, "sort_by_incremental", "sql")
-        assert re.search(
-            r'alter\s+table.*set\s+sorted\s+by\s*\(\s*"ds"\s*,\s*"region"\s*\)',
-            sql,
-            re.IGNORECASE | re.DOTALL,
-        )
+        assert_set_sorted_by(sql, '"ds", "region"')
 
     def test_sorted_by_python(self, project):
         run_dbt(["compile"])
         python_code = read_compiled_file(project, "sorted_by_python", "sql")
-        assert re.search(
-            r'alter\s+table.*set\s+sorted\s+by\s*\(\s*"ds"\s*\)',
-            python_code,
-            re.IGNORECASE | re.DOTALL,
-        )
+        assert_set_sorted_by(python_code, '"ds"')
 
     def test_sorted_by_contract(self, project):
         run_dbt(["compile"])
         sql = read_compiled_file(project, "contract_sorted_by", "sql")
-        assert re.search(r'alter\s+table.*set\s+sorted\s+by\s*\(\s*"ds"\s*\)', sql, re.IGNORECASE | re.DOTALL)
+        assert_set_sorted_by(sql, '"ds"')
 
     def test_partitioned_and_sorted_together(self, project):
         run_dbt(["compile"])
         sql = read_compiled_file(project, "partitioned_and_sorted", "sql")
-        # Both ALTERs should appear, with partitioned before sorted.
-        assert re.search(
-            r'alter\s+table.*set\s+partitioned\s+by\s*\(\s*"ds"\s*\).*'
-            r'alter\s+table.*set\s+sorted\s+by\s*\(\s*"region"\s*\)',
-            sql,
-            re.IGNORECASE | re.DOTALL,
-        )
+        assert_partitioned_before_sorted(sql, "ds", '"region"')
 
 
 @pytest.mark.skip_database_type(
@@ -224,5 +231,7 @@ class TestSortedByValidation:
         return target
 
     def test_sorted_by_list_values_must_be_strings(self, project):
-        with pytest.raises(Exception, match="sorted_by/sort_by list values must be non-empty strings"):
+        with pytest.raises(
+            Exception, match="sorted_by/sort_by list values must be non-empty strings"
+        ):
             run_dbt(["compile"])
