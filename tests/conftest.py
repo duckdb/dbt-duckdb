@@ -22,6 +22,12 @@ pytest_plugins = ["dbt.tests.fixtures.project"]
 
 MOTHERDUCK_TOKEN = "MOTHERDUCK_TOKEN"
 TEST_MOTHERDUCK_TOKEN = "TEST_MOTHERDUCK_TOKEN"
+PROFILE_TYPES = ("memory", "file", "md", "buenavista", "nightly")
+DATABASE_TYPES = ("duckdb", "ducklake")
+CONFIG_SKIP_MARKERS = {
+    "skip_profile": ("--profile", PROFILE_TYPES, "profile"),
+    "skip_database_type": ("--database-type", DATABASE_TYPES, "database type"),
+}
 
 # This option cleans up each test's duckdb instance as soon as the duckdbPyConnection
 # closes instead of allowing it to live in the instance cache for reuse on the next
@@ -41,11 +47,13 @@ def create_motherduck_database_sql(database_name: str, database_type: str) -> st
 
 
 def pytest_addoption(parser):
-    parser.addoption("--profile", action="store", default="memory", type=str)
+    parser.addoption(
+        "--profile", action="store", choices=PROFILE_TYPES, default="memory", type=str
+    )
     parser.addoption(
         "--database-type",
         action="store",
-        choices=("duckdb", "ducklake"),
+        choices=DATABASE_TYPES,
         default="duckdb",
         type=str,
     )
@@ -157,35 +165,57 @@ def dbt_profile_target(profile_type, database_type, bv_server_process, tmpdir_fa
     return profile
 
 
-@pytest.fixture(autouse=True, scope="class")
-def skip_by_profile_type(profile_type, request):
-    if request.node.get_closest_marker("skip_profile"):
-        for skip_profile_type in request.node.get_closest_marker("skip_profile").args:
-            if skip_profile_type == profile_type:
-                pytest.skip(f"skipped on '{profile_type}' profile")
-
-
-@pytest.fixture(autouse=True, scope="class")
-def skip_by_database_type(database_type, request):
-    for marker in request.node.iter_markers("skip_database_type"):
-        if database_type in marker.args:
-            pytest.skip(f"skipped on '{database_type}' database type")
-
-
-@pytest.fixture(autouse=True)
-def skip_test_by_database_type(database_type, request):
-    for marker in request.node.iter_markers("skip_database_type"):
-        if database_type in marker.args:
-            pytest.skip(f"skipped on '{database_type}' database type")
-
-
 @pytest.fixture(scope="session")
 def test_data_path():
     test_dir = os.path.dirname(os.path.abspath(__file__))
     return os.path.join(test_dir, "data")
 
 
+def mark_skipped_by_config(items, marker_name, selected_value):
+    """Apply skip marks based on the testing configuration of a particular run.
+
+    pytest_collection_modifyitems() calls this function for each entry
+    on CONFIG_SKIP_MARKERS.
+    """
+    try:
+        _, known_values, value_description = CONFIG_SKIP_MARKERS[marker_name]
+    except KeyError:
+        raise pytest.UsageError(f"Unknown config skip marker: {marker_name}") from None
+
+    for item in items:
+        for marker in item.iter_markers(marker_name):
+            unknown_values = [value for value in marker.args if value not in known_values]
+            if not marker.args or unknown_values:
+                supplied_values = ", ".join(repr(value) for value in marker.args) or "none"
+                expected_values = ", ".join(repr(value) for value in known_values)
+                raise pytest.UsageError(
+                    f"{item.nodeid}: {marker_name} has unknown {value_description} "
+                    f"value(s) {supplied_values}; expected one or more of {expected_values}"
+                )
+
+            if selected_value in marker.args:
+                reason = marker.kwargs.get(
+                    "reason", f"skipped on '{selected_value}' {value_description}"
+                )
+                item.add_marker(pytest.mark.skip(reason=reason))
+                break
+
+
 def pytest_collection_modifyitems(config, items):
+    """Apply skip marker during collection.
+
+    Implementing skips this way offers two benefits:
+    - It allows to verify that the skip parameters are valid (no typos).
+    - Skips are applied before any fixture is initialized, so only fixtures
+    that are needed for each testing config are initialized.
+
+    Pytest calls this hook after collecting test items, but before initializing anything.
+    - It converts the custom profile and database-type markers into Pytest skips,
+    - Also skips tests when there are no valid s3 credentials or the DuckLake extension is unavailable.
+    """
+    for marker_name, (option_name, _, _) in CONFIG_SKIP_MARKERS.items():
+        mark_skipped_by_config(items, marker_name, config.getoption(option_name))
+
     skip_s3 = None
     # Skip the S3 tests if the secrets are not available
     if not (
