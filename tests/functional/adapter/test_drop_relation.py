@@ -1,6 +1,4 @@
 import duckdb
-"A bit verbose, but this is one of the main areas where the accepted syntax for DuckDB databases and DuckLake differ."
-
 import pytest
 
 from dbt.tests.util import get_connection, relation_from_name, run_dbt
