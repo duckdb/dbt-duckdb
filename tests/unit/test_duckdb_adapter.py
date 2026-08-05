@@ -77,6 +77,53 @@ class TestDuckDBAdapter(unittest.TestCase):
             alter.assert_not_called()
 
 
+class TestDuckDBAdapterIcebergCatalog(unittest.TestCase):
+    def _make_adapter(self, attach):
+        set_from_args(Namespace(STRICT_MODE=True), {})
+        profile_cfg = {
+            "outputs": {
+                "test": {
+                    "type": "duckdb",
+                    "path": ":memory:",
+                    "attach": attach,
+                }
+            },
+            "target": "test",
+        }
+        project_cfg = {
+            "name": "X",
+            "version": "0.1",
+            "profile": "test",
+            "project-root": "/tmp/dbt/does-not-exist",
+            "quoting": {"identifier": False, "schema": True},
+            "config-version": 2,
+        }
+        config = config_from_parts_or_dicts(project_cfg, profile_cfg, cli_vars={})
+        return DuckDBAdapter(config, mock.MagicMock())
+
+    def test_is_iceberg_catalog_db_true(self):
+        adapter = self._make_adapter(
+            [{"path": "lakehouse", "alias": "polaris", "options": {"type": "iceberg", "endpoint": "http://polaris:8181/api/catalog"}}]
+        )
+        assert adapter.is_iceberg_catalog_db("polaris") is True
+
+    def test_is_iceberg_catalog_db_false_for_regular_db(self):
+        adapter = self._make_adapter(
+            [{"path": "lakehouse", "alias": "polaris", "options": {"type": "iceberg", "endpoint": "http://polaris:8181/api/catalog"}}]
+        )
+        assert adapter.is_iceberg_catalog_db("main") is False
+
+    def test_is_iceberg_catalog_db_false_when_no_iceberg_attach(self):
+        adapter = self._make_adapter([{"path": "/tmp/other.duckdb", "alias": "other"}])
+        assert adapter.is_iceberg_catalog_db("other") is False
+
+    def test_is_iceberg_catalog_db_none(self):
+        adapter = self._make_adapter(
+            [{"path": "lakehouse", "alias": "polaris", "options": {"type": "iceberg", "endpoint": "http://polaris:8181/api/catalog"}}]
+        )
+        assert adapter.is_iceberg_catalog_db(None) is False
+
+
 class TestDuckDBAdapterWithSecrets(unittest.TestCase):
     def setUp(self):
         set_from_args(Namespace(STRICT_MODE=True), {})
