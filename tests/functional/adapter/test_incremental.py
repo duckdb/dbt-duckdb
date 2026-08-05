@@ -463,6 +463,40 @@ _merge_ducklake_update_delete = """
 SELECT 1 AS id, 'Alice' AS name, 25 AS age, 'Engineer' AS job
 """
 
+_merge_ducklake_cross_clause_actions = """
+{{ config(
+    materialized='incremental',
+    incremental_strategy='merge',
+    unique_key='id',
+    merge_clauses={
+        'when_matched': [
+            {'action': 'update', 'mode': 'by_name'}
+        ],
+        'when_not_matched': [
+            {'by': 'source', 'action': 'delete'}
+        ]
+    }
+) }}
+
+SELECT 1 AS id, 'Alice' AS name, 25 AS age, 'Engineer' AS job
+"""
+
+_merge_ducklake_multiple_not_matched_actions = """
+{{ config(
+    materialized='incremental',
+    incremental_strategy='merge',
+    unique_key='id',
+    merge_clauses={
+        'when_not_matched': [
+            {'by': 'source', 'action': 'update', 'set_expressions': {'name': "'Missing'"}},
+            {'by': 'source', 'action': 'delete'}
+        ]
+    }
+) }}
+
+SELECT 1 AS id, 'Alice' AS name, 25 AS age, 'Engineer' AS job
+"""
+
 _merge_ducklake_valid_single_update = """
 {{ config(
     materialized='incremental',
@@ -570,6 +604,7 @@ class TestIncrementalMerge:
         assert alice[0] == 2  # version should be incremented
         assert alice[1] is not None  # updated_at should be set
 
+    @pytest.mark.skip_database_type("ducklake", reason="DuckLake does not support RETURNING")
     def test_merge_with_returning(self, project):
         """Test merge with returning columns"""
         run_dbt(["run", "--select", "merge_with_returning"], expect_pass=True)
@@ -580,6 +615,9 @@ class TestIncrementalMerge:
         result = project.run_sql(f"SELECT COUNT(*) as count FROM {relation}", fetch="one")
         assert result[0] == 4
 
+    @pytest.mark.skip_database_type(
+        "ducklake", reason="DuckLake supports only one MERGE update or delete action"
+    )
     def test_merge_custom_clauses(self, project):
         """Test merge with custom when_matched and when_not_matched clauses"""
         run_dbt(["run", "--select", "merge_custom_clauses"], expect_pass=True)
@@ -614,8 +652,11 @@ class TestIncrementalMergeValidation:
             "merge_empty_clauses.sql": _merge_empty_clauses,
             "merge_invalid_clause_list.sql": _merge_invalid_clause_list,
             "merge_invalid_clause_element.sql": _merge_invalid_clause_element,
+            "merge_ducklake_returning.sql": _merge_with_returning,
             "merge_ducklake_multiple_updates.sql": _merge_ducklake_multiple_updates,
             "merge_ducklake_update_delete.sql": _merge_ducklake_update_delete,
+            "merge_ducklake_cross_clause_actions.sql": _merge_ducklake_cross_clause_actions,
+            "merge_ducklake_multiple_not_matched_actions.sql": _merge_ducklake_multiple_not_matched_actions,
             "merge_ducklake_valid_single_update.sql": _merge_ducklake_valid_single_update,
         }
 
@@ -670,33 +711,34 @@ class TestIncrementalMergeValidation:
         result = run_dbt(["run", "--select", "merge_invalid_clause_element"], expect_pass=False)
         assert "elements must be dictionaries, found: not_a_dict" in str(result.results[0].message)
 
-    # NOTE: The following DuckLake tests require a DuckLake attachment to be active
-    # They will only trigger validation errors when the target relation is in a ducklake database
-    def test_ducklake_multiple_updates(self, project):
-        """Test DuckLake restriction fails for multiple UPDATE actions (in ducklake environments)"""
-        run_dbt(["run", "--select", "merge_ducklake_multiple_updates"], expect_pass=True)
-        try:
-            # This will pass in non-ducklake environments, fail in ducklake environments
-            result = run_dbt(["run", "--select", "merge_ducklake_multiple_updates"], expect_pass=False)
-            # If we get here, it means the run failed (ducklake environment)
-            assert "DuckLake MERGE restrictions" in str(result.results[0].message)
-            assert "can contain only a single UPDATE or DELETE action" in str(result.results[0].message)
-        except AssertionError:
-            # Run passed - we're in a non-ducklake environment, validation was skipped
-            pass
+    @pytest.mark.skip_database_type(
+        "duckdb", reason="This test validates a DuckLake-specific MERGE restriction"
+    )
+    def test_ducklake_returning(self, project):
+        """Test DuckLake restriction fails for RETURNING."""
+        run_dbt(["run", "--select", "merge_ducklake_returning"], expect_pass=True)
+        result = run_dbt(["run", "--select", "merge_ducklake_returning"], expect_pass=False)
+        assert "DuckLake MERGE restrictions" in str(result.results[0].message)
+        assert "merge_returning_columns is not supported" in str(result.results[0].message)
 
-    def test_ducklake_update_delete(self, project):
-        """Test DuckLake restriction fails for UPDATE + DELETE actions (in ducklake environments)"""
-        run_dbt(["run", "--select", "merge_ducklake_update_delete"], expect_pass=True)
-        try:
-            # This will pass in non-ducklake environments, fail in ducklake environments
-            result = run_dbt(["run", "--select", "merge_ducklake_update_delete"], expect_pass=False)
-            # If we get here, it means the run failed (ducklake environment)
-            assert "DuckLake MERGE restrictions" in str(result.results[0].message)
-            assert "Found 2 UPDATE/DELETE actions" in str(result.results[0].message)
-        except AssertionError:
-            # Run passed - we're in a non-ducklake environment, validation was skipped
-            pass
+    @pytest.mark.skip_database_type(
+        "duckdb", reason="This test validates a DuckLake-specific MERGE restriction"
+    )
+    @pytest.mark.parametrize(
+        "model_name",
+        [
+            "merge_ducklake_multiple_updates",
+            "merge_ducklake_update_delete",
+            "merge_ducklake_cross_clause_actions",
+            "merge_ducklake_multiple_not_matched_actions",
+        ],
+    )
+    def test_ducklake_multiple_update_delete_actions(self, project, model_name):
+        """Test DuckLake restriction fails for multiple UPDATE/DELETE actions."""
+        run_dbt(["run", "--select", model_name], expect_pass=True)
+        result = run_dbt(["run", "--select", model_name], expect_pass=False)
+        assert "DuckLake MERGE restrictions" in str(result.results[0].message)
+        assert "Found 2 UPDATE/DELETE actions" in str(result.results[0].message)
 
     def test_ducklake_valid_single_update(self, project):
         """Test DuckLake accepts single UPDATE action"""

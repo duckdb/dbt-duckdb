@@ -24,17 +24,19 @@
 {% endmacro %}
 
 {% macro build_snapshot_staging_table(strategy, sql, target_relation) %}
-    {% set temp_relation = make_temp_relation(target_relation) %}
+    {% set temporary_relation = duckdb__dispatch_temporary_relation(target_relation) %}
+    {% set temp_relation = temporary_relation.relation %}
+    {% set temporary = temporary_relation.temporary %}
 
     {% set select = snapshot_staging_table(strategy, sql, target_relation) %}
 
     {% call statement('build_snapshot_staging_relation') %}
-        {{ create_table_as(False, temp_relation, select) }}
+        {{ create_table_as(temporary, temp_relation, select) }}
     {% endcall %}
 
     {% do return(temp_relation) %}
 {% endmacro %}
 
-{% macro duckdb__post_snapshot(staging_relation) %}
-    {% do return(drop_relation(staging_relation)) %}
+{% macro duckdb__post_snapshot(temporary_relation) %}
+    {% do return(drop_relation(temporary_relation)) %}
 {% endmacro %}

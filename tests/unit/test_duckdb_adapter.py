@@ -350,4 +350,3 @@ class TestDuckDBAdapterIsDucklake(unittest.TestCase):
 
         result = adapter.is_ducklake(relation)
         self.assertTrue(result)
-

@@ -7,19 +7,32 @@ from dbt.tests.adapter.persist_docs.test_persist_docs import (
 )
 from dbt.tests.util import run_dbt
 
+# DuckLake support is merged and will be available in a future release:
+# https://github.com/duckdb/ducklake/pull/1102
+
+@pytest.mark.skip_database_type(
+    "ducklake", reason="DuckLake does not support comments on view columns"
+)
 @pytest.mark.skip_profile("md")
 class TestPersistDocs(BasePersistDocs):
     pass
 
 
+@pytest.mark.skip_database_type(
+    "ducklake", reason="DuckLake does not support comments on view columns"
+)
 @pytest.mark.skip_profile("md")
 class TestPersistDocsColumnMissing(BasePersistDocsColumnMissing):
     pass
 
 
+@pytest.mark.skip_database_type(
+    "ducklake", reason="DuckLake does not support comments on view columns"
+)
 @pytest.mark.skip_profile("md")
 class TestPersistDocsCommentOnQuotedColumn(BasePersistDocsCommentOnQuotedColumn):
     pass
+
 
 @pytest.mark.requires_ducklake
 @pytest.mark.skip_profile("md", "buenavista")

@@ -1,13 +1,9 @@
 {% materialization incremental, adapter="duckdb", supported_languages=['sql', 'python'] -%}
 
   {%- set language = model['language'] -%}
-  -- only create temp tables if using local duckdb, as it is not currently supported for remote databases
-  {%- set temporary = not adapter.is_motherduck() -%}
-
   -- relations
   {%- set existing_relation = load_cached_relation(this) -%}
   {%- set target_relation = this.incorporate(type='table') -%}
-  {%- set temp_relation = make_temp_relation(target_relation)-%}
   {%- set intermediate_relation = make_intermediate_relation(target_relation)-%}
   {%- set backup_relation_type = 'table' if existing_relation is none else existing_relation.type -%}
   {%- set backup_relation = make_backup_relation(target_relation, backup_relation_type) -%}
@@ -36,16 +32,13 @@
   {{ drop_relation_if_exists(preexisting_backup_relation) }}
 
   {% set to_drop = [] %}
+   -- if not using a temporary table we will update the temp relation to use a different temp schema ("dbt_temp" by default)
+   -- for microbatch with concurrent batches, include batch timestamps in the identifier to avoid collisions
+  {%- set batch_id = adapter.batch_id_for_model(model) -%}
+  {% set temporary_relation = duckdb__dispatch_temporary_relation(target_relation, batch_id) %}
+  {% set temp_relation = temporary_relation.relation %}
+  {% set temporary = temporary_relation.temporary %}
   {% if not temporary %}
-    -- if not using a temporary table we will update the temp relation to use a different temp schema ("dbt_temp" by default)
-    -- for microbatch with concurrent batches, include batch timestamps in the identifier to avoid collisions
-    {%- set batch_id = adapter.batch_id_for_model(model) -%}
-    {% set temp_relation = temp_relation.incorporate(path=adapter.get_temp_relation_path(this, batch_id)) %}
-    {% do run_query(create_schema(temp_relation)) %}
-    {% if not adapter.disable_transactions() %}
-      {% do adapter.commit() %}
-    {% endif %}
-    -- then drop the temp relation after we insert the incremental data into the target relation
     {% do to_drop.append(temp_relation) %}
   {% endif %}
 
