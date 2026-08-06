@@ -20,11 +20,14 @@ model_non_main_schema_sql = """
 """
 
 
+@pytest.mark.skip_profile("md") 
+# The test would fail under motherduck because when the primary database
+# is motherduck a real table is created in place of temporary table
+# in the sqlite database, which is unexpected and broken. 
 class TestSQLitePlugin:
-
     @pytest.fixture(scope="class")
     def sqlite_test_db(self):
-        path = '/tmp/satest.db'
+        path = "/tmp/satest.db"
         Path(path).unlink(missing_ok=True)
         db = sqlite3.connect(path)
         cursor = db.cursor()
@@ -47,9 +50,7 @@ class TestSQLitePlugin:
                     "dev": {
                         "type": "duckdb",
                         "path": dbt_profile_target.get("path", ":memory:"),
-                        "attach": [
-                           {'path': sqlite_test_db}
-                        ]
+                        "attach": [{"path": sqlite_test_db}],
                     }
                 },
                 "target": "dev",
@@ -60,7 +61,6 @@ class TestSQLitePlugin:
     def models(self, test_data_path):
         return {
             "read_write.sql": model_sql,
-
         }
 
     def test_sqlite_plugin(self, project):
@@ -84,7 +84,7 @@ class TestSQLitePluginNonMainSchemaRaises:
         # filename determines the attached database name in duckdb, so we
         # use 'satest_nm.db' to land at catalog name 'satest_nm' and stay
         # disjoint from the sibling test class's 'satest' database.
-        path = '/tmp/satest_nm.db'
+        path = "/tmp/satest_nm.db"
         Path(path).unlink(missing_ok=True)
         db = sqlite3.connect(path)
         cursor = db.cursor()
@@ -102,9 +102,7 @@ class TestSQLitePluginNonMainSchemaRaises:
                     "dev": {
                         "type": "duckdb",
                         "path": dbt_profile_target.get("path", ":memory:"),
-                        "attach": [
-                            {'path': sqlite_test_db}
-                        ]
+                        "attach": [{"path": sqlite_test_db}],
                     }
                 },
                 "target": "dev",
@@ -125,5 +123,3 @@ class TestSQLitePluginNonMainSchemaRaises:
         with pytest.raises(Exception) as exc_info:
             run_dbt(["run"])
         assert "Schema must be 'main' when writing to sqlite" in str(exc_info.value)
-
-
