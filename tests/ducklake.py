@@ -5,17 +5,14 @@ import pytest
 
 SUPPORTED_DUCKLAKE_PROFILES = {"memory", "md"}
 
-# Managed DuckLake does not expose its metadata catalog, so tests attach it
-# explicitly under this alias.
-MD_DUCKLAKE_METADATA_ALIAS = "__ducklake_metadata_ducklake_db"
 
+def ducklake_metadata_schema(database_name: str) -> str:
+    """Catalog holding the DuckLake metadata tables (``ducklake_table``, ...).
 
-def ducklake_metadata_schema_name(test_database_name: str, profile_type: str) -> str:
-    """Catalog holding the DuckLake metadata tables (``ducklake_table``, ...)."""
-    if profile_type == "md":
-        return MD_DUCKLAKE_METADATA_ALIAS
-    # Local DuckLake attaches its metadata alongside the data catalog.
-    return f"__ducklake_metadata_{test_database_name}"
+    Local DuckLake attaches this catalog itself; managed DuckLake does not
+    expose it, so tests attach it under the same name.
+    """
+    return f"__ducklake_metadata_{database_name}"
 
 
 def configure_ducklake_profile(
@@ -50,9 +47,10 @@ class BaseDucklakeIntegration:
     @pytest.fixture(scope="class")
     def ducklake_attachment(self, test_database_name, profile_type, tmp_path_factory, request):
         if profile_type == "md":
+            metadata_db = ducklake_metadata_schema(test_database_name)
             return {
-                "path": f"md:__ducklake_metadata_{test_database_name}",
-                "alias": MD_DUCKLAKE_METADATA_ALIAS,
+                "path": f"md:{metadata_db}",
+                "alias": metadata_db,
                 "type": "motherduck",
             }
 
@@ -66,10 +64,6 @@ class BaseDucklakeIntegration:
             "alias": test_database_name,
             "options": {"data_path": str(data_path)},
         }
-
-    @pytest.fixture(scope="class")
-    def metadata_schema(self, test_database_name, profile_type):
-        return ducklake_metadata_schema_name(test_database_name, profile_type)
 
     @pytest.fixture(scope="class")
     def profiles_config_update(self, dbt_profile_target, ducklake_attachment, profile_type):
