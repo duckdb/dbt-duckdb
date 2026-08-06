@@ -13,7 +13,6 @@ from dbt.tests.util import run_dbt
 @pytest.mark.skip_database_type(
     "ducklake", reason="DuckLake does not support comments on view columns"
 )
-@pytest.mark.skip_profile("md")
 class TestPersistDocs(BasePersistDocs):
     pass
 
@@ -21,7 +20,6 @@ class TestPersistDocs(BasePersistDocs):
 @pytest.mark.skip_database_type(
     "ducklake", reason="DuckLake does not support comments on view columns"
 )
-@pytest.mark.skip_profile("md")
 class TestPersistDocsColumnMissing(BasePersistDocsColumnMissing):
     pass
 
@@ -29,7 +27,6 @@ class TestPersistDocsColumnMissing(BasePersistDocsColumnMissing):
 @pytest.mark.skip_database_type(
     "ducklake", reason="DuckLake does not support comments on view columns"
 )
-@pytest.mark.skip_profile("md")
 class TestPersistDocsCommentOnQuotedColumn(BasePersistDocsCommentOnQuotedColumn):
     pass
 
