@@ -35,6 +35,24 @@ models__partitioned_by_time_parts = """
 {{ render_create_table_as("select 1 as event_day, 2 as event_month, 3 as event_year, 4 as event_hour") }}
 """
 
+models__partitioned_by_transform = """
+{{ config(materialized='view', partitioned_by=['day(ts)', '"region"']) }}
+
+{{ render_create_table_as("select TIMESTAMP '2024-01-01' as ts, 'us' as region") }}
+"""
+
+models__partitioned_by_quoted_identifier = """
+{{ config(materialized='view', partitioned_by='"field name"') }}
+
+{{ render_create_table_as('select 1 as "field name"') }}
+"""
+
+models__partitioned_by_bucket_transform = """
+{{ config(materialized='view', partitioned_by=['bucket(16, user_id)']) }}
+
+{{ render_create_table_as("select 1 as user_id") }}
+"""
+
 models__partitioned_by_python = """
 {{ config(materialized='view', partitioned_by='ds') }}
 
@@ -92,8 +110,21 @@ def read_compiled_file(project, model_name, extension):
         if named_matches:
             matches = named_matches
 
-    assert len(matches) == 1, f"Expected one compiled file for '{model_name}', found {len(matches)}"
+    assert len(matches) == 1, (
+        f"Expected one compiled file for '{model_name}', found {len(matches)}"
+    )
     return matches[0].read_text()
+
+
+def normalize_sql(sql):
+    return " ".join(sql.split())
+
+
+def assert_set_partitioned_by(sql, expected):
+    assert re.search(
+        f"alter table(.*)set partitioned by \\({re.escape(expected)}\\)",
+        normalize_sql(sql),
+    )
 
 
 class BasePartitionedByCompile:
@@ -112,6 +143,9 @@ class BasePartitionedByCompile:
             "partitioned_by_python.sql": models__partitioned_by_python,
             "contract_partitioned_by.sql": models__contract_partitioned_by,
             "partitioned_by_time_parts.sql": models__partitioned_by_time_parts,
+            "partitioned_by_transform.sql": models__partitioned_by_transform,
+            "partitioned_by_bucket_transform.sql": models__partitioned_by_bucket_transform,
+            "partitioned_by_quoted_identifier.sql": models__partitioned_by_quoted_identifier,
             "schema.yml": schema_yml,
         }
 
@@ -134,39 +168,42 @@ class TestDucklakePartitionedByCompile(BasePartitionedByCompile):
     def test_partitioned_by_string(self, project):
         run_dbt(["compile"])
         sql = read_compiled_file(project, "partitioned_by_table", "sql")
-        assert re.search(r'alter\s+table.*set\s+partitioned\s+by\s*\(\s*"ds"\s*\)', sql, re.IGNORECASE | re.DOTALL)
+        assert_set_partitioned_by(sql, "ds")
 
     def test_partition_by_list(self, project):
         run_dbt(["compile"])
         sql = read_compiled_file(project, "partition_by_incremental", "sql")
-        assert re.search(
-            r'alter\s+table.*set\s+partitioned\s+by\s*\(\s*"ds"\s*,\s*"region"\s*\)',
-            sql,
-            re.IGNORECASE | re.DOTALL,
-        )
+        assert_set_partitioned_by(sql, "ds, region")
 
     def test_partitioned_by_python(self, project):
         run_dbt(["compile"])
         python_code = read_compiled_file(project, "partitioned_by_python", "sql")
-        assert re.search(
-            r'alter\s+table.*set\s+partitioned\s+by\s*\(\s*"ds"\s*\)',
-            python_code,
-            re.IGNORECASE | re.DOTALL,
-        )
+        assert_set_partitioned_by(python_code, "ds")
 
     def test_partitioned_by_contract(self, project):
         run_dbt(["compile"])
         sql = read_compiled_file(project, "contract_partitioned_by", "sql")
-        assert re.search(r'alter\s+table.*set\s+partitioned\s+by\s*\(\s*"ds"\s*\)', sql, re.IGNORECASE | re.DOTALL)
+        assert_set_partitioned_by(sql, "ds")
 
     def test_partitioned_by_time_parts(self, project):
         run_dbt(["compile"])
         sql = read_compiled_file(project, "partitioned_by_time_parts", "sql")
-        assert re.search(
-            r'alter\s+table.*set\s+partitioned\s+by\s*\(\s*"event_day"\s*,\s*"event_month"\s*,\s*"event_year"\s*,\s*"event_hour"\s*\)',
-            sql,
-            re.IGNORECASE | re.DOTALL,
-        )
+        assert_set_partitioned_by(sql, "event_day, event_month, event_year, event_hour")
+
+    def test_partitioned_by_quoted_identifier(self, project):
+        run_dbt(["compile"])
+        sql = read_compiled_file(project, "partitioned_by_quoted_identifier", "sql")
+        assert_set_partitioned_by(sql, '"field name"')
+
+    def test_partitioned_by_transform(self, project):
+        run_dbt(["compile"])
+        sql = read_compiled_file(project, "partitioned_by_transform", "sql")
+        assert_set_partitioned_by(sql, 'day(ts), "region"')
+
+    def test_partitioned_by_bucket_transform(self, project):
+        run_dbt(["compile"])
+        sql = read_compiled_file(project, "partitioned_by_bucket_transform", "sql")
+        assert_set_partitioned_by(sql, "bucket(16, user_id)")
 
 
 @pytest.mark.skip_database_type(
@@ -186,11 +223,17 @@ class TestNonDucklakePartitionedByCompile(BasePartitionedByCompile):
         sql_incremental = read_compiled_file(project, "partition_by_incremental", "sql").lower()
         sql_contract = read_compiled_file(project, "contract_partitioned_by", "sql").lower()
         sql_time_parts = read_compiled_file(project, "partitioned_by_time_parts", "sql").lower()
+        sql_transform = read_compiled_file(project, "partitioned_by_transform", "sql").lower()
+        sql_bucket = read_compiled_file(project, "partitioned_by_bucket_transform", "sql").lower()
+        sql_quoted = read_compiled_file(project, "partitioned_by_quoted_identifier", "sql").lower()
         python_code = read_compiled_file(project, "partitioned_by_python", "sql").lower()
         assert "set partitioned by" not in sql_table
         assert "set partitioned by" not in sql_incremental
         assert "set partitioned by" not in sql_contract
         assert "set partitioned by" not in sql_time_parts
+        assert "set partitioned by" not in sql_transform
+        assert "set partitioned by" not in sql_bucket
+        assert "set partitioned by" not in sql_quoted
         assert "set partitioned by" not in python_code
 
 
@@ -222,5 +265,7 @@ class TestPartitionedByValidation:
         return target
 
     def test_partitioned_by_list_values_must_be_strings(self, project):
-        with pytest.raises(Exception, match="partitioned_by/partition_by list values must be non-empty strings"):
+        with pytest.raises(
+            Exception, match="partitioned_by/partition_by list values must be non-empty strings"
+        ):
             run_dbt(["compile"])
