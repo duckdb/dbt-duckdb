@@ -20,7 +20,10 @@ model_non_main_schema_sql = """
 """
 
 
-@pytest.mark.skip_profile("md")
+@pytest.mark.skip_profile("md") 
+# The test would fail under motherduck because when the primary database
+# is motherduck a real table is created in place of temporary table
+# in the sqlite database, which is unexpected and broken. 
 class TestSQLitePlugin:
     @pytest.fixture(scope="class")
     def sqlite_test_db(self):
