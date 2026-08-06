@@ -4,58 +4,72 @@ import pytest
 from dbt.tests.util import run_dbt
 
 
-models__table_sorted_model = """
-{{ config(materialized='table', database='ducklake_db', sorted_by='ds') }}
+@pytest.fixture(scope="class")
+def models__table_sorted_model(test_database_name):
+    return f"""
+{{{{ config(materialized='table', database='{test_database_name}', sorted_by='ds') }}}}
 
 select 1 as id, '2025-01-01' as ds, 'us' as region, 10 as amount
 union all
 select 2 as id, '2025-01-02' as ds, 'eu' as region, 20 as amount
 """
 
-models__incremental_sorted_model = """
-{{ config(
+
+@pytest.fixture(scope="class")
+def models__incremental_sorted_model(test_database_name):
+    return f"""
+{{{{ config(
     materialized='incremental',
-    database='ducklake_db',
+    database='{test_database_name}',
     unique_key='id',
     sort_by=['ds', 'region']
-) }}
+) }}}}
 
-{% if is_incremental() %}
+{{% if is_incremental() %}}
 select 2 as id, '2025-01-02' as ds, 'eu' as region, 22 as amount
 union all
 select 3 as id, '2025-01-03' as ds, 'ca' as region, 30 as amount
-{% else %}
+{{% else %}}
 select 1 as id, '2025-01-01' as ds, 'us' as region, 10 as amount
 union all
 select 2 as id, '2025-01-02' as ds, 'eu' as region, 20 as amount
-{% endif %}
+{{% endif %}}
 """
 
-models__python_sorted_model = """
+
+@pytest.fixture(scope="class")
+def models__python_sorted_model(test_database_name):
+    return f"""
 import pandas as pd
 
 
 def model(dbt, _):
-    dbt.config(materialized='table', database='ducklake_db', sorted_by='ds')
+    dbt.config(materialized='table', database='{test_database_name}', sorted_by='ds')
     return pd.DataFrame(
-        {
+        {{
             "id": [1, 2],
             "ds": ["2025-01-01", "2025-01-02"],
             "region": ["us", "eu"],
             "amount": [10, 20],
-        }
+        }}
     )
 """
 
-models__partitioned_and_sorted_model = """
-{{ config(materialized='table', database='ducklake_db', partitioned_by='ds', sorted_by='region') }}
+
+@pytest.fixture(scope="class")
+def models__partitioned_and_sorted_model(test_database_name):
+    return f"""
+{{{{ config(materialized='table', database='{test_database_name}', partitioned_by='ds', sorted_by='region') }}}}
 
 select 1 as id, '2025-01-01' as ds, 'us' as region, 10 as amount
 union all
 select 2 as id, '2025-01-02' as ds, 'eu' as region, 20 as amount
 """
 
-models__non_ducklake_sorted_table = """
+
+@pytest.fixture(scope="class")
+def models__non_ducklake_sorted_table():
+    return """
 {{ config(materialized='table', sorted_by='ds') }}
 
 select 1 as ds, 'a' as value
@@ -63,20 +77,29 @@ union all
 select 2 as ds, 'b' as value
 """
 
-models__invalid_sorted_by = """
-{{ config(materialized='table', database='ducklake_db', sorted_by=['ds', 1]) }}
+
+@pytest.fixture(scope="class")
+def models__invalid_sorted_by(test_database_name):
+    return f"""
+{{{{ config(materialized='table', database='{test_database_name}', sorted_by=['ds', 1]) }}}}
 
 select 1 as ds, 'a' as value
 """
 
-models__empty_sorted_by_list = """
-{{ config(materialized='table', database='ducklake_db', sorted_by=[]) }}
+
+@pytest.fixture(scope="class")
+def models__empty_sorted_by_list(test_database_name):
+    return f"""
+{{{{ config(materialized='table', database='{test_database_name}', sorted_by=[]) }}}}
 
 select 1 as ds, 'a' as value
 """
 
-models__invalid_sorted_by_string = """
-{{ config(materialized='table', database='ducklake_db', sorted_by='ds); drop table x; --') }}
+
+@pytest.fixture(scope="class")
+def models__invalid_sorted_by_string(test_database_name):
+    return f"""
+{{{{ config(materialized='table', database='{test_database_name}', sorted_by='ds); drop table x; --') }}}}
 
 select 1 as ds, 'a' as value
 """
@@ -108,15 +131,6 @@ def get_sort_columns(project, model_name, schema_name):
     """
     return [row[0].lower() for row in project.run_sql(query, fetch="all")]
 
-
-def ducklake_database_name(test_database_name, profile_type):
-    return test_database_name if profile_type == "md" else "ducklake_db"
-
-
-def with_ducklake_database(models, database):
-    return {name: sql.replace("ducklake_db", database) for name, sql in models.items()}
-
-
 @pytest.mark.requires_ducklake
 @pytest.mark.skip_profile("buenavista")
 class BaseDucklakeSortedBy:
@@ -128,9 +142,8 @@ class BaseDucklakeSortedBy:
     @pytest.fixture(scope="class")
     def ducklake_attachment(self, test_database_name, profile_type, tmp_path_factory):
         if profile_type == "md":
-            database_name = ducklake_database_name(test_database_name, profile_type)
             return {
-                "path": f"md:__ducklake_metadata_{database_name}",
+                "path": f"md:__ducklake_metadata_{test_database_name}",
                 "alias": "__ducklake_metadata_ducklake_db",
                 "type": "motherduck",
             }
@@ -142,19 +155,16 @@ class BaseDucklakeSortedBy:
 
         return {
             "path": f"ducklake:sqlite:{metadata_path}",
-            "alias": "ducklake_db",
+            "alias": test_database_name,
             "options": {"data_path": str(data_path)},
         }
 
     @pytest.fixture(scope="class")
     def profiles_config_update(
-        self, dbt_profile_target, ducklake_attachment, test_database_name, profile_type
+        self, dbt_profile_target, ducklake_attachment, profile_type
     ):
         target = dict(dbt_profile_target)
         if profile_type == "md":
-            database_name = ducklake_database_name(test_database_name, profile_type)
-            target["path"] = f"md:{database_name}"
-            target["database"] = database_name
             target["is_ducklake"] = True
         else:
             target["path"] = target.get("path", ":memory:")
@@ -169,17 +179,19 @@ class BaseDucklakeSortedBy:
 
 class TestDucklakeSortedByIntegration(BaseDucklakeSortedBy):
     @pytest.fixture(scope="class")
-    def models(self, test_database_name, profile_type):
-        database = ducklake_database_name(test_database_name, profile_type)
-        return with_ducklake_database(
-            {
-                "table_sorted_model.sql": models__table_sorted_model,
-                "incremental_sorted_model.sql": models__incremental_sorted_model,
-                "python_sorted_model.py": models__python_sorted_model,
-                "partitioned_and_sorted_model.sql": models__partitioned_and_sorted_model,
-            },
-            database,
-        )
+    def models(
+        self,
+        models__table_sorted_model,
+        models__incremental_sorted_model,
+        models__python_sorted_model,
+        models__partitioned_and_sorted_model,
+    ):
+        return {
+            "table_sorted_model.sql": models__table_sorted_model,
+            "incremental_sorted_model.sql": models__incremental_sorted_model,
+            "python_sorted_model.py": models__python_sorted_model,
+            "partitioned_and_sorted_model.sql": models__partitioned_and_sorted_model,
+        }
 
     def test_table_sorted_by_sets_sort_columns(self, project):
         result = run_dbt(["run", "--select", "table_sorted_model"], expect_pass=True)
@@ -223,7 +235,7 @@ class TestDucklakeSortedByIntegration(BaseDucklakeSortedBy):
 )
 class TestNonDucklakeSortedBy:
     @pytest.fixture(scope="class")
-    def models(self):
+    def models(self, models__non_ducklake_sorted_table):
         return {
             "non_ducklake_sorted_table.sql": models__non_ducklake_sorted_table,
         }
@@ -241,16 +253,17 @@ class TestNonDucklakeSortedBy:
 
 class TestSortedByValidation(BaseDucklakeSortedBy):
     @pytest.fixture(scope="class")
-    def models(self, test_database_name, profile_type):
-        database = ducklake_database_name(test_database_name, profile_type)
-        return with_ducklake_database(
-            {
-                "invalid_sorted_by.sql": models__invalid_sorted_by,
-                "empty_sorted_by_list.sql": models__empty_sorted_by_list,
-                "invalid_sorted_by_string.sql": models__invalid_sorted_by_string,
-            },
-            database,
-        )
+    def models(
+        self,
+        models__invalid_sorted_by,
+        models__empty_sorted_by_list,
+        models__invalid_sorted_by_string,
+    ):
+        return {
+            "invalid_sorted_by.sql": models__invalid_sorted_by,
+            "empty_sorted_by_list.sql": models__empty_sorted_by_list,
+            "invalid_sorted_by_string.sql": models__invalid_sorted_by_string,
+        }
 
     def test_sorted_by_list_values_must_be_strings(self, project):
         result = run_dbt(["run", "--select", "invalid_sorted_by"], expect_pass=False)

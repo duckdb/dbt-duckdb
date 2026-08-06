@@ -3,51 +3,61 @@ from pathlib import Path
 import pytest
 from dbt.tests.util import run_dbt
 
-
-models__table_partitioned_model = """
-{{ config(materialized='table', database='ducklake_db', partitioned_by='ds') }}
+@pytest.fixture(scope="class")
+def models__table_partitioned_model(test_database_name):
+    return f"""
+{{{{ config(materialized='table', database='{test_database_name}', partitioned_by='ds') }}}}
 
 select 1 as id, '2025-01-01' as ds, 'us' as region, 10 as amount
 union all
 select 2 as id, '2025-01-02' as ds, 'eu' as region, 20 as amount
 """
 
-models__incremental_partitioned_model = """
-{{ config(
+
+@pytest.fixture(scope="class")
+def models__incremental_partitioned_model(test_database_name):
+    return f"""
+{{{{ config(
     materialized='incremental',
-    database='ducklake_db',
+    database='{test_database_name}',
     unique_key='id',
     partition_by=['ds', 'region']
-) }}
+) }}}}
 
-{% if is_incremental() %}
+{{% if is_incremental() %}}
 select 2 as id, '2025-01-02' as ds, 'eu' as region, 22 as amount
 union all
 select 3 as id, '2025-01-03' as ds, 'ca' as region, 30 as amount
-{% else %}
+{{% else %}}
 select 1 as id, '2025-01-01' as ds, 'us' as region, 10 as amount
 union all
 select 2 as id, '2025-01-02' as ds, 'eu' as region, 20 as amount
-{% endif %}
+{{% endif %}}
 """
 
-models__python_partitioned_model = """
+
+@pytest.fixture(scope="class")
+def models__python_partitioned_model(test_database_name):
+    return f"""
 import pandas as pd
 
 
 def model(dbt, _):
-    dbt.config(materialized='table', database='ducklake_db', partitioned_by='ds')
+    dbt.config(materialized='table', database='{test_database_name}', partitioned_by='ds')
     return pd.DataFrame(
-        {
+        {{
             "id": [1, 2],
             "ds": ["2025-01-01", "2025-01-02"],
             "region": ["us", "eu"],
             "amount": [10, 20],
-        }
+        }}
     )
 """
 
-models__non_ducklake_partitioned_table = """
+
+@pytest.fixture(scope="class")
+def models__non_ducklake_partitioned_table():
+    return """
 {{ config(materialized='table', partitioned_by='ds') }}
 
 select 1 as ds, 'a' as value
@@ -55,20 +65,29 @@ union all
 select 2 as ds, 'b' as value
 """
 
-models__invalid_partitioned_by = """
-{{ config(materialized='table', database='ducklake_db', partitioned_by=['ds', 1]) }}
+
+@pytest.fixture(scope="class")
+def models__invalid_partitioned_by(test_database_name):
+    return f"""
+{{{{ config(materialized='table', database='{test_database_name}', partitioned_by=['ds', 1]) }}}}
 
 select 1 as ds, 'a' as value
 """
 
-models__empty_partitioned_by_list = """
-{{ config(materialized='table', database='ducklake_db', partitioned_by=[]) }}
+
+@pytest.fixture(scope="class")
+def models__empty_partitioned_by_list(test_database_name):
+    return f"""
+{{{{ config(materialized='table', database='{test_database_name}', partitioned_by=[]) }}}}
 
 select 1 as ds, 'a' as value
 """
 
-models__transform_partitioned_model = """
-{{ config(materialized='table', database='ducklake_db', partitioned_by=['day(ts)', 'region']) }}
+
+@pytest.fixture(scope="class")
+def models__transform_partitioned_model(test_database_name):
+    return f"""
+{{{{ config(materialized='table', database='{test_database_name}', partitioned_by=['day(ts)', 'region']) }}}}
 
 select TIMESTAMP '2025-01-01 00:00:00' as ts, 'us' as region, 1 as id
 union all
@@ -108,15 +127,6 @@ def get_partition_columns_with_transforms(project, model_name, schema_name):
     rows = project.run_sql(query, fetch="all")
     return [row[0].lower() for row in rows], [str(row[1]).lower() for row in rows]
 
-
-def ducklake_database_name(test_database_name, profile_type):
-    return test_database_name if profile_type == "md" else "ducklake_db"
-
-
-def with_ducklake_database(models, database):
-    return {name: sql.replace("ducklake_db", database) for name, sql in models.items()}
-
-
 @pytest.mark.requires_ducklake
 @pytest.mark.skip_profile("buenavista")
 class BaseDucklakePartitionedBy:
@@ -128,9 +138,8 @@ class BaseDucklakePartitionedBy:
     @pytest.fixture(scope="class")
     def ducklake_attachment(self, test_database_name, profile_type, tmp_path_factory):
         if profile_type == "md":
-            database_name = ducklake_database_name(test_database_name, profile_type)
             return {
-                "path": f"md:__ducklake_metadata_{database_name}",
+                "path": f"md:__ducklake_metadata_{test_database_name}",
                 "alias": "__ducklake_metadata_ducklake_db",
                 "type": "motherduck",
             }
@@ -142,19 +151,16 @@ class BaseDucklakePartitionedBy:
 
         return {
             "path": f"ducklake:sqlite:{metadata_path}",
-            "alias": "ducklake_db",
+            "alias": test_database_name,
             "options": {"data_path": str(data_path)},
         }
 
     @pytest.fixture(scope="class")
     def profiles_config_update(
-        self, dbt_profile_target, ducklake_attachment, test_database_name, profile_type
+        self, dbt_profile_target, ducklake_attachment, profile_type
     ):
         target = dict(dbt_profile_target)
         if profile_type == "md":
-            database_name = ducklake_database_name(test_database_name, profile_type)
-            target["path"] = f"md:{database_name}"
-            target["database"] = database_name
             target["is_ducklake"] = True
         else:
             target["path"] = target.get("path", ":memory:")
@@ -169,17 +175,19 @@ class BaseDucklakePartitionedBy:
 
 class TestDucklakePartitionedByIntegration(BaseDucklakePartitionedBy):
     @pytest.fixture(scope="class")
-    def models(self, test_database_name, profile_type):
-        database = ducklake_database_name(test_database_name, profile_type)
-        return with_ducklake_database(
-            {
-                "table_partitioned_model.sql": models__table_partitioned_model,
-                "incremental_partitioned_model.sql": models__incremental_partitioned_model,
-                "python_partitioned_model.py": models__python_partitioned_model,
-                "transform_partitioned_model.sql": models__transform_partitioned_model,
-            },
-            database,
-        )
+    def models(
+        self,
+        models__table_partitioned_model,
+        models__incremental_partitioned_model,
+        models__python_partitioned_model,
+        models__transform_partitioned_model,
+    ):
+        return {
+            "table_partitioned_model.sql": models__table_partitioned_model,
+            "incremental_partitioned_model.sql": models__incremental_partitioned_model,
+            "python_partitioned_model.py": models__python_partitioned_model,
+            "transform_partitioned_model.sql": models__transform_partitioned_model,
+        }
 
     def test_table_partitioned_by_sets_partition_columns(self, project):
         result = run_dbt(["run", "--select", "table_partitioned_model"], expect_pass=True)
@@ -243,7 +251,7 @@ class TestDucklakePartitionedByIntegration(BaseDucklakePartitionedBy):
 )
 class TestNonDucklakePartitionedBy:
     @pytest.fixture(scope="class")
-    def models(self):
+    def models(self, models__non_ducklake_partitioned_table):
         return {
             "non_ducklake_partitioned_table.sql": models__non_ducklake_partitioned_table,
         }
@@ -261,15 +269,11 @@ class TestNonDucklakePartitionedBy:
 
 class TestPartitionedByValidation(BaseDucklakePartitionedBy):
     @pytest.fixture(scope="class")
-    def models(self, test_database_name, profile_type):
-        database = ducklake_database_name(test_database_name, profile_type)
-        return with_ducklake_database(
-            {
-                "invalid_partitioned_by.sql": models__invalid_partitioned_by,
-                "empty_partitioned_by_list.sql": models__empty_partitioned_by_list,
-            },
-            database,
-        )
+    def models(self, models__invalid_partitioned_by, models__empty_partitioned_by_list):
+        return {
+            "invalid_partitioned_by.sql": models__invalid_partitioned_by,
+            "empty_partitioned_by_list.sql": models__empty_partitioned_by_list,
+        }
 
     def test_partitioned_by_list_values_must_be_strings(self, project):
         result = run_dbt(["run", "--select", "invalid_partitioned_by"], expect_pass=False)
