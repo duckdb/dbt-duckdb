@@ -1,7 +1,8 @@
-from pathlib import Path
-
 import pytest
 from dbt.tests.util import run_dbt
+
+from tests.ducklake import BaseDucklakeIntegration
+
 
 @pytest.fixture(scope="class")
 def models__table_partitioned_model(test_database_name):
@@ -95,18 +96,12 @@ select TIMESTAMP '2025-01-02 00:00:00' as ts, 'eu' as region, 2 as id
 """
 
 
-def get_partition_columns_with_transforms(project, model_name, schema_name):
+def get_partition_columns_with_transforms(project, model_name, schema_name, metadata_schema):
     """Returns partition metadata as a tuple ([columns...], [transforms...])
 
     For example, (["c1", "c2"], ["day", "identity"]) means that column
     c1 uses the day transform and c2 the identity transform.
     """
-    relation = project.adapter.Relation.create(
-        database="ducklake_db",
-        schema=schema_name,
-        identifier=model_name,
-    )
-    metadata_schema = "__ducklake_metadata_ducklake_db"
     query = f"""
         select c.column_name, pc.transform
         from {metadata_schema}.ducklake_partition_column pc
@@ -117,8 +112,8 @@ def get_partition_columns_with_transforms(project, model_name, schema_name):
           on t.table_id = c.table_id
         join {metadata_schema}.ducklake_schema s
           on s.schema_id = t.schema_id
-        where lower(t.table_name) = lower('{relation.identifier}')
-          and lower(s.schema_name) = lower('{relation.schema}')
+        where lower(t.table_name) = lower('{model_name}')
+          and lower(s.schema_name) = lower('{schema_name}')
           and t.end_snapshot is null
           and c.end_snapshot is null
           and s.end_snapshot is null
@@ -127,53 +122,8 @@ def get_partition_columns_with_transforms(project, model_name, schema_name):
     rows = project.run_sql(query, fetch="all")
     return [row[0].lower() for row in rows], [str(row[1]).lower() for row in rows]
 
-@pytest.mark.requires_ducklake
-@pytest.mark.skip_profile("buenavista")
-class BaseDucklakePartitionedBy:
-    @pytest.fixture(scope="class", autouse=True)
-    def skip_non_ducklake_motherduck(self, profile_type, database_type):
-        if profile_type == "md" and database_type != "ducklake":
-            pytest.skip("requires the managed DuckLake MotherDuck profile")
 
-    @pytest.fixture(scope="class")
-    def ducklake_attachment(self, test_database_name, profile_type, tmp_path_factory):
-        if profile_type == "md":
-            return {
-                "path": f"md:__ducklake_metadata_{test_database_name}",
-                "alias": "__ducklake_metadata_ducklake_db",
-                "type": "motherduck",
-            }
-
-        root = Path(tmp_path_factory.mktemp("ducklake_partitioned_by"))
-        metadata_path = root / "metadata.ducklake"
-        data_path = root / "data"
-        data_path.mkdir(parents=True, exist_ok=True)
-
-        return {
-            "path": f"ducklake:sqlite:{metadata_path}",
-            "alias": test_database_name,
-            "options": {"data_path": str(data_path)},
-        }
-
-    @pytest.fixture(scope="class")
-    def profiles_config_update(
-        self, dbt_profile_target, ducklake_attachment, profile_type
-    ):
-        target = dict(dbt_profile_target)
-        if profile_type == "md":
-            target["is_ducklake"] = True
-        else:
-            target["path"] = target.get("path", ":memory:")
-        target["attach"] = [ducklake_attachment]
-        return {
-            "test": {
-                "outputs": {"dev": target},
-                "target": "dev",
-            }
-        }
-
-
-class TestDucklakePartitionedByIntegration(BaseDucklakePartitionedBy):
+class TestDucklakePartitionedByIntegration(BaseDucklakeIntegration):
     @pytest.fixture(scope="class")
     def models(
         self,
@@ -189,56 +139,58 @@ class TestDucklakePartitionedByIntegration(BaseDucklakePartitionedBy):
             "transform_partitioned_model.sql": models__transform_partitioned_model,
         }
 
-    def test_table_partitioned_by_sets_partition_columns(self, project):
+    def test_table_partitioned_by_sets_partition_columns(self, project, metadata_schema):
         result = run_dbt(["run", "--select", "table_partitioned_model"], expect_pass=True)
         schema = result.results[0].node.schema
         partition_columns, _ = get_partition_columns_with_transforms(
-            project, "table_partitioned_model", schema
+            project, "table_partitioned_model", schema, metadata_schema
         )
         assert partition_columns == ["ds"]
 
-    def test_table_partitioned_by_is_idempotent(self, project):
+    def test_table_partitioned_by_is_idempotent(self, project, metadata_schema):
         run_dbt(["run", "--select", "table_partitioned_model"], expect_pass=True)
         result = run_dbt(["run", "--select", "table_partitioned_model"], expect_pass=True)
         schema = result.results[0].node.schema
         partition_columns, _ = get_partition_columns_with_transforms(
-            project, "table_partitioned_model", schema
+            project, "table_partitioned_model", schema, metadata_schema
         )
         assert partition_columns == ["ds"]
 
-    def test_incremental_partition_by_sets_partition_columns(self, project):
+    def test_incremental_partition_by_sets_partition_columns(self, project, metadata_schema):
         run_dbt(["run", "--select", "incremental_partitioned_model"], expect_pass=True)
         result = run_dbt(["run", "--select", "incremental_partitioned_model"], expect_pass=True)
         schema = result.results[0].node.schema
         partition_columns, _ = get_partition_columns_with_transforms(
-            project, "incremental_partitioned_model", schema
+            project, "incremental_partitioned_model", schema, metadata_schema
         )
         assert partition_columns == ["ds", "region",]
 
-    def test_incremental_partition_by_full_refresh_sets_partition_columns(self, project):
+    def test_incremental_partition_by_full_refresh_sets_partition_columns(
+        self, project, metadata_schema
+    ):
         result = run_dbt(
             ["run", "--select", "incremental_partitioned_model", "--full-refresh"],
             expect_pass=True,
         )
         schema = result.results[0].node.schema
         partition_columns, _ = get_partition_columns_with_transforms(
-            project, "incremental_partitioned_model", schema
+            project, "incremental_partitioned_model", schema, metadata_schema
         )
         assert partition_columns == ["ds", "region",]
 
-    def test_python_partitioned_by_sets_partition_columns(self, project):
+    def test_python_partitioned_by_sets_partition_columns(self, project, metadata_schema):
         result = run_dbt(["run", "--select", "python_partitioned_model"], expect_pass=True)
         schema = result.results[0].node.schema
         partition_columns, _ = get_partition_columns_with_transforms(
-            project, "python_partitioned_model", schema
+            project, "python_partitioned_model", schema, metadata_schema
         )
         assert partition_columns == ["ds"]
 
-    def test_table_partitioned_by_transform_sets_partition_columns(self, project):
+    def test_table_partitioned_by_transform_sets_partition_columns(self, project, metadata_schema):
         result = run_dbt(["run", "--select", "transform_partitioned_model"], expect_pass=True)
         schema = result.results[0].node.schema
         partition_columns, transforms = get_partition_columns_with_transforms(
-            project, "transform_partitioned_model", schema
+            project, "transform_partitioned_model", schema, metadata_schema
         )
         assert partition_columns == ["ts", "region"]
         assert "day" in transforms[0]
@@ -267,7 +219,7 @@ class TestNonDucklakePartitionedBy:
         assert row_count == 2
 
 
-class TestPartitionedByValidation(BaseDucklakePartitionedBy):
+class TestPartitionedByValidation(BaseDucklakeIntegration):
     @pytest.fixture(scope="class")
     def models(self, models__invalid_partitioned_by, models__empty_partitioned_by_list):
         return {

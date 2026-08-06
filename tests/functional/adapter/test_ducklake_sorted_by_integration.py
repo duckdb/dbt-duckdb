@@ -1,7 +1,7 @@
-from pathlib import Path
-
 import pytest
 from dbt.tests.util import run_dbt
+
+from tests.ducklake import BaseDucklakeIntegration
 
 
 @pytest.fixture(scope="class")
@@ -105,13 +105,7 @@ select 1 as ds, 'a' as value
 """
 
 
-def get_sort_columns(project, model_name, schema_name):
-    relation = project.adapter.Relation.create(
-        database="ducklake_db",
-        schema=schema_name,
-        identifier=model_name,
-    )
-    metadata_schema = "__ducklake_metadata_ducklake_db"
+def get_sort_columns(project, model_name, schema_name, metadata_schema):
     query = f"""
         select se.expression
         from {metadata_schema}.ducklake_sort_info si
@@ -122,8 +116,8 @@ def get_sort_columns(project, model_name, schema_name):
           on t.table_id = si.table_id
         join {metadata_schema}.ducklake_schema s
           on s.schema_id = t.schema_id
-        where lower(t.table_name) = lower('{relation.identifier}')
-          and lower(s.schema_name) = lower('{relation.schema}')
+        where lower(t.table_name) = lower('{model_name}')
+          and lower(s.schema_name) = lower('{schema_name}')
           and t.end_snapshot is null
           and s.end_snapshot is null
           and si.end_snapshot is null
@@ -131,53 +125,8 @@ def get_sort_columns(project, model_name, schema_name):
     """
     return [row[0].lower() for row in project.run_sql(query, fetch="all")]
 
-@pytest.mark.requires_ducklake
-@pytest.mark.skip_profile("buenavista")
-class BaseDucklakeSortedBy:
-    @pytest.fixture(scope="class", autouse=True)
-    def skip_non_ducklake_motherduck(self, profile_type, database_type):
-        if profile_type == "md" and database_type != "ducklake":
-            pytest.skip("requires the managed DuckLake MotherDuck profile")
 
-    @pytest.fixture(scope="class")
-    def ducklake_attachment(self, test_database_name, profile_type, tmp_path_factory):
-        if profile_type == "md":
-            return {
-                "path": f"md:__ducklake_metadata_{test_database_name}",
-                "alias": "__ducklake_metadata_ducklake_db",
-                "type": "motherduck",
-            }
-
-        root = Path(tmp_path_factory.mktemp("ducklake_sorted_by"))
-        metadata_path = root / "metadata.ducklake"
-        data_path = root / "data"
-        data_path.mkdir(parents=True, exist_ok=True)
-
-        return {
-            "path": f"ducklake:sqlite:{metadata_path}",
-            "alias": test_database_name,
-            "options": {"data_path": str(data_path)},
-        }
-
-    @pytest.fixture(scope="class")
-    def profiles_config_update(
-        self, dbt_profile_target, ducklake_attachment, profile_type
-    ):
-        target = dict(dbt_profile_target)
-        if profile_type == "md":
-            target["is_ducklake"] = True
-        else:
-            target["path"] = target.get("path", ":memory:")
-        target["attach"] = [ducklake_attachment]
-        return {
-            "test": {
-                "outputs": {"dev": target},
-                "target": "dev",
-            }
-        }
-
-
-class TestDucklakeSortedByIntegration(BaseDucklakeSortedBy):
+class TestDucklakeSortedByIntegration(BaseDucklakeIntegration):
     @pytest.fixture(scope="class")
     def models(
         self,
@@ -193,40 +142,49 @@ class TestDucklakeSortedByIntegration(BaseDucklakeSortedBy):
             "partitioned_and_sorted_model.sql": models__partitioned_and_sorted_model,
         }
 
-    def test_table_sorted_by_sets_sort_columns(self, project):
+    def test_table_sorted_by_sets_sort_columns(self, project, metadata_schema):
         result = run_dbt(["run", "--select", "table_sorted_model"], expect_pass=True)
         schema = result.results[0].node.schema
-        assert get_sort_columns(project, "table_sorted_model", schema) == ["ds"]
+        assert get_sort_columns(project, "table_sorted_model", schema, metadata_schema) == ["ds"]
 
-    def test_table_sorted_by_is_idempotent(self, project):
+    def test_table_sorted_by_is_idempotent(self, project, metadata_schema):
         run_dbt(["run", "--select", "table_sorted_model"], expect_pass=True)
         result = run_dbt(["run", "--select", "table_sorted_model"], expect_pass=True)
         schema = result.results[0].node.schema
-        assert get_sort_columns(project, "table_sorted_model", schema) == ["ds"]
+        assert get_sort_columns(project, "table_sorted_model", schema, metadata_schema) == ["ds"]
 
-    def test_incremental_sort_by_sets_sort_columns(self, project):
+    def test_incremental_sort_by_sets_sort_columns(self, project, metadata_schema):
         run_dbt(["run", "--select", "incremental_sorted_model"], expect_pass=True)
         result = run_dbt(["run", "--select", "incremental_sorted_model"], expect_pass=True)
         schema = result.results[0].node.schema
-        assert get_sort_columns(project, "incremental_sorted_model", schema) == ["ds", "region"]
+        sort_columns = get_sort_columns(
+            project, "incremental_sorted_model", schema, metadata_schema
+        )
+        assert sort_columns == ["ds", "region"]
 
-    def test_incremental_sort_by_full_refresh_sets_sort_columns(self, project):
+    def test_incremental_sort_by_full_refresh_sets_sort_columns(self, project, metadata_schema):
         result = run_dbt(
             ["run", "--select", "incremental_sorted_model", "--full-refresh"],
             expect_pass=True,
         )
         schema = result.results[0].node.schema
-        assert get_sort_columns(project, "incremental_sorted_model", schema) == ["ds", "region"]
+        sort_columns = get_sort_columns(
+            project, "incremental_sorted_model", schema, metadata_schema
+        )
+        assert sort_columns == ["ds", "region"]
 
-    def test_python_sorted_by_sets_sort_columns(self, project):
+    def test_python_sorted_by_sets_sort_columns(self, project, metadata_schema):
         result = run_dbt(["run", "--select", "python_sorted_model"], expect_pass=True)
         schema = result.results[0].node.schema
-        assert get_sort_columns(project, "python_sorted_model", schema) == ["ds"]
+        assert get_sort_columns(project, "python_sorted_model", schema, metadata_schema) == ["ds"]
 
-    def test_partitioned_and_sorted_together(self, project):
+    def test_partitioned_and_sorted_together(self, project, metadata_schema):
         result = run_dbt(["run", "--select", "partitioned_and_sorted_model"], expect_pass=True)
         schema = result.results[0].node.schema
-        assert get_sort_columns(project, "partitioned_and_sorted_model", schema) == ["region"]
+        sort_columns = get_sort_columns(
+            project, "partitioned_and_sorted_model", schema, metadata_schema
+        )
+        assert sort_columns == ["region"]
 
 
 @pytest.mark.skip_profile("buenavista")
@@ -251,7 +209,7 @@ class TestNonDucklakeSortedBy:
         assert row_count == 2
 
 
-class TestSortedByValidation(BaseDucklakeSortedBy):
+class TestSortedByValidation(BaseDucklakeIntegration):
     @pytest.fixture(scope="class")
     def models(
         self,
