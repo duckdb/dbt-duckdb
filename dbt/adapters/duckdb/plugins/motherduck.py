@@ -87,4 +87,10 @@ class Plugin(BasePlugin):
         # If a user specified MotherDuck config options via the plugin config,
         # pass it to the config kwarg in duckdb.connect.
         if not creds.is_motherduck_attach:
-            config.update(self.get_md_config_settings(self._config))
+            md_config = self.get_md_config_settings(self._config)
+            config.update(md_config)
+            # MotherDuck config options can only be set at connection init,
+            # so remove them from settings to prevent SET statements on cursors
+            for key in md_config:
+                if creds.settings is not None:
+                    creds.settings.pop(key, None)
