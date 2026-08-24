@@ -2,6 +2,7 @@ import os
 import traceback
 from collections import defaultdict
 from dataclasses import dataclass
+from dataclasses import replace
 from datetime import datetime
 from functools import cached_property
 from typing import Any
@@ -45,6 +46,11 @@ from dbt.adapters.duckdb.utils import TargetLocation
 from dbt.adapters.events.logging import AdapterLogger
 from dbt.adapters.exceptions import IndexConfigError
 from dbt.adapters.exceptions import IndexConfigNotDictError
+from dbt.adapters.planning import ExistingIndexStrategy
+from dbt.adapters.planning import PlanProvenance
+from dbt.adapters.planning import TableDocumentationStrategy
+from dbt.adapters.planning import TableIndexStrategy
+from dbt.adapters.planning import TableLifecyclePlan
 from dbt.adapters.sql import SQLAdapter
 
 
@@ -119,6 +125,49 @@ class DuckDBAdapter(SQLAdapter):
     # can be overridden via the model config metadata
     _temp_schema_name = DEFAULT_TEMP_SCHEMA_NAME
     _temp_schema_model_uuid: dict[str, str] = defaultdict(lambda: str(uuid4()).split("-")[-1])
+
+    @available.parse_none
+    def plan_table_materialization(
+        self, materialization_macro_id: str, language: str, model: Optional[Any] = None
+    ) -> Optional[TableLifecyclePlan]:
+        if (
+            language != "sql"
+            or materialization_macro_id
+            != "macro.dbt_duckdb.materialization_table_duckdb"
+        ):
+            return super().plan_table_materialization(materialization_macro_id, language, model)
+        config = getattr(model, "config", None)
+        if config is not None and any(
+            config.get(name) is not None
+            for name in ("partitioned_by", "partition_by", "sorted_by", "sort_by")
+        ):
+            return None
+        return TableLifecyclePlan.stage_and_swap(
+            indexes=TableIndexStrategy.AFTER_SWAP,
+            existing_indexes=ExistingIndexStrategy.DROP_BEFORE_SWAP,
+            provenance=(
+                PlanProvenance(
+                    rule="materialization.table.stage_and_swap",
+                    detail="DuckDB applies indexes to the target relation after swapping",
+                ),
+            ),
+        )
+
+    @available
+    def resolve_table_lifecycle_plan(
+        self,
+        plan: TableLifecyclePlan,
+        model: Any,
+        target_relation: BaseRelation,
+        config: Any,
+    ) -> TableLifecyclePlan:
+        if not self.is_ducklake(target_relation):
+            return plan
+
+        return replace(
+            plan,
+            documentation=TableDocumentationStrategy.AFTER_COMMIT,
+        )
 
     @classmethod
     def date_function(cls) -> str:
