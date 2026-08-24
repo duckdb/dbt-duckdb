@@ -1,6 +1,10 @@
 import os
 import random
-import resource
+
+try:
+    import resource
+except ImportError:
+    resource = None
 import string
 import subprocess
 import time
@@ -11,10 +15,11 @@ import pytest
 
 from tests.ducklake import configure_ducklake_profile
 
-# Increase the number of open files allowed
+# Increase the number of open files allowed on platforms where resource is available
 # Hack for https://github.com/dbt-labs/dbt-core/issues/7316
-soft_limit, hard_limit = resource.getrlimit(resource.RLIMIT_NOFILE)
-resource.setrlimit(resource.RLIMIT_NOFILE, (hard_limit, hard_limit))
+if resource is not None:
+    soft_limit, hard_limit = resource.getrlimit(resource.RLIMIT_NOFILE)
+    resource.setrlimit(resource.RLIMIT_NOFILE, (hard_limit, hard_limit))
 
 # Import the standard functional fixtures as a plugin
 # Note: fixtures with session scope need to be local
@@ -127,7 +132,9 @@ def bv_server_process(profile_type):
 # The profile dictionary, used to write out profiles.yml
 # dbt will supply a unique schema per test, so we do not specify 'schema' here
 @pytest.fixture(scope="session")
-def dbt_profile_target(profile_type, database_type, bv_server_process, tmpdir_factory, request):
+def dbt_profile_target(
+    profile_type, database_type, bv_server_process, tmpdir_factory, request
+):
     profile = {"type": "duckdb", "threads": 4}
 
     if profile_type == "buenavista":
@@ -141,7 +148,10 @@ def dbt_profile_target(profile_type, database_type, bv_server_process, tmpdir_fa
         profile["path"] = str(tmpdir_factory.mktemp("dbs") / "tmp.db")
     elif profile_type == "md":
         # Test against MotherDuck
-        if MOTHERDUCK_TOKEN not in os.environ and MOTHERDUCK_TOKEN.lower() not in os.environ:
+        if (
+            MOTHERDUCK_TOKEN not in os.environ
+            and MOTHERDUCK_TOKEN.lower() not in os.environ
+        ):
             if TEST_MOTHERDUCK_TOKEN not in os.environ:
                 raise ValueError(
                     f"Please set the {MOTHERDUCK_TOKEN} or {TEST_MOTHERDUCK_TOKEN} \
@@ -149,7 +159,9 @@ def dbt_profile_target(profile_type, database_type, bv_server_process, tmpdir_fa
                 )
             profile["token"] = os.environ.get(TEST_MOTHERDUCK_TOKEN)
         else:
-            profile["token"] = os.environ.get(MOTHERDUCK_TOKEN, os.environ.get(MOTHERDUCK_TOKEN.lower()))
+            profile["token"] = os.environ.get(
+                MOTHERDUCK_TOKEN, os.environ.get(MOTHERDUCK_TOKEN.lower())
+            )
         profile["disable_transactions"] = True
         db_name = request.getfixturevalue("test_database_name")
         profile["path"] = f"md:{db_name}"
@@ -184,9 +196,13 @@ def mark_skipped_by_config(items, marker_name, selected_value):
 
     for item in items:
         for marker in item.iter_markers(marker_name):
-            unknown_values = [value for value in marker.args if value not in known_values]
+            unknown_values = [
+                value for value in marker.args if value not in known_values
+            ]
             if not marker.args or unknown_values:
-                supplied_values = ", ".join(repr(value) for value in marker.args) or "none"
+                supplied_values = (
+                    ", ".join(repr(value) for value in marker.args) or "none"
+                )
                 expected_values = ", ".join(repr(value) for value in known_values)
                 raise pytest.UsageError(
                     f"{item.nodeid}: {marker_name} has unknown {value_description} "
@@ -219,7 +235,9 @@ def pytest_collection_modifyitems(config, items):
     skip_s3 = None
     # Skip the S3 tests if the secrets are not available
     if not (
-        os.getenv("S3_MD_ORG_KEY") and os.getenv("S3_MD_ORG_REGION") and os.getenv("S3_MD_ORG_SECRET")
+        os.getenv("S3_MD_ORG_KEY")
+        and os.getenv("S3_MD_ORG_REGION")
+        and os.getenv("S3_MD_ORG_SECRET")
     ):
         skip_s3 = pytest.mark.skip(reason="need S3 credentials to run this test")
 
@@ -227,8 +245,10 @@ def pytest_collection_modifyitems(config, items):
     try:
         duckdb.sql("install httpfs")
     except duckdb.Error as e:
-        if "Failed to download extension \"httpfs\"" in str(e):
-            skip_s3 = pytest.mark.skip(reason="httpfs not available and is needed for setting s3 credentials")
+        if 'Failed to download extension "httpfs"' in str(e):
+            skip_s3 = pytest.mark.skip(
+                reason="httpfs not available and is needed for setting s3 credentials"
+            )
 
     # Skip ducklake tests if the extension is unavailable
     skip_ducklake = None
