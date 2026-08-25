@@ -10,6 +10,7 @@ from dbt.tests.adapter.constraints.test_constraints import (
     BaseIncrementalConstraintsRollback,
     BaseModelConstraintsRuntimeEnforcement,
 )
+from dbt.tests.util import run_dbt
 
 
 pytestmark = pytest.mark.skip_database_type(
@@ -103,3 +104,48 @@ class TestModelConstraintsRuntimeEnforcement(
     @pytest.fixture(scope="class")
     def expected_error_messages(self):
         return ["NOT NULL constraint failed"]
+
+
+@pytest.mark.skip_profile("md", "buenavista")
+class TestCompositeModelLevelForeignKey:
+    @pytest.fixture(scope="class")
+    def models(self):
+        return {
+            "parent.sql": "select 1 as id, 'parent' as type",
+            "child.sql": "select 1 as parent_id, 'parent' as parent_type",
+            "schema.yml": """
+version: 2
+models:
+  - name: parent
+    config:
+      contract:
+        enforced: true
+    constraints:
+      - type: primary_key
+        columns: [id, type]
+    columns:
+      - name: id
+        data_type: integer
+      - name: type
+        data_type: varchar
+  - name: child
+    config:
+      contract:
+        enforced: true
+    constraints:
+      - type: foreign_key
+        columns: [parent_id, parent_type]
+        to: ref('parent')
+        to_columns: [id, type]
+    columns:
+      - name: parent_id
+        data_type: integer
+      - name: parent_type
+        data_type: varchar
+""",
+        }
+
+    def test_composite_model_level_foreign_key(self, project):
+        results = run_dbt(["run"])
+
+        assert len(results) == 2

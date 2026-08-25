@@ -2,6 +2,9 @@ import unittest
 from argparse import Namespace
 from unittest import mock
 
+from dbt_common.contracts.constraints import ColumnLevelConstraint
+from dbt_common.contracts.constraints import ConstraintType
+from dbt_common.contracts.constraints import ModelLevelConstraint
 from dbt.flags import set_from_args
 from dbt.adapters.duckdb import DuckDBAdapter
 from dbt.adapters.duckdb.connections import DuckDBConnectionManager
@@ -75,6 +78,34 @@ class TestDuckDBAdapter(unittest.TestCase):
             self.assertIsNone(self.adapter.expand_column_types(mock.MagicMock(), mock.MagicMock()))
             get_cols.assert_not_called()
             alter.assert_not_called()
+
+    def test_render_column_foreign_key_omits_database(self):
+        constraint = ColumnLevelConstraint(
+            type=ConstraintType.foreign_key,
+            to='"database"."schema"."parent"',
+            to_columns=["id"],
+        )
+
+        rendered = self.adapter.render_column_constraint(constraint)
+
+        self.assertEqual(rendered, 'references "schema"."parent" (id)')
+
+    def test_render_model_foreign_key_omits_database(self):
+        constraint = ModelLevelConstraint(
+            type=ConstraintType.foreign_key,
+            name="child_parent_fk",
+            columns=["parent_id", "parent_type"],
+            to='"database"."schema"."parent"',
+            to_columns=["id", "type"],
+        )
+
+        rendered = self.adapter.render_model_constraint(constraint)
+
+        self.assertEqual(
+            rendered,
+            'constraint child_parent_fk foreign key (parent_id, parent_type) '
+            'references "schema"."parent" (id, type)',
+        )
 
 
 class TestDuckDBAdapterWithSecrets(unittest.TestCase):
