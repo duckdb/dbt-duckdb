@@ -12,6 +12,7 @@ from uuid import uuid4
 
 from dbt_common.contracts.constraints import ColumnLevelConstraint
 from dbt_common.contracts.constraints import ConstraintType
+from dbt_common.contracts.constraints import ModelLevelConstraint
 from dbt_common.dataclass_schema import dbtClassMixin
 from dbt_common.dataclass_schema import ValidationError
 from dbt_common.exceptions import DbtDatabaseError
@@ -396,18 +397,37 @@ class DuckDBAdapter(SQLAdapter):
         rendering."""
         if constraint.type == ConstraintType.foreign_key:
             if constraint.to and constraint.to_columns:
-                # TODO: this is a hack to get around a limitation in DuckDB around setting FKs
-                # across databases.
-                pieces = constraint.to.split(".")
-                if len(pieces) > 2:
-                    constraint_to = ".".join(pieces[1:])
-                else:
-                    constraint_to = constraint.to
+                constraint_to = cls._constraint_target_without_database(constraint.to)
                 return f"references {constraint_to} ({', '.join(constraint.to_columns)})"
             else:
                 return f"references {constraint.expression}"
         else:
             return super().render_column_constraint(constraint)
+
+    @classmethod
+    def render_model_constraint(cls, constraint: ModelLevelConstraint) -> Optional[str]:
+        if (
+            constraint.type == ConstraintType.foreign_key
+            and constraint.to
+            and constraint.to_columns
+        ):
+            constraint_prefix = f"constraint {constraint.name} " if constraint.name else ""
+            column_list = ", ".join(constraint.columns)
+            constraint_to = cls._constraint_target_without_database(constraint.to)
+            return (
+                f"{constraint_prefix}foreign key ({column_list}) references "
+                f"{constraint_to} ({', '.join(constraint.to_columns)})"
+            )
+        return super().render_model_constraint(constraint)
+
+    @staticmethod
+    def _constraint_target_without_database(constraint_to: str) -> str:
+        # DuckDB does not accept a catalog-qualified foreign key target, even when
+        # the target is in the current catalog.
+        pieces = constraint_to.split(".")
+        if len(pieces) > 2:
+            return ".".join(pieces[1:])
+        return constraint_to
 
     def _clean_up_temp_relation_for_incremental(self, config):
         if self.is_motherduck() and hasattr(config, "model"):
