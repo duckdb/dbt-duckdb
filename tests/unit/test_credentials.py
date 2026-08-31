@@ -455,3 +455,38 @@ def test_add_secret_with_list():
     allowed_hosts array ['host1', 'host2', 'host3']
 )"""
     assert sql == expected
+
+
+def test_motherduck_token_top_level():
+    creds = DuckDBCredentials(path="md:my_db", motherduck_token="quack")
+    assert creds.settings["motherduck_token"] == "quack"
+    # the auto-added motherduck plugin moves the token from the settings
+    # into the duckdb.connect config for non-attach connections
+    assert "motherduck" in [p.module for p in creds.plugins]
+    from dbt.adapters.duckdb.plugins import BasePlugin
+
+    plugin = BasePlugin.create("motherduck", credentials=creds)
+    config = {}
+    plugin.update_connection_config(creds, config)
+    assert config["motherduck_token"] == "quack"
+    assert "motherduck_token" not in creds.settings
+
+
+def test_motherduck_token_top_level_matching_settings():
+    creds = DuckDBCredentials(
+        path="md:my_db",
+        motherduck_token="quack",
+        settings={"motherduck_token": "quack"},
+    )
+    assert creds.settings["motherduck_token"] == "quack"
+
+
+def test_motherduck_token_conflict():
+    from dbt_common.exceptions import DbtRuntimeError
+
+    with pytest.raises(DbtRuntimeError):
+        DuckDBCredentials(
+            path="md:my_db",
+            motherduck_token="quack",
+            settings={"motherduck_token": "honk"},
+        )
