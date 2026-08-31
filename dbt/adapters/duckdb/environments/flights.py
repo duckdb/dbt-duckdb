@@ -54,13 +54,26 @@ MAX_FLIGHT_NAME_LENGTH = 120
 FLIGHT_ENTRYPOINT = """
 
 # --- dbt-duckdb flight entrypoint (generated) ---
+__dbt_settings = {settings!r}
+
+
+def __dbt_apply_settings(cursor):
+    # The profile's `settings` are applied to every cursor the local
+    # environment hands a Python model (see Environment.initialize_cursor), so
+    # apply them here too; otherwise the same model produces different results
+    # depending on where it was submitted.
+    for statement in __dbt_settings:
+        cursor.execute(statement)
+
+
 def main():
     import duckdb as _duckdb
 
     con = _duckdb.connect("md:")
+    __dbt_apply_settings(con)
 
     def load_df_function(table_name):
-        return con.query(f"select * from {table_name}")
+        return con.query(f"select * from {{table_name}}")
 
     dbt = dbtObj(load_df_function)
     df = model(dbt, con)
@@ -69,12 +82,26 @@ def main():
         # cursor boundaries, so materialize it on the same cursor.
         materialize(df, con)
     else:
-        materialize(df, con.cursor())
+        write_cursor = con.cursor()
+        __dbt_apply_settings(write_cursor)
+        materialize(df, write_cursor)
 
 
 if __name__ == "__main__":
     main()
 """
+
+
+def _distribution_name(requirement: str) -> Optional[str]:
+    """The distribution a requirements.txt line pins, normalized per PEP 503.
+
+    Returns None for lines that are not a plain requirement (pip options, URLs
+    without an egg name), which are passed through untouched.
+    """
+    match = re.match(r"^([A-Za-z0-9][A-Za-z0-9._-]*)\s*(?:\[|[=<>!~;@]|$)", requirement)
+    if not match:
+        return None
+    return re.sub(r"[-_.]+", "-", match.group(1)).lower()
 
 
 def _sanitize(value: str) -> str:
@@ -105,9 +132,19 @@ def flight_name(parsed_model: Dict[str, Any], prefix: str = "dbt") -> str:
     return name
 
 
-def build_source(compiled_code: str) -> str:
+def settings_statements(settings: Optional[Dict[str, Any]]) -> List[str]:
+    """Render the profile's `settings` as SET statements for the Flight.
+
+    Mirrors Environment.initialize_cursor: values go in as strings and DuckDB
+    casts them to the setting's type.
+    """
+    return [f"SET {key} = '{escape_sql_string(value)}'" for key, value in (settings or {}).items()]
+
+
+def build_source(compiled_code: str, settings: Optional[Dict[str, Any]] = None) -> str:
     """Turn a model's compiled Python into a Flight entrypoint."""
-    source = compiled_code.lstrip() + FLIGHT_ENTRYPOINT
+    entrypoint = FLIGHT_ENTRYPOINT.format(settings=settings_statements(settings))
+    source = compiled_code.lstrip() + entrypoint
     size = len(source.encode("utf-8"))
     if size > MAX_SOURCE_BYTES:
         raise DbtRuntimeError(
@@ -128,18 +165,34 @@ def build_requirements(parsed_model: Dict[str, Any], config: FlightConfig) -> st
     the local environment, where the model runs in dbt's own interpreter, but
     it is load-bearing here.
     """
-    packages: List[str] = []
-    packages.extend(config.requirements or [])
-    packages.extend(parsed_model.get("config", {}).get("packages") or [])
-
     # Pin duckdb to whatever the local client uses. That version is known to be
     # accepted by MotherDuck (we are talking to it right now), whereas an
     # unpinned install can pick up a newer PyPI release that MotherDuck
-    # rejects at connect time. A user-supplied pin wins.
-    if not any(re.match(r"^duckdb\b", p.strip(), re.IGNORECASE) for p in packages):
-        packages.insert(0, f"duckdb=={config.duckdb_version or duckdb.__version__}")
+    # rejects at connect time.
+    #
+    # Later sources override earlier ones for the same distribution, so a
+    # model's own `packages` beat the profile-wide `flights.requirements`,
+    # which in turn beat the default duckdb pin. Emitting both would leave the
+    # installer to fail on two conflicting pins for one distribution.
+    packages: List[str] = [f"duckdb=={config.duckdb_version or duckdb.__version__}"]
+    packages.extend(config.requirements or [])
+    packages.extend((parsed_model.get("config") or {}).get("packages") or [])
 
-    requirements = "\n".join(packages) + "\n"
+    resolved: Dict[str, str] = {}
+    passthrough: List[str] = []
+    for package in packages:
+        entry = package.strip()
+        if not entry:
+            continue
+        name = _distribution_name(entry)
+        if name is None:
+            # pip options (-r, --index-url, ...) and anything else we cannot
+            # attribute to a distribution: keep in order, do not deduplicate.
+            passthrough.append(entry)
+        else:
+            resolved[name] = entry
+
+    requirements = "\n".join(passthrough + list(resolved.values())) + "\n"
     size = len(requirements.encode("utf-8"))
     if size > MAX_REQUIREMENTS_BYTES:
         raise DbtRuntimeError(
@@ -157,15 +210,16 @@ class FlightRunner:
     a model fails.
     """
 
-    def __init__(self, config: FlightConfig):
+    def __init__(self, config: FlightConfig, settings: Optional[Dict[str, Any]] = None):
         self._config = config
+        self._settings = settings
         # Flight name -> id, so repeat models in one dbt invocation skip the
         # lookup. Ids are stable for a Flight's lifetime.
         self._flight_ids: Dict[str, str] = {}
 
     def submit(self, cursor, parsed_model: Dict[str, Any], compiled_code: str) -> AdapterResponse:
         name = flight_name(parsed_model, self._config.name_prefix)
-        source = build_source(compiled_code)
+        source = build_source(compiled_code, self._settings)
         requirements = build_requirements(parsed_model, self._config)
 
         flight_id = self._upsert_flight(cursor, name, source, requirements)
@@ -299,13 +353,37 @@ class FlightRunner:
             if status in TERMINAL_STATUSES:
                 return status, row[1]
             if time.monotonic() > deadline:
+                # Cancel rather than walk away: an abandoned run would keep
+                # going and commit the model table well after dbt reported the
+                # node as failed, and a retry would race a second run writing
+                # the same relation.
+                cancelled = self._cancel_run(cursor, flight_id, run_number)
                 raise DbtRuntimeError(
                     f"Timed out after {self._config.timeout_sec}s waiting for MotherDuck "
-                    f"Flight '{name}' run {run_number} (last status: {status}). The run may "
-                    "still be going; check it in MotherDuck, and raise "
-                    "`flights.timeout_sec` if the model needs longer."
+                    f"Flight '{name}' run {run_number} (last status: {status}). "
+                    + (
+                        "The run was cancelled. "
+                        if cancelled
+                        else "The run could not be cancelled and may still be going; "
+                        "check it in MotherDuck. "
+                    )
+                    + "Raise `flights.timeout_sec` if the model needs longer."
                 )
             time.sleep(self._config.poll_interval_sec)
+
+    def _cancel_run(self, cursor, flight_id: str, run_number: int) -> bool:
+        try:
+            self._query_one(
+                cursor,
+                "SELECT * FROM MD_CANCEL_FLIGHT_RUN("
+                f"flight_id := '{flight_id}', run_number := {run_number})",
+            )
+            return True
+        except Exception as err:
+            # Losing the race against a run that just finished is normal, and a
+            # failed cancel must not mask the timeout we are reporting.
+            logger.debug(f"Could not cancel flight run {run_number}: {err}")
+            return False
 
     def _run_logs(self, cursor, flight_id: str, run_number: int) -> str:
         """Fetch the tail of a run's logs, for attaching to a failure."""

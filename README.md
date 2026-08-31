@@ -855,12 +855,19 @@ dbt keeps one Flight per model, named after the model's project, database, schem
 when the model's code or requirements actually change — so each model gets its own run and version history in the
 MotherDuck UI. If a run fails, the tail of its log is attached to the dbt error.
 
-Two things are worth knowing before you turn this on:
+Three things are worth knowing before you turn this on:
 
 * **This is how you run Python models under MotherDuck SaaS mode.** Local execution is blocked there because the model
   would run with full filesystem access on the dbt host; a Flight has no such access to your machine.
 * **Each model run costs roughly ten seconds of fixed overhead** (container start plus dependency install), so it pays
   off for models that need the remote compute, not for small ones that were fine locally.
+* **A Flight's writes are not part of dbt's transaction.** The Flight commits from its own MotherDuck session, so unlike
+  a locally executed Python model, its table survives a rollback later in the same dbt run. A model that fails after
+  materializing can leave a populated table behind.
+
+Only databases a Flight can reach are eligible: your connection has to target a MotherDuck database, and models in a
+local catalog (or in a MotherDuck attachment given a different local alias) are rejected before a run is started, since
+the Flight's own `md:` connection cannot resolve those names.
 
 Because the model body runs on MotherDuck rather than on your machine, anything host-local is unavailable to it: local
 files, modules from `module_paths`, secrets/filesystems/extensions configured on your local connection, non-MotherDuck

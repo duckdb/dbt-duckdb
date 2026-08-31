@@ -28,6 +28,11 @@ def parsed_model(**config):
     }
 
 
+def credentials(**kwargs):
+    # from_dict so `database` is derived from `path` the way dbt does it
+    return DuckDBCredentials.from_dict({"schema": "main", "path": "md:my_db", **kwargs})
+
+
 class FakeCursor:
     """Stands in for a DuckDB cursor, recording SQL and replaying canned rows."""
 
@@ -110,6 +115,46 @@ def test_build_requirements_adds_profile_requirements():
     assert requirements == ["duckdb==1.5.5", "pandas==2.2.3"]
 
 
+def test_model_packages_override_profile_requirements():
+    # Two pins for one distribution would make the installer fail before the
+    # model ever runs, so the more specific one has to win outright.
+    config = FlightConfig(requirements=["pandas==2.2.3"], duckdb_version="1.5.5")
+    requirements = build_requirements(parsed_model(packages=["pandas==2.1.0"]), config)
+    assert requirements.splitlines() == ["duckdb==1.5.5", "pandas==2.1.0"]
+
+
+def test_build_requirements_normalizes_distribution_names():
+    config = FlightConfig(requirements=["scikit_learn==1.4.0"])
+    requirements = build_requirements(parsed_model(packages=["Scikit-Learn==1.5.0"]), config)
+    assert "scikit_learn==1.4.0" not in requirements
+    assert "Scikit-Learn==1.5.0" in requirements
+
+
+def test_build_requirements_handles_extras_and_markers():
+    config = FlightConfig(requirements=["pandas[performance]==2.2.3"])
+    requirements = build_requirements(parsed_model(packages=["pandas==2.1.0"]), config)
+    assert "pandas[performance]==2.2.3" not in requirements
+    assert "pandas==2.1.0" in requirements
+
+
+def test_build_requirements_passes_pip_options_through():
+    config = FlightConfig(requirements=["--index-url https://example.com/simple", "pandas==2.2.3"])
+    lines = build_requirements(parsed_model(), config).splitlines()
+    assert lines[0] == "--index-url https://example.com/simple"
+    assert "pandas==2.2.3" in lines
+
+
+def test_build_source_applies_profile_settings():
+    source = build_source(COMPILED_CODE, {"TimeZone": "UTC"})
+    assert "SET TimeZone = 'UTC'" in source
+    # ...on the write cursor too, matching Environment.initialize_cursor
+    assert source.count("__dbt_apply_settings(") == 3
+
+
+def test_build_source_without_settings_is_a_no_op():
+    assert "__dbt_settings = []" in build_source(COMPILED_CODE)
+
+
 def _runner_cursor(status="SUCCEEDED", existing=None):
     """A cursor wired for the create-run-poll path."""
     return FakeCursor(
@@ -175,6 +220,30 @@ def test_submit_raises_with_logs_when_the_run_fails():
     assert "ValueError: nope" in message
 
 
+def test_submit_cancels_the_run_when_it_times_out():
+    cursor = _runner_cursor(status="RUNNING")
+    cursor.responses["MD_CANCEL_FLIGHT_RUN"] = [(True,)]
+
+    with pytest.raises(DbtRuntimeError) as excinfo:
+        # timeout_sec=0 means the deadline has already passed on the first poll
+        FlightRunner(FlightConfig(timeout_sec=0)).submit(cursor, parsed_model(), COMPILED_CODE)
+
+    # An abandoned run would commit the table after dbt gave up on the node
+    assert cursor.sql_containing("MD_CANCEL_FLIGHT_RUN")
+    assert "was cancelled" in str(excinfo.value)
+
+
+def test_submit_reports_a_failed_cancel_without_masking_the_timeout():
+    cursor = _runner_cursor(status="RUNNING")  # no MD_CANCEL_FLIGHT_RUN response -> raises
+
+    with pytest.raises(DbtRuntimeError) as excinfo:
+        FlightRunner(FlightConfig(timeout_sec=0)).submit(cursor, parsed_model(), COMPILED_CODE)
+
+    message = str(excinfo.value)
+    assert "Timed out" in message
+    assert "could not be cancelled" in message
+
+
 def test_submit_passes_optional_flight_settings():
     cursor = _runner_cursor()
     config = FlightConfig(access_token_name="analytics-token", max_runtime_sec=900)
@@ -185,8 +254,8 @@ def test_submit_passes_optional_flight_settings():
     assert "max_runtime_sec := 900" in create
 
 
-def _env(**flight_kwargs):
-    creds = DuckDBCredentials(path="md:my_db")
+def _env(creds=None, **flight_kwargs):
+    creds = creds or credentials()
     if flight_kwargs:
         creds.flights = FlightConfig(**flight_kwargs)
     return MotherDuckEnvironment(creds)
@@ -207,8 +276,84 @@ def test_submission_method_profile_default_can_be_overridden_per_model():
 
 
 def test_submission_method_rejects_unknown_values():
-    with pytest.raises(ValueError, match="Unsupported submission_method"):
+    with pytest.raises(DbtRuntimeError, match="Unsupported submission_method"):
         _env().submission_method(parsed_model(submission_method="spark"))
+
+
+def test_flight_target_accepts_a_motherduck_database():
+    _env().validate_flight_target(parsed_model())
+
+
+def test_flight_target_rejects_a_local_primary_connection():
+    # MotherDuck attached to a local database still selects MotherDuckEnvironment,
+    # but a Flight cannot see the local `memory` catalog the model targets.
+    creds = DuckDBCredentials.from_dict(
+        {
+            "database": "memory",
+            "schema": "main",
+            "path": ":memory:",
+            "attach": [{"path": "md:my_db"}],
+        }
+    )
+    model = parsed_model()
+    model["database"] = "memory"
+    with pytest.raises(DbtRuntimeError) as excinfo:
+        _env(creds).validate_flight_target(model)
+    # and the error names the database that *is* reachable
+    assert "not reachable from a MotherDuck Flight" in str(excinfo.value)
+    assert "my_db" in str(excinfo.value)
+
+
+def test_flight_target_rejects_a_profile_with_no_reachable_database():
+    # Every MotherDuck attachment is aliased, so none of them resolve remotely
+    creds = DuckDBCredentials.from_dict(
+        {
+            "database": "memory",
+            "schema": "main",
+            "path": ":memory:",
+            "attach": [{"path": "md:my_db", "alias": "aliased"}],
+        }
+    )
+    model = parsed_model()
+    model["database"] = "aliased"
+    with pytest.raises(DbtRuntimeError, match="only be submitted to MotherDuck Flights"):
+        _env(creds).validate_flight_target(model)
+
+
+def test_flight_target_accepts_an_unaliased_motherduck_attachment():
+    creds = DuckDBCredentials.from_dict(
+        {
+            "database": "memory",
+            "schema": "main",
+            "path": ":memory:",
+            "attach": [{"path": "md:my_db"}],
+        }
+    )
+    _env(creds).validate_flight_target(parsed_model())
+
+
+def test_flight_target_rejects_a_database_the_flight_cannot_see():
+    # An aliased attachment resolves locally but not inside the Flight, whose
+    # fresh md: connection only knows MotherDuck's own database names.
+    creds = DuckDBCredentials.from_dict(
+        {
+            "database": "my_db",
+            "schema": "main",
+            "path": "md:my_db",
+            "attach": [{"path": "md:other_db", "alias": "aliased"}],
+        }
+    )
+    model = parsed_model()
+    model["database"] = "aliased"
+    with pytest.raises(DbtRuntimeError, match="not reachable from a MotherDuck Flight"):
+        _env(creds).validate_flight_target(model)
+
+
+def test_flight_runner_is_shared_and_carries_profile_settings():
+    env = _env(credentials(settings={"TimeZone": "UTC"}))
+    runner = env.flight_runner()
+    assert env.flight_runner() is runner
+    assert runner._settings == {"TimeZone": "UTC"}
 
 
 def test_flights_block_parses_from_a_profile():

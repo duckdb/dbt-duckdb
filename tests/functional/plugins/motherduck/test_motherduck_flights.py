@@ -4,6 +4,7 @@ These run real Flights, which cost MotherDuck compute and take ~10s each, and
 require an account with Flights enabled. They are opt-in: set
 DBT_DUCKDB_TEST_FLIGHTS=1 to run them.
 """
+
 import os
 
 import pytest
@@ -53,16 +54,29 @@ class TestMotherDuckFlightPythonModel:
 
         # The Flight wrote the table from its own session; this assertion also
         # covers the cross-session visibility the incremental path depends on.
-        rows = project.run_sql(
-            "select grp, n from flight_model order by grp", fetch="all"
-        )
+        rows = project.run_sql("select grp, n from flight_model order by grp", fetch="all")
         assert [(row[0], row[1]) for row in rows] == [(0, 33), (1, 34), (2, 33)]
 
     def test_rerun_reuses_the_flight(self, project):
-        # A second run of unchanged code must not fail, and must not need a new
-        # Flight version -- the runner compares against the current version.
+        # Unchanged code must not mint a new Flight version on every dbt run,
+        # so assert on the version itself: the row count is identical either
+        # way and would not catch a regression in the reuse check.
         run_dbt(["run"])
+
+        # Resolved in two steps: MotherDuck's table functions reject subqueries
+        # in their arguments.
+        (flight_id,) = project.run_sql(
+            'select flight_id from MD_LIST_FLIGHTS("limit" := 200, owner_only := true) '
+            "where flight_name like '%-flight_model'",
+            fetch="one",
+        )
+        version_sql = f"select current_version from MD_GET_FLIGHT(flight_id := '{flight_id}')"
+        (before,) = project.run_sql(version_sql, fetch="one")
+
         run_dbt(["run"])
+        (after,) = project.run_sql(version_sql, fetch="one")
+
+        assert after == before
         (count,) = project.run_sql("select count(*) from flight_model", fetch="one")
         assert count == 3
 
