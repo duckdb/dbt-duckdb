@@ -147,5 +147,15 @@ class BasePlugin:
         """
         pass
 
+    def modify_cursor(self, cursor: DuckDBPyConnection) -> DuckDBPyConnection:
+        """
+        Modify each copy of the DuckDB cursor.
+        This method should be overridden by subclasses to extend the behaviour of cursor
+
+        :param cursor: A DuckDBPyConnection instance to be modified.
+        :return: A DuckDBPyConnection instance.
+        """
+        return cursor
+
     def default_materialization(self):
         return "table"
