@@ -2,7 +2,7 @@
 
 These run real Flights, which cost MotherDuck compute and take ~10s each, and
 require an account with Flights enabled. They are opt-in: set
-DBT_DUCKDB_TEST_FLIGHTS=1 to run them.
+DBT_DUCKDB_TEST_FLIGHTS=1 to run them (`tox -e md-flights`).
 """
 
 import os
@@ -10,10 +10,22 @@ import os
 import pytest
 from dbt.tests.util import run_dbt
 
-pytestmark = pytest.mark.skipif(
-    os.getenv("DBT_DUCKDB_TEST_FLIGHTS", "") not in ("1", "true", "True"),
-    reason="Set DBT_DUCKDB_TEST_FLIGHTS=1 to run tests that execute real MotherDuck Flights",
-)
+FLIGHTS_ENABLED = os.getenv("DBT_DUCKDB_TEST_FLIGHTS", "") in ("1", "true", "True")
+
+
+class FlightTestBase:
+    @pytest.fixture(autouse=True)
+    def require_flights(self, project):
+        if not FLIGHTS_ENABLED:
+            pytest.skip(
+                "Set DBT_DUCKDB_TEST_FLIGHTS=1 to run tests that execute real MotherDuck Flights"
+            )
+        # Turning the flag on for an account without Flights should skip, not
+        # fail: this suite would otherwise take down the whole MotherDuck job.
+        try:
+            project.run_sql('select 1 from MD_LIST_FLIGHTS("limit" := 1)', fetch="all")
+        except Exception as err:
+            pytest.skip(f"MotherDuck Flights are not available on this account: {err}")
 
 upstream_sql = """
 {{ config(materialized='table') }}
@@ -41,7 +53,7 @@ def model(dbt, session):
 
 
 @pytest.mark.skip_profile("buenavista", "file", "memory")
-class TestMotherDuckFlightPythonModel:
+class TestMotherDuckFlightPythonModel(FlightTestBase):
     @pytest.fixture(scope="class")
     def models(self):
         return {
@@ -82,7 +94,7 @@ class TestMotherDuckFlightPythonModel:
 
 
 @pytest.mark.skip_profile("buenavista", "file", "memory")
-class TestMotherDuckFlightsEnabledByDefault:
+class TestMotherDuckFlightsEnabledByDefault(FlightTestBase):
     @pytest.fixture(scope="class")
     def profiles_config_update(self, dbt_profile_target, test_database_name):
         return {
@@ -91,6 +103,12 @@ class TestMotherDuckFlightsEnabledByDefault:
                     "dev": {
                         "type": "duckdb",
                         "path": f"md:{test_database_name}",
+                        # config_options carries MD_TEST_CONFIG_OPTIONS, which every
+                        # profile whose primary database is md:{database_name} needs:
+                        # without it a lingering instance makes the next test's
+                        # connection to the same path fail (see tests/conftest.py).
+                        "config_options": dbt_profile_target.get("config_options"),
+                        "is_ducklake": dbt_profile_target.get("is_ducklake"),
                         "flights": {"enabled_by_default": True},
                     }
                 },
