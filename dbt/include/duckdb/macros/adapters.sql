@@ -251,6 +251,20 @@ def materialize(df, con):
   );
 {% endmacro %}
 
+{% macro duckdb__get_empty_subquery_sql(select_sql, select_sql_header=none) %}
+    {#- get_column_schema_from_query wraps this in DESCRIBE (...), which cannot parse
+        an inlined sql_header (issue #515), so run the header separately to keep its
+        session effects visible to the describe -#}
+    {%- if select_sql_header is not none -%}
+      {%- do run_query(select_sql_header) -%}
+    {%- endif -%}
+    select * from (
+        {{ select_sql }}
+    ) as __dbt_sbq
+    where false
+    limit 0
+{% endmacro %}
+
 {% macro duckdb__get_columns_in_relation(relation) -%}
   {# DESCRIBE avoids the global information_schema.columns scan, which forces a full
      catalog load on attached catalogs like DuckLake (issue #762). DuckDB's column_type
