@@ -494,6 +494,39 @@ relative to the current working directory, but you can change the default direct
 
 Unfortunately incremental materialization strategies are not yet supported for `external` models.
 
+##### Registering external files in a DuckLake catalog
+
+The built-in `ducklake` plugin registers the parquet file written by an `external` model into an attached
+[DuckLake](https://ducklake.select/) catalog via
+[`ducklake_add_data_files`](https://ducklake.select/docs/stable/duckdb/maintenance/add_files) — the file is added to the
+lake's metadata without being copied. The lake table is created from the parquet schema if it does not exist yet.
+
+```yaml
+default:
+  outputs:
+    dev:
+      type: duckdb
+      path: /tmp/dbt.duckdb
+      attach:
+        - path: "ducklake:metadata.ducklake"
+          alias: my_lake
+      plugins:
+        - module: ducklake
+          config:
+            database: my_lake
+```
+
+```
+{{ config(materialized='external', plugin='ducklake') }}
+SELECT ...
+```
+
+The target DuckLake database is set via the `database` plugin config or per-model with `ducklake_database`. Optional
+model (or plugin) configs: `ducklake_schema` (default `main`), `ducklake_table` (default: the model name), and the
+`ignore_extra_columns`/`allow_missing_columns` options of `ducklake_add_data_files`. Note that the file must be
+readable where the catalog runs its queries: registering files from a local disk into a remote (e.g.
+MotherDuck-managed) DuckLake catalog will not work — write the model to object storage the catalog can read instead.
+
 
 #### Incremental Strategy Configuration
 
