@@ -817,6 +817,63 @@ object that can be easily converted into a Pandas/Polars DataFrame or an Arrow t
 any Python object that DuckDB knows how to turn into a table, including a Pandas/Polars `DataFrame`, a DuckDB `Relation`, or an Arrow `Table`,
 `Dataset`, `RecordBatchReader`, or `Scanner`.
 
+#### Running Python models on MotherDuck Flights
+
+By default a Python model runs in the dbt process itself. On MotherDuck you can instead submit it to a
+[Flight](https://motherduck.com/docs/concepts/flights/), which runs the model in a MotherDuck-managed container next to
+your data. Set `submission_method` on the model:
+
+```python
+def model(dbt, session):
+    dbt.config(
+        materialized="table",
+        submission_method="flight",
+        packages=["pandas==2.2.3", "scikit-learn==1.5.0"],
+    )
+    ...
+```
+
+or make it the default for every Python model in the project via your profile:
+
+```yaml
+default:
+  outputs:
+    dev:
+      type: duckdb
+      path: md:my_db
+      flights:
+        enabled_by_default: true    # individual models can still set submission_method: local
+        access_token_name: analytics-token  # defaults to MotherDuck's built-in Flights token
+        max_runtime_sec: 1800       # per-run timeout enforced by MotherDuck
+        timeout_sec: 3600           # how long dbt waits for the run to finish
+        poll_interval_sec: 2.0
+        requirements:               # added to every model's own `packages`
+          - pandas==2.2.3
+```
+
+dbt keeps one Flight per model, named after the model's project, database, schema, and identifier, and updates it only
+when the model's code or requirements actually change — so each model gets its own run and version history in the
+MotherDuck UI. If a run fails, the tail of its log is attached to the dbt error.
+
+Three things are worth knowing before you turn this on:
+
+* **This is how you run Python models under MotherDuck SaaS mode.** Local execution is blocked there because the model
+  would run with full filesystem access on the dbt host; a Flight has no such access to your machine.
+* **Each model run costs roughly ten seconds of fixed overhead** (container start plus dependency install), so it pays
+  off for models that need the remote compute, not for small ones that were fine locally.
+* **A Flight's writes are not part of dbt's transaction.** The Flight commits from its own MotherDuck session, so unlike
+  a locally executed Python model, its table survives a rollback later in the same dbt run. A model that fails after
+  materializing can leave a populated table behind.
+
+Only databases a Flight can reach are eligible: your connection has to target a MotherDuck database, and models in a
+local catalog (or in a MotherDuck attachment given a different local alias) are rejected before a run is started, since
+the Flight's own `md:` connection cannot resolve those names.
+
+Because the model body runs on MotherDuck rather than on your machine, anything host-local is unavailable to it: local
+files, modules from `module_paths`, secrets/filesystems/extensions configured on your local connection, non-MotherDuck
+attached databases, and plugin sources materialized as views over in-memory DataFrames. Dependencies must be declared up
+front through `packages` (or `flights.requirements`), since a Flight installs them before the model runs.
+
 #### Batch processing with Python models
 
 As of version 1.6.1, it is possible to both read and write data in chunks, which allows for larger-than-memory
