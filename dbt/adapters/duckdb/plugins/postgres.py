@@ -7,6 +7,7 @@ from typing import Tuple
 from duckdb import DuckDBPyConnection
 
 from . import BasePlugin
+from ..credentials import DuckDBCredentials
 from dbt.adapters.events.logging import AdapterLogger
 
 PG_EXT = "postgres"
@@ -15,11 +16,16 @@ PG_EXT = "postgres"
 class Plugin(BasePlugin):
     logger = AdapterLogger("DuckDB_PostgresPlugin")
 
-    def __init__(self, name: str, plugin_config: Dict[str, Any]):
+    def __init__(
+        self,
+        name: str,
+        plugin_config: Dict[str, Any],
+        credentials: Optional[DuckDBCredentials] = None,
+    ):
         """
         Initialize the Plugin with a name and configuration.
         """
-        super().__init__(name, plugin_config)
+        super().__init__(name, plugin_config, credentials=credentials)
         self.logger.debug(
             "Plugin __init__ called with name: %s and config: %s", name, plugin_config
         )
