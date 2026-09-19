@@ -19,6 +19,7 @@
   {%- set parquet_read_options = config.get('parquet_read_options', {'union_by_name': False}) -%}
   {%- set json_read_options = config.get('json_read_options', {'auto_detect': True}) -%}
   {%- set csv_read_options = config.get('csv_read_options', {'auto_detect': True}) -%}
+  {%- set is_partitioned = config.get('options', {}).get('partition_by') is not none -%}
 
   -- set language - python or sql
   {%- set language = model['language'] -%}
@@ -59,22 +60,25 @@
     {{- create_table_as(False, temp_relation, compiled_code, language) }}
   {%- endcall %}
 
-  -- check if relation is empty
-  {%- set count_query -%}
-    select count(*) as row_count from {{ temp_relation }}
-  {%- endset -%}
-  {%- set row_count = run_query(count_query) -%}
+  -- Empty, non-partitioned Parquet files retain their schema, so write them as-is.
+  -- Other formats and partitioned datasets need a sentinel row so DuckDB can
+  -- recover the source columns when the file-backed view is created.
+  {% if format != 'parquet' or is_partitioned %}
+    {%- set count_query -%}
+      select count(*) as row_count from {{ temp_relation }}
+    {%- endset -%}
+    {%- set row_count = run_query(count_query) -%}
 
-  -- if relation is empty, write a non-empty table with column names and null values
-  {% call statement('main', language='sql') -%}
-    {% if row_count[0][0] == 0 %}
-    insert into {{ temp_relation }} values (
-      {%- for col in get_columns_in_relation(temp_relation) -%}
-      NULL,
-      {%- endfor -%}
-    )
-    {% endif %}
-  {%- endcall %}
+    {% call statement('main', language='sql') -%}
+      {% if row_count[0][0] == 0 %}
+      insert into {{ temp_relation }} values (
+        {%- for col in get_columns_in_relation(temp_relation) -%}
+        NULL,
+        {%- endfor -%}
+      )
+      {% endif %}
+    {%- endcall %}
+  {% endif %}
 
   -- write a temp relation into file
   {{ write_to_file(temp_relation, location, write_options) }}
@@ -114,7 +118,7 @@
         {%- endfor -%}
         )
         -- if relation is empty, filter by all columns having null values
-        {% if row_count[0][0] == 0 %}
+        {% if is_partitioned and row_count[0][0] == 0 %}
           where 1
           {%- for col in get_columns_in_relation(temp_relation) -%}
             {{ '' }} AND "{{ col.column }}" is not NULL
