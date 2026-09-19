@@ -170,3 +170,41 @@ class BaseExternalMaterializations:
 
 class TestExternalMaterializations(BaseExternalMaterializations):
     pass
+
+
+empty_partition_by_sql = """
+    {{ config(materialized="external", options={"partition_by": "id"}) }}
+    select 1 as id, 'a' as name where false
+"""
+
+empty_per_thread_output_sql = """
+    {{ config(materialized="external", options={"per_thread_output": true}) }}
+    select 1 as id, 'a' as name where false
+"""
+
+
+class TestEmptyGlobbedExternalMaterializations:
+    """Partitioned and per-thread outputs are read back through a glob, so an
+    empty result still needs the sentinel row to leave a file behind."""
+
+    @pytest.fixture(scope="class")
+    def dbt_profile_target(self, dbt_profile_target, tmp_path_factory):
+        extroot = str(tmp_path_factory.getbasetemp() / "empty_globbed")
+        os.mkdir(extroot)
+        dbt_profile_target["external_root"] = extroot
+        return dbt_profile_target
+
+    @pytest.fixture(scope="class")
+    def models(self):
+        return {
+            "empty_partition_by.sql": empty_partition_by_sql,
+            "empty_per_thread_output.sql": empty_per_thread_output_sql,
+        }
+
+    def test_empty(self, project):
+        results = run_dbt()
+        assert len(results) == 2
+        for name in ("empty_partition_by", "empty_per_thread_output"):
+            relation = relation_from_name(project.adapter, name)
+            result = project.run_sql(f"select count(*) from {relation}", fetch="one")
+            assert result[0] == 0
