@@ -143,3 +143,80 @@ class TestIndexOnAttachedDatabase:
         # "Catalog Error: Index ... does not exist!".
         rerun_results = run_dbt()
         assert len(rerun_results) == 1
+
+
+fk_schema_yml = """
+version: 2
+
+models:
+  - name: fk_target
+    config:
+      database: attach_test
+      materialized: table
+      contract:
+        enforced: true
+    columns:
+      - name: col
+        data_type: int
+        constraints:
+          - type: primary_key
+
+  - name: fk_source
+    config:
+      database: attach_test
+      materialized: table
+      contract:
+        enforced: true
+    columns:
+      - name: col
+        data_type: int
+        constraints:
+          - type: foreign_key
+            expression: "main.fk_target (col)"
+"""
+
+
+@pytest.mark.skip_profile("memory", "buenavista", "md")
+class TestForeignKeyOnAttachedDatabase:
+    @pytest.fixture(scope="class")
+    def attach_test_db(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            path = os.path.join(temp_dir, "attach_test.duckdb")
+            duckdb.connect(path).close()
+            yield path
+
+    @pytest.fixture(scope="class")
+    def profiles_config_update(self, dbt_profile_target, attach_test_db):
+        return {
+            "test": {
+                "outputs": {
+                    "dev": {
+                        "type": "duckdb",
+                        "path": dbt_profile_target.get("path", ":memory:"),
+                        "attach": [{"path": attach_test_db, "alias": "attach_test"}],
+                    }
+                },
+                "target": "dev",
+            }
+        }
+
+    @pytest.fixture(scope="class")
+    def models(self):
+        return {
+            "schema.yml": fk_schema_yml,
+            "fk_target.sql": "select 1 as col",
+            "fk_source.sql": "-- depends_on: {{ ref('fk_target') }}\nselect 1 as col",
+        }
+
+    def test_foreign_key_on_attached_database(self, project, attach_test_db):
+        results = run_dbt()
+        assert len(results) == 2
+
+        DuckDBConnectionManager.close_all_connections()
+        db = duckdb.connect(attach_test_db)
+        constraints = db.execute(
+            "select constraint_type from duckdb_constraints() "
+            "where table_name = 'fk_source'"
+        ).fetchall()
+        db.close()
+        assert ("FOREIGN KEY",) in constraints
