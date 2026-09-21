@@ -143,3 +143,96 @@ class TestIndexOnAttachedDatabase:
         # "Catalog Error: Index ... does not exist!".
         rerun_results = run_dbt()
         assert len(rerun_results) == 1
+
+
+fk_schema_yml = """
+version: 2
+
+models:
+  - name: fk_target
+    config:
+      materialized: table
+      contract:
+        enforced: true
+    columns:
+      - name: col
+        data_type: int
+        constraints:
+          - type: primary_key
+      - name: extra
+        data_type: varchar
+
+  - name: fk_source
+    config:
+      materialized: table
+      contract:
+        enforced: true
+    columns:
+      - name: col
+        data_type: int
+        constraints:
+          - type: foreign_key
+            expression: "main.fk_target (col)"
+      - name: extra
+        data_type: varchar
+"""
+
+fk_source_model_sql = """
+    -- depends_on: {{ ref("fk_target") }}
+    select unnest([1, 1]) as col, unnest(['a', 'b']) as extra
+"""
+
+fk_target_model_sql = """
+    select unnest([1, 2]) as col, unnest(['blah', 'blah']) as extra
+"""
+
+
+@pytest.mark.skip_profile("memory", "buenavista", "md")
+class TestForeignKeyOnAttachedDatabaseAlias:
+    """Regression test for #623: when `database` in the profile is set to
+    match one of the `attach` aliases (routing all model materialization
+    into that attached database instead of the primary one), a model with
+    a FOREIGN KEY constraint failed with "Catalog Error: Table ... does not
+    exist" because the target of the FK -- necessarily unqualified, since
+    DuckDB rejects a catalog-qualified FOREIGN KEY target even when it
+    matches the current catalog -- was resolved against the primary
+    (path-derived) catalog rather than the attached one. A DuckDB cursor
+    does not inherit a `USE` issued on its parent connection, so every
+    per-model cursor defaulted back to the primary catalog unless `USE`
+    was reissued on the cursor itself."""
+
+    @pytest.fixture(scope="class")
+    def attach_test_db(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            path = os.path.join(temp_dir, "attach_test.duckdb")
+            db = duckdb.connect(path)
+            db.close()
+            yield path
+
+    @pytest.fixture(scope="class")
+    def profiles_config_update(self, dbt_profile_target, attach_test_db):
+        return {
+            "test": {
+                "outputs": {
+                    "dev": {
+                        "type": "duckdb",
+                        "path": dbt_profile_target.get("path", ":memory:"),
+                        "database": "attach_test",
+                        "attach": [{"path": attach_test_db, "alias": "attach_test"}],
+                    }
+                },
+                "target": "dev",
+            }
+        }
+
+    @pytest.fixture(scope="class")
+    def models(self):
+        return {
+            "schema.yml": fk_schema_yml,
+            "fk_source.sql": fk_source_model_sql,
+            "fk_target.sql": fk_target_model_sql,
+        }
+
+    def test_foreign_key_on_attached_database_alias(self, project):
+        results = run_dbt()
+        assert len(results) == 2

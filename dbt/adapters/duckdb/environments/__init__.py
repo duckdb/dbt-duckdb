@@ -202,6 +202,20 @@ class Environment(abc.ABC):
             for attachment in creds.attach:
                 conn.execute(attachment.to_sql())
 
+            # If `database` was configured to match one of the attach aliases
+            # (rather than the primary database derived from `path`), switch
+            # the connection's default catalog to it. DuckDB rejects any
+            # catalog-qualified name in a FOREIGN KEY constraint -- even one
+            # that matches the *current* catalog -- so a model with an FK
+            # constraint can only resolve its (necessarily unqualified)
+            # target if the attach alias is already the default catalog.
+            # Without this, `database` pointed dbt's relation naming at the
+            # alias, but new connections still defaulted to the path-derived
+            # catalog, so unqualified FK targets failed to resolve.
+            attach_aliases = {a.alias for a in creds.attach if a.alias}
+            if creds.database in attach_aliases:
+                conn.execute(f'USE "{creds.database}"')
+
         if creds.is_motherduck:
             # Each incremental model will try to create a temporary schema, usually the
             # DEFAULT_TEMP_SCHEMA_NAME, in its own transaction, which will result in all
@@ -220,6 +234,20 @@ class Environment(abc.ABC):
         plugins: Optional[Dict[str, BasePlugin]] = None,
         registered_df: dict = {},
     ):
+        # A new cursor does not inherit a `USE` issued on its parent
+        # connection -- it resets to the path-derived default catalog -- so
+        # if `database` was configured to match an attach alias, we have to
+        # switch to it again here, the same way `initialize_db` does for the
+        # base connection. Without this, unqualified names (e.g. FOREIGN KEY
+        # targets, which DuckDB refuses to catalog-qualify even when they
+        # match the current catalog) fail to resolve against the attached
+        # database, since every cursor runs against the primary catalog
+        # instead.
+        if creds.attach:
+            attach_aliases = {a.alias for a in creds.attach if a.alias}
+            if creds.database in attach_aliases:
+                cursor.execute(f'USE "{creds.database}"')
+
         if creds.settings is not None:
             for key, value in creds.settings.items():
                 # Okay to set these as strings because DuckDB will cast them
