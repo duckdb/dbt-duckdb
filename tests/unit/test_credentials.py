@@ -347,6 +347,22 @@ def test_infer_database_name_from_path():
     creds = DuckDBCredentials.from_dict(payload)
     assert creds.database == "f1234"
 
+    payload = {"path": "/tmp/analytics.duckdb"}
+    creds = DuckDBCredentials.from_dict(payload)
+    assert creds.database == "analytics"
+
+    payload = {"path": "/tmp/analytics.v2.duckdb"}
+    creds = DuckDBCredentials.from_dict(payload)
+    assert creds.database == "analytics"
+
+    payload = {"path": "my.db.duckdb"}
+    creds = DuckDBCredentials.from_dict(payload)
+    assert creds.database == "my"
+
+    payload = {"path": ".hidden.duckdb"}
+    creds = DuckDBCredentials.from_dict(payload)
+    assert creds.database == "hidden"
+
     payload = {"path": "md:?token=abc123"}
     creds = DuckDBCredentials.from_dict(payload)
     assert creds.database == "my_db"
@@ -365,6 +381,22 @@ def test_infer_database_name_from_path():
     }
     creds = DuckDBCredentials.from_dict(payload)
     assert creds.database == "remote"
+
+
+@pytest.mark.parametrize(
+    "filename", ["analytics.duckdb", "analytics.v2.duckdb", "my.db.duckdb", ".hidden.duckdb"]
+)
+def test_path_derived_database_name_matches_duckdb(tmp_path, filename):
+    path = str(tmp_path / filename)
+    with duckdb.connect(path) as conn:
+        catalog = conn.execute("SELECT current_database()").fetchone()[0]
+    assert DuckDBCredentials.path_derived_database_name(path) == catalog
+
+
+def test_database_matches_dotted_path():
+    payload = {"path": "/tmp/analytics.v2.duckdb", "database": "analytics"}
+    creds = DuckDBCredentials.from_dict(payload)
+    assert creds.database == "analytics"
 
 
 def test_database_matches_attach_alias():

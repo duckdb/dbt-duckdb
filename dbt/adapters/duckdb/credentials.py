@@ -340,6 +340,10 @@ class DuckDBCredentials(Credentials):
         elif parsed.scheme.lower() == "ducklake":
             parsed_ducklake = urlparse(inferred_db_name)
             inferred_db_name = parsed_ducklake.path
+        else:
+            # DuckDB names the catalog after the first non-empty dot-separated part
+            # of the file name, e.g. "my.db.duckdb" -> "my", ".hidden.duckdb" -> "hidden"
+            inferred_db_name = next((part for part in base_file.split(".") if part), "")
 
         return inferred_db_name
 
