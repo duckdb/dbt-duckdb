@@ -162,6 +162,49 @@ class Extension(dbtClassMixin):
 
 
 @dataclass
+class FlightConfig(dbtClassMixin):
+    """Settings for running Python models on MotherDuck Flights.
+    Only consulted for models submitted with `submission_method: flight`.
+    """
+
+    # Submit every Python model to a Flight. Models can opt back out with
+    # `submission_method: local`.
+    enabled_by_default: bool = False
+
+    # Label of the MotherDuck access token the Flight uses at runtime; its
+    # scope must cover every database the model touches. The runtime injects
+    # it as MOTHERDUCK_TOKEN, a reserved variable, so the token from
+    # `path`/`config_options` cannot be forwarded instead. Defaults to
+    # MotherDuck's built-in Flights token.
+    access_token_name: Optional[str] = None
+
+    # Per-run timeout enforced by MotherDuck; 0 means none, None the plan default.
+    max_runtime_sec: Optional[int] = None
+
+    # How long dbt waits for a run before cancelling it.
+    timeout_sec: int = 3600
+
+    # How often to poll a running Flight.
+    poll_interval_sec: float = 2.0
+
+    # Lines of a failed run's log to inline in the dbt error. A Flight log
+    # includes the whole dependency install, so this defaults to off and the
+    # error points at the log instead.
+    log_lines: int = 0
+
+    # Overrides the MotherDuck UI link to a run's logs; takes {flight_id} and
+    # {run_number}.
+    log_url_template: Optional[str] = None
+
+    # Requirements added to every Flight, on top of each model's `packages`.
+    requirements: Optional[List[str]] = None
+
+    # Version to pin `duckdb` to inside the Flight; defaults to the local
+    # client's version, which MotherDuck is known to accept.
+    duckdb_version: Optional[str] = None
+
+
+@dataclass
 class DuckDBCredentials(Credentials):
     database: str = "main"
     schema: str = "main"
@@ -232,6 +275,12 @@ class DuckDBCredentials(Credentials):
     # exceptions occur on a model run (e.g., IOExceptions that were caused
     # by networking issues)
     retries: Optional[Retries] = None
+
+    # Settings for running Python models on MotherDuck Flights instead of in
+    # the local dbt process; see the FlightConfig dataclass above. Deliberately
+    # absent from _connection_keys(), which dbt logs: access_token_name names a
+    # MotherDuck token and does not belong in the output.
+    flights: Optional[FlightConfig] = None
 
     # An optional flag to indicate whether the database is a ducklake database,
     # so that the adapter can generate queries that work for ducklake.

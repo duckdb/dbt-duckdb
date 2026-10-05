@@ -24,6 +24,8 @@ from .constants import DEFAULT_TEMP_SCHEMA_NAME
 from .constants import DUCKDB_BASE_INCREMENTAL_STRATEGIES
 from .constants import DUCKDB_MERGE_LOWEST_VERSION_POSSIBLE
 from .constants import DUCKLAKE_ALTER_RENAME_FIX_VERSION
+from .constants import FLIGHT_NAME_KEY
+from .constants import FLIGHT_SUBMISSION
 from .constants import TEMP_SCHEMA_NAME
 from dbt.adapters.base import AdapterConfig
 from dbt.adapters.base import BaseRelation
@@ -342,7 +344,19 @@ class DuckDBAdapter(SQLAdapter):
         if not connection:
             connection = self.connections.get_thread_connection()
         env = DuckDBConnectionManager.env()
+        parsed_model = self._resolve_flight_name(env, parsed_model)
         return env.submit_python_job(connection.handle, parsed_model, compiled_code)
+
+    def _resolve_flight_name(self, env, parsed_model: dict) -> dict:
+        """Name the MotherDuck Flight for a model, via the overridable macro.
+        Macros are only resolvable here, on the adapter, so the name rides along
+        in the model dict rather than through the Environment interface.
+        """
+        submission_method = getattr(env, "submission_method", None)
+        if submission_method is None or submission_method(parsed_model) != FLIGHT_SUBMISSION:
+            return parsed_model
+        name = self.execute_macro("flight_name", kwargs={"parsed_model": parsed_model})
+        return {**parsed_model, FLIGHT_NAME_KEY: name}
 
     def get_rows_different_sql(
         self,
