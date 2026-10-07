@@ -163,6 +163,12 @@
 
     {{ sql_header if sql_header is not none }}
 
+  {% if contract_config.enforced and not temporary and relation.database %}
+    {#-- DuckDB rejects catalog-qualified foreign key targets, so bind
+         unqualified/schema-qualified targets in the table's catalog. --#}
+    {% do run_query('use ' ~ adapter.quote(relation.database)) %}
+  {% endif %}
+
     create {% if temporary: -%}temporary{%- endif %} table
       {{ relation.include(database=(not temporary), schema=(not temporary)) }}
   {% if contract_config.enforced and not temporary %}
