@@ -98,19 +98,20 @@ class BaseExternalMaterializations:
             bucket.objects.filter(Prefix=s3_path).delete()
 
     @pytest.fixture(scope="class")
-    def dbt_profile_target(self, profile_type, dbt_profile_target, extroot):
+    def dbt_profile_target(self, profile_type, dbt_profile_target, extroot, dest):
         target = copy.deepcopy(dbt_profile_target)
         target["external_root"] = extroot
-        target["secrets"] = [
-            {
-                "type": DEST_S3,
-                "region": os.getenv("S3_MD_ORG_REGION"),
-                "key_id": os.getenv("S3_MD_ORG_KEY"),
-                "secret": os.getenv("S3_MD_ORG_SECRET"),
-            }
-        ]
-        if profile_type == "md":
-            target["secrets"][0]["persistent"] = True
+        if dest == DEST_S3:
+            target["secrets"] = [
+                {
+                    "type": DEST_S3,
+                    "region": os.getenv("S3_MD_ORG_REGION"),
+                    "key_id": os.getenv("S3_MD_ORG_KEY"),
+                    "secret": os.getenv("S3_MD_ORG_SECRET"),
+                }
+            ]
+            if profile_type == "md":
+                target["secrets"][0]["persistent"] = True
         return target
 
     @pytest.fixture(scope="class")
@@ -119,8 +120,7 @@ class BaseExternalMaterializations:
             "name": "base",
         }
 
-    @pytest.mark.with_s3_creds
-    def test_base(self, project, empty):
+    def test_base(self, project, empty, extroot):
         # seed command
         results = run_dbt(["seed"])
         # seed result length
@@ -182,6 +182,13 @@ class BaseExternalMaterializations:
             models,
         )
 
+        if empty:
+            result = project.run_sql(
+                f"select count(*) from read_parquet('{extroot}/test.parquet')",
+                fetch="one",
+            )
+            assert result[0] == 0
+
         # check relations in catalog
         catalog = run_dbt(["docs", "generate"])
         assert len(catalog.nodes) == 7
@@ -198,7 +205,7 @@ class TestExternalMaterializationsLocalEmpty(BaseExternalMaterializations):
     @pytest.fixture(scope="class")
     def dest(self):
         return DEST_LOCAL
-    
+
     @pytest.fixture(scope="class")
     def empty(self):
         return True
@@ -210,7 +217,7 @@ class TestExternalMaterializationsS3(BaseExternalMaterializations):
     @pytest.fixture(scope="class")
     def dest(self):
         return DEST_S3
-    
+
     @pytest.fixture(scope="class")
     def empty(self):
         return False
@@ -222,7 +229,7 @@ class TestExternalMaterializationsS3Empty(BaseExternalMaterializations):
     @pytest.fixture(scope="class")
     def dest(self):
         return DEST_S3
-    
+
     @pytest.fixture(scope="class")
     def empty(self):
         return True
