@@ -149,3 +149,63 @@ models:
         results = run_dbt(["run"])
 
         assert len(results) == 2
+
+
+@pytest.mark.skip_profile("md", "buenavista")
+class TestContractQuotedColumnNames:
+    @pytest.fixture(scope="class")
+    def models(self):
+        model_sql = """select 1 as "Order ID", 'a' as "group", 'x' as plain_col"""
+        columns_yml = """
+    columns:
+      - name: Order ID
+        data_type: integer
+        quote: true
+        constraints:
+          - type: not_null
+      - name: group
+        data_type: varchar
+        quote: true
+      - name: plain_col
+        data_type: varchar
+"""
+        return {
+            "quoted_table.sql": model_sql,
+            "quoted_incremental.sql": model_sql,
+            "schema.yml": f"""
+version: 2
+models:
+  - name: quoted_table
+    config:
+      materialized: table
+      contract:
+        enforced: true
+{columns_yml}
+  - name: quoted_incremental
+    config:
+      materialized: incremental
+      on_schema_change: append_new_columns
+      contract:
+        enforced: true
+{columns_yml}
+""",
+        }
+
+    def test_contract_quoted_column_names(self, project):
+        # The second run exercises the incremental merge path on top of the
+        # contracted table built by the first run.
+        for _ in range(2):
+            results = run_dbt(["run"])
+            assert len(results) == 2
+
+        table_rows = project.run_sql(
+            f'select "Order ID", "group", plain_col from {project.test_schema}.quoted_table',
+            fetch="all",
+        )
+        assert table_rows == [(1, "a", "x")]
+
+        incremental_rows = project.run_sql(
+            f'select "Order ID", "group", plain_col from {project.test_schema}.quoted_incremental',
+            fetch="all",
+        )
+        assert incremental_rows == [(1, "a", "x"), (1, "a", "x")]
