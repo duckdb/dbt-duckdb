@@ -829,9 +829,16 @@ def model(dbt, session):
         materialized="table",
         submission_method="flight",
         packages=["pandas==2.2.3", "scikit-learn==1.5.0"],
+        instance_type="F32",   # optional: a bigger runner for this model only
     )
     ...
 ```
+
+`instance_type` picks the runner a model's Flight runs on, named after its memory: `F4` (0.5 vCPU / 4 GB),
+`F16` (2 vCPU / 16 GB) or `F32` (4 vCPU / 32 GB). Omit it to take the plan default, which is `F16` or the plan cap when
+that is smaller; MotherDuck rejects a size above your plan's cap. Set it per model as above, or project-wide under
+`flights:` below — the model config wins, so one memory-hungry model does not push everything else onto a bigger
+runner. Reach for it only when a run fails on memory pressure and reducing peak memory has not helped.
 
 or make it the default for every Python model in the project via your profile:
 
@@ -845,6 +852,7 @@ default:
         enabled_by_default: true    # individual models can still set submission_method: local
         access_token_name: analytics-token  # defaults to MotherDuck's built-in Flights token
         max_runtime_sec: 1800       # per-run timeout enforced by MotherDuck
+        instance_type: F16          # runner size: F4, F16 (default) or F32
         timeout_sec: 3600           # how long dbt waits for the run to finish
         poll_interval_sec: 2.0
         log_lines: 0                # lines of a failed run's log to inline in the dbt error

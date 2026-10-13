@@ -9,6 +9,7 @@ one in SaaS mode, which is what lets Python models run there at all.
 
 import re
 import time
+from dataclasses import dataclass
 from typing import Any
 from typing import Dict
 from typing import List
@@ -152,6 +153,56 @@ def build_requirements(parsed_model: Dict[str, Any], config: FlightConfig) -> st
     return requirements
 
 
+@dataclass
+class FlightSpec:
+    """The version-bearing fields of a Flight that this adapter sets.
+
+    MotherDuck mints a new immutable version whenever one of these changes, so
+    they travel together: they are what gets written on create/update and what
+    the reuse check compares against the current version.
+    """
+
+    source: str
+    requirements: str
+    instance_type: Optional[str] = None
+    access_token_name: Optional[str] = None
+    max_runtime_sec: Optional[int] = None
+
+    def sql_args(self) -> str:
+        """The named arguments for MD_CREATE_FLIGHT / MD_UPDATE_FLIGHT."""
+        args = (
+            f"source_code := '{escape_sql_string(self.source)}', "
+            f"requirements_txt := '{escape_sql_string(self.requirements)}'"
+        )
+        if self.access_token_name:
+            args += f", access_token_name := '{escape_sql_string(self.access_token_name)}'"
+        if self.max_runtime_sec is not None:
+            args += f", max_runtime_sec := {int(self.max_runtime_sec)}"
+        if self.instance_type:
+            args += f", instance_type := '{escape_sql_string(self.instance_type)}'"
+        return args
+
+    def version_fields(self) -> Dict[str, Any]:
+        """Column -> expected value, for comparing against a version snapshot.
+
+        Only fields this adapter actually sets are included. An omitted field
+        takes a server-side default that the snapshot reports concretely, so
+        comparing it would never match and would version the Flight on every
+        dbt run.
+        """
+        fields: Dict[str, Any] = {
+            "source_code": self.source,
+            "requirements_txt": self.requirements,
+        }
+        if self.access_token_name:
+            fields["access_token_name"] = self.access_token_name
+        if self.max_runtime_sec is not None:
+            fields["max_runtime_sec"] = int(self.max_runtime_sec)
+        if self.instance_type:
+            fields["instance_type"] = self.instance_type
+        return fields
+
+
 class FlightRunner:
     """Drives the Flight lifecycle for Python model submission.
     One Flight per model node, so each keeps its own run and version history in
@@ -166,10 +217,15 @@ class FlightRunner:
 
     def submit(self, cursor, parsed_model: Dict[str, Any], compiled_code: str) -> AdapterResponse:
         name = self.flight_name(parsed_model)
-        source = build_source(compiled_code, self._settings)
-        requirements = build_requirements(parsed_model, self._config)
+        spec = FlightSpec(
+            source=build_source(compiled_code, self._settings),
+            requirements=build_requirements(parsed_model, self._config),
+            instance_type=self.instance_type(parsed_model),
+            access_token_name=self._config.access_token_name,
+            max_runtime_sec=self._config.max_runtime_sec,
+        )
 
-        flight_id = self._upsert_flight(cursor, name, source, requirements)
+        flight_id = self._upsert_flight(cursor, name, spec)
         run_number = self._start_run(cursor, flight_id)
         logger.debug(f"Flight {name} ({flight_id}) started run {run_number}")
 
@@ -197,39 +253,45 @@ class FlightRunner:
             name = "-".join(["dbt"] + [str(part) for part in parts if part])
         return sanitize_flight_name(str(name))
 
+    def instance_type(self, parsed_model: Dict[str, Any]) -> Optional[str]:
+        """The runner size for this model; the model config beats the profile.
+
+        Not validated against a fixed list, so a size MotherDuck adds later
+        works without an adapter release; MotherDuck rejects an unknown or
+        over-plan size with a clear message.
+        """
+        value = (parsed_model.get("config") or {}).get("instance_type")
+        if value is None:
+            value = self._config.instance_type
+        return str(value).upper() if value else None
+
     # -- lifecycle steps ---------------------------------------------------
 
-    def _upsert_flight(self, cursor, name: str, source: str, requirements: str) -> str:
-        """Create the Flight, or update it when its code changed.
-        Every content change mints a new immutable version, so check first
-        rather than versioning on every dbt run.
+    def _upsert_flight(self, cursor, name: str, spec: FlightSpec) -> str:
+        """Create the Flight, or update it when any version-bearing field changed.
+        Every such change mints a new immutable version, so check first rather
+        than versioning on every dbt run.
         """
         flight_id = self._find_flight(cursor, name)
         if flight_id is None:
-            return self._create_flight(cursor, name, source, requirements)
+            return self._create_flight(cursor, name, spec)
 
-        if self._is_current(cursor, flight_id, source, requirements):
+        if self._is_current(cursor, flight_id, spec):
             logger.debug(f"MotherDuck Flight {name} is up to date; reusing it")
             return flight_id
 
         self._execute(
             cursor,
             "SELECT flight_id FROM MD_UPDATE_FLIGHT("
-            f"flight_id := '{flight_id}', "
-            f"source_code := '{escape_sql_string(source)}', "
-            f"requirements_txt := '{escape_sql_string(requirements)}'"
-            f"{self._optional_args()})",
+            f"flight_id := '{flight_id}', {spec.sql_args()})",
         )
         logger.debug(f"Updated MotherDuck Flight {name} ({flight_id})")
         return flight_id
 
-    def _create_flight(self, cursor, name: str, source: str, requirements: str) -> str:
+    def _create_flight(self, cursor, name: str, spec: FlightSpec) -> str:
         sql = (
             "SELECT flight_id FROM MD_CREATE_FLIGHT("
-            f"name := '{escape_sql_string(name)}', "
-            f"source_code := '{escape_sql_string(source)}', "
-            f"requirements_txt := '{escape_sql_string(requirements)}'"
-            f"{self._optional_args()})"
+            f"name := '{escape_sql_string(name)}', {spec.sql_args()})"
         )
         try:
             row = self._execute(cursor, sql).fetchone()
@@ -247,20 +309,12 @@ class FlightRunner:
                     "so this model cannot run on it. Override the `duckdb__flight_name` "
                     "macro to give this project's Flights a distinct name."
                 ) from err
-            return self._upsert_flight(cursor, name, source, requirements)
+            return self._upsert_flight(cursor, name, spec)
 
         flight_id = str(row[0])
         self._flight_ids[name] = flight_id
         logger.debug(f"Created MotherDuck Flight {name} ({flight_id})")
         return flight_id
-
-    def _optional_args(self) -> str:
-        args = ""
-        if self._config.access_token_name:
-            args += f", access_token_name := '{escape_sql_string(self._config.access_token_name)}'"
-        if self._config.max_runtime_sec is not None:
-            args += f", max_runtime_sec := {int(self._config.max_runtime_sec)}"
-        return args
 
     def _find_flight(self, cursor, name: str) -> Optional[str]:
         """Resolve a Flight id by name, among the Flights we own.
@@ -287,19 +341,32 @@ class FlightRunner:
                 return None
             offset += page
 
-    def _is_current(self, cursor, flight_id: str, source: str, requirements: str) -> bool:
+    def _is_current(self, cursor, flight_id: str, spec: FlightSpec) -> bool:
+        """Does the current version already match every field we would write?
+
+        Comparing only the source would silently ignore a changed instance
+        size, token or timeout: those are version-bearing too, so the Flight
+        would be reused and the new setting never applied.
+        """
         # Two queries: MotherDuck's table functions reject subqueries in args.
         current = self._execute(
             cursor, f"SELECT current_version FROM MD_GET_FLIGHT(flight_id := '{flight_id}')"
         ).fetchone()
         if current is None or current[0] is None:
             return False
+
+        expected = spec.version_fields()
+        columns = ", ".join(expected)
         row = self._execute(
             cursor,
-            "SELECT source_code, requirements_txt FROM MD_GET_FLIGHT_VERSION("
+            f"SELECT {columns} FROM MD_GET_FLIGHT_VERSION("
             f"flight_id := '{flight_id}', version_number := {int(current[0])})",
         ).fetchone()
-        return bool(row) and row[0] == source and row[1] == requirements
+        if not row or len(row) != len(expected):
+            # zip() would truncate to the shorter side and read a partial match
+            # as "current", quietly skipping the update.
+            return False
+        return all(actual == value for actual, value in zip(row, expected.values()))
 
     def _start_run(self, cursor, flight_id: str) -> int:
         row = self._execute(

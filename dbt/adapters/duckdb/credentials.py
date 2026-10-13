@@ -181,6 +181,11 @@ class FlightConfig(dbtClassMixin):
     # Per-run timeout enforced by MotherDuck; 0 means none, None the plan default.
     max_runtime_sec: Optional[int] = None
 
+    # Runner size for every Flight: F4, F16 or F32, named after the runner's
+    # memory in GB. None uses the plan default (F16, or the plan cap when that
+    # is smaller). A model can override this with `instance_type` in its config.
+    instance_type: Optional[str] = None
+
     # How long dbt waits for a run before cancelling it.
     timeout_sec: int = 3600
 

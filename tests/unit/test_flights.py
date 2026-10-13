@@ -7,6 +7,7 @@ from dbt.adapters.duckdb.credentials import DuckDBCredentials, FlightConfig
 from dbt.adapters.duckdb.constants import FLIGHT_NAME_KEY
 from dbt.adapters.duckdb.environments.flights import (
     FlightRunner,
+    FlightSpec,
     build_requirements,
     build_source,
     sanitize_flight_name,
@@ -457,3 +458,126 @@ def test_flights_config_is_not_in_the_logged_connection_keys():
     creds = credentials(flights={"access_token_name": "analytics-token"})
     assert "flights" not in creds._connection_keys()
     assert all("token" not in str(value) for _, value in creds.connection_info())
+
+
+EXISTING = [("11111111-2222-3333-4444-555555555555", "dbt-my_project-my_db-main-my_model")]
+
+
+def _current_version_row(spec, **changed):
+    """The snapshot a Flight would report if it already carried `spec`.
+
+    `changed` overrides individual fields, so a test can say "same code, older
+    instance size" while keeping the row shaped like the query's column list.
+    """
+    fields = spec.version_fields()
+    fields.update(changed)
+    return [tuple(fields.values())]
+
+
+def _spec(config, **model_config):
+    model = parsed_model(**model_config)
+    runner = FlightRunner(config)
+    return FlightSpec(
+        source=build_source(COMPILED_CODE),
+        requirements=build_requirements(model, config),
+        instance_type=runner.instance_type(model),
+        access_token_name=config.access_token_name,
+        max_runtime_sec=config.max_runtime_sec,
+    )
+
+
+def test_instance_type_from_the_profile_is_sent():
+    cursor = _runner_cursor()
+    FlightRunner(FlightConfig(instance_type="F32")).submit(cursor, parsed_model(), COMPILED_CODE)
+    assert "instance_type := 'F32'" in cursor.sql_containing("MD_CREATE_FLIGHT")[0]
+
+
+def test_model_instance_type_overrides_the_profile():
+    # One memory-hungry model should not force the whole project onto a bigger
+    # runner, so the model config wins.
+    cursor = _runner_cursor()
+    FlightRunner(FlightConfig(instance_type="F4")).submit(
+        cursor, parsed_model(instance_type="F32"), COMPILED_CODE
+    )
+    assert "instance_type := 'F32'" in cursor.sql_containing("MD_CREATE_FLIGHT")[0]
+
+
+def test_instance_type_is_normalized_to_upper_case():
+    cursor = _runner_cursor()
+    FlightRunner(FlightConfig()).submit(cursor, parsed_model(instance_type="f16"), COMPILED_CODE)
+    assert "instance_type := 'F16'" in cursor.sql_containing("MD_CREATE_FLIGHT")[0]
+
+
+def test_no_instance_type_leaves_the_plan_default():
+    cursor = _runner_cursor()
+    FlightRunner(FlightConfig()).submit(cursor, parsed_model(), COMPILED_CODE)
+    assert "instance_type" not in cursor.sql_containing("MD_CREATE_FLIGHT")[0]
+
+
+def test_changing_instance_type_updates_the_flight():
+    # Instance size is version-bearing: comparing only the source would reuse
+    # the Flight and silently keep running on the old runner.
+    config = FlightConfig(instance_type="F32")
+    cursor = _runner_cursor(existing=EXISTING)
+    # the Flight is currently on the plan default
+    cursor.responses["MD_GET_FLIGHT_VERSION"] = _current_version_row(
+        _spec(config), instance_type="F16"
+    )
+
+    FlightRunner(config).submit(cursor, parsed_model(), COMPILED_CODE)
+
+    assert cursor.sql_containing("MD_UPDATE_FLIGHT")
+    assert "instance_type := 'F32'" in cursor.sql_containing("MD_UPDATE_FLIGHT")[0]
+
+
+def test_changing_the_access_token_updates_the_flight():
+    config = FlightConfig(access_token_name="new-token")
+    cursor = _runner_cursor(existing=EXISTING)
+    cursor.responses["MD_GET_FLIGHT_VERSION"] = _current_version_row(
+        _spec(config), access_token_name="old-token"
+    )
+
+    FlightRunner(config).submit(cursor, parsed_model(), COMPILED_CODE)
+
+    assert cursor.sql_containing("MD_UPDATE_FLIGHT")
+
+
+def test_changing_max_runtime_updates_the_flight():
+    config = FlightConfig(max_runtime_sec=900)
+    cursor = _runner_cursor(existing=EXISTING)
+    cursor.responses["MD_GET_FLIGHT_VERSION"] = _current_version_row(
+        _spec(config), max_runtime_sec=300
+    )
+
+    FlightRunner(config).submit(cursor, parsed_model(), COMPILED_CODE)
+
+    assert cursor.sql_containing("MD_UPDATE_FLIGHT")
+
+
+def test_unchanged_settings_still_reuse_the_flight():
+    config = FlightConfig(instance_type="F32", access_token_name="tok", max_runtime_sec=900)
+    cursor = _runner_cursor(existing=EXISTING)
+    cursor.responses["MD_GET_FLIGHT_VERSION"] = _current_version_row(_spec(config))
+
+    FlightRunner(config).submit(cursor, parsed_model(), COMPILED_CODE)
+
+    assert not cursor.sql_containing("MD_UPDATE_FLIGHT")
+    assert cursor.sql_containing("MD_RUN_FLIGHT")
+
+
+def test_version_comparison_ignores_fields_we_do_not_set():
+    # An omitted field takes a server default the snapshot reports concretely;
+    # comparing it would version the Flight on every single dbt run.
+    spec = FlightSpec(source="s", requirements="r")
+    assert list(spec.version_fields()) == ["source_code", "requirements_txt"]
+
+
+def test_a_short_version_row_is_not_treated_as_current():
+    # zip() would truncate and compare only the columns that came back
+    config = FlightConfig(instance_type="F32")
+    cursor = _runner_cursor(existing=EXISTING)
+    cursor.responses["MD_GET_FLIGHT_VERSION"] = [(build_source(COMPILED_CODE),)]
+
+    FlightRunner(config).submit(cursor, parsed_model(), COMPILED_CODE)
+
+    assert cursor.sql_containing("MD_UPDATE_FLIGHT")
