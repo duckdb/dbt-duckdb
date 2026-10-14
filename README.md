@@ -63,6 +63,19 @@ purpose, column meaning, and expected grain before they generate queries.
 As of `dbt-duckdb` 1.5.2, you can connect to a DuckDB instance running on [MotherDuck](http://www.motherduck.com) by setting your `path` to use a [md:<database> connection string](https://motherduck.com/docs/getting-started/connect-query-from-python/installation-authentication), just as you would with the DuckDB CLI
 or the Python API.
 
+You can pass your [MotherDuck token](https://motherduck.com/docs/key-tasks/authenticating-and-connecting-to-motherduck/authenticating-to-motherduck/) via the `motherduck_token` property in your profile
+(it may also be set in the `settings` dictionary, as a `motherduck_token` query parameter on the `path`, or via the `motherduck_token` environment variable):
+
+```yaml
+default:
+  outputs:
+    dev:
+      type: duckdb
+      path: "md:my_db"
+      motherduck_token: "{{ env_var('MOTHERDUCK_TOKEN') }}"
+  target: dev
+```
+
 MotherDuck databases generally work the same way as local DuckDB databases from the perspective of dbt, but
 there are a [few differences to be aware of](https://motherduck.com/docs/architecture-and-capabilities#considerations-and-limitations):
 1. MotherDuck is compatible with client DuckDB versions 0.10.2 and newer.

@@ -240,8 +240,22 @@ class DuckDBCredentials(Credentials):
     # which is the case in fully managed ducklake in MotherDuck.
     is_ducklake: Optional[bool] = None
 
+    # The access token to use when connecting to MotherDuck (i.e., when the
+    # path or an attached database uses the md: scheme); equivalent to
+    # setting motherduck_token in the settings dictionary.
+    motherduck_token: Optional[str] = None
+
     def __post_init__(self):
         self.settings = self.settings or {}
+
+        if self.motherduck_token:
+            existing_token = self.settings.get("motherduck_token")
+            if existing_token is not None and existing_token != self.motherduck_token:
+                raise DbtRuntimeError(
+                    "Conflicting values for motherduck_token found in the profile; "
+                    "please set it in only one place"
+                )
+            self.settings["motherduck_token"] = self.motherduck_token
         self.secrets = self.secrets or []
         self._secrets = []
 
