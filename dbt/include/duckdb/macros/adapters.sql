@@ -55,7 +55,8 @@
     (
     {% for i in user_provided_columns %}
       {% set col = user_provided_columns[i] %}
-      {{ col['name'] }} {{ "," if not loop.last }}
+      {% set col_name = adapter.quote(col['name']) if col.get('quote') else col['name'] %}
+      {{ col_name }} {{ "," if not loop.last }}
     {% endfor %}
   )
 {% endmacro %}
