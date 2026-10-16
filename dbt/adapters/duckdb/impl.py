@@ -284,8 +284,10 @@ class DuckDBAdapter(SQLAdapter):
     def duckdb_version(self) -> Version:
         """Get the DuckDB version for the current DuckDB connection (cached)."""
         _, cursor = self.connections.add_select_query("SELECT version()")
-        row = cursor.fetchone()
-        version_string = row[0] if row else None
+        # fetchall() drains the result; DuckDB 2.0 rejects register() on a cursor
+        # whose result was only partially fetched.
+        rows = cursor.fetchall()
+        version_string = rows[0][0] if rows else None
 
         if not version_string:
             raise DbtDatabaseError(
