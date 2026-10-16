@@ -343,7 +343,7 @@ class DuckDBCredentials(Credentials):
         else:
             # DuckDB names the catalog after the first non-empty dot-separated part
             # of the file name, e.g. "my.db.duckdb" -> "my", ".hidden.duckdb" -> "hidden"
-            inferred_db_name = next((part for part in base_file.split(".") if part), "")
+            inferred_db_name = base_file.lstrip(".").split(".")[0]
 
         return inferred_db_name
 
