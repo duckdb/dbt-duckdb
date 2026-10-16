@@ -16,7 +16,10 @@ jobs:
         # hatch-vcs derives the release version from the pushed tag
         fetch-depth: 0
     - name: Set up uv
-      uses: astral-sh/setup-uv@v9.0.0
+      uses: astral-sh/setup-uv@v10.3.0
+      with:
+        # never build release artifacts from a (potentially poisoned) shared cache
+        enable-cache: false
     - name: Build a binary wheel and a source tarball
       run: uv build
     # hatch-vcs falls back to version 0.0.0 on a tagless checkout; never publish that
@@ -71,7 +74,7 @@ jobs:
         name: python-package-distributions
         path: dist/
     - name: Sign the dists with Sigstore
-      uses: sigstore/gh-action-sigstore-python@v3.4.0
+      uses: sigstore/gh-action-sigstore-python@v3.5.0
       with:
         inputs: >-
           ./dist/*.tar.gz

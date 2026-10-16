@@ -22,9 +22,11 @@
     {%- endif -%}
   {%- endfor -%}
 
-  {%- do validate_ducklake_restrictions(config, target_relation, errors) -%}
-
   {%- do validate_merge_clauses(config, base_configuration_fields, errors) -%}
+
+  {%- if not errors -%}
+    {%- do validate_ducklake_restrictions(config, target_relation, errors) -%}
+  {%- endif -%}
 
   {%- if errors -%}
     {{ exceptions.raise_compiler_error("MERGE configuration errors:\n" ~ errors|join('\n')) }}
@@ -95,21 +97,19 @@
 {%- endmacro -%}
 
 {%- macro validate_ducklake_restrictions(config, target_relation, errors) -%}
-  {%- if target_relation and adapter.is_ducklake(target_relation) -%}
-    {%- set merge_clauses = config.get('merge_clauses', {}) -%}
-    {%- if merge_clauses and 'when_matched' in merge_clauses -%}
-      {%- set when_matched_clauses = merge_clauses.get('when_matched', []) -%}
-      {%- set update_delete_count = 0 -%}
+  {%- if not target_relation or not adapter.is_ducklake(target_relation) -%}
+    {%- do return(none) -%}
+  {%- endif -%}
 
-      {%- for clause in when_matched_clauses -%}
-        {%- if clause is mapping and clause.get('action') in ['update', 'delete'] -%}
-          {%- set update_delete_count = update_delete_count + 1 -%}
-        {%- endif -%}
-      {%- endfor -%}
+  {%- if config.get('merge_returning_columns') -%}
+    {%- do errors.append("DuckLake MERGE restrictions: merge_returning_columns is not supported because DuckLake does not support RETURNING.") -%}
+  {%- endif -%}
 
-      {%- if update_delete_count > 1 -%}
-        {%- do errors.append("DuckLake MERGE restrictions: when_matched clauses can contain only a single UPDATE or DELETE action. Found " ~ update_delete_count ~ " UPDATE/DELETE actions. DuckLake currently supports only one UPDATE or DELETE operation per MERGE statement.") -%}
-      {%- endif -%}
-    {%- endif -%}
+  {%- set unsupported_clauses = ['update', 'delete'] -%}
+  {%- set merge_clauses = config.get('merge_clauses') or {} -%}
+  {%- set configured_clauses = merge_clauses.get('when_matched', []) + merge_clauses.get('when_not_matched', []) -%}
+  {%- set unsupported_configured_clauses = configured_clauses | selectattr('action', 'defined') | selectattr('action', 'in', unsupported_clauses) | list -%}
+  {%- if unsupported_configured_clauses|length > 1 -%}
+    {%- do errors.append("DuckLake MERGE restrictions: merge_clauses can contain only a single UPDATE or DELETE action across when_matched and when_not_matched. Found " ~ unsupported_configured_clauses|length ~ " UPDATE/DELETE actions. DuckLake currently supports only one UPDATE or DELETE operation per MERGE statement.") -%}
   {%- endif -%}
 {%- endmacro -%}

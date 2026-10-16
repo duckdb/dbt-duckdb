@@ -14,6 +14,9 @@ from dbt_common.exceptions import DbtRuntimeError
 from dbt.adapters.contracts.connection import Credentials
 from dbt.adapters.duckdb.secrets import DEFAULT_SECRET_PREFIX
 from dbt.adapters.duckdb.secrets import Secret
+from dbt.adapters.duckdb.utils import escape_sql_string
+
+MOTHERDUCK_SCHEMES = {"md", "motherduck"}
 
 
 @dataclass
@@ -44,10 +47,12 @@ class Attachment(dbtClassMixin):
     is_ducklake: Optional[bool] = None
 
     def to_sql(self) -> str:
-        # remove query parameters (not supported in ATTACH)
-        parsed = urlparse(self.path)
-        path = self.path.replace(f"?{parsed.query}", "")
-        base = f"ATTACH IF NOT EXISTS '{path}'"
+        # remove query parameters from MotherDuck paths (not supported in ATTACH)
+        path = self.path
+        parsed = urlparse(path)
+        if parsed.scheme in MOTHERDUCK_SCHEMES:
+            path = path.split("?", 1)[0]
+        base = f"ATTACH IF NOT EXISTS '{escape_sql_string(path)}'"
         if self.alias:
             base += f" AS {self.alias}"
 
@@ -102,12 +107,13 @@ class Attachment(dbtClassMixin):
                     if isinstance(value, str):
                         # Only quote if not already quoted (single or double quotes)
                         stripped_value = value.strip()
-                        if (stripped_value.startswith("'") and stripped_value.endswith("'")) or (
-                            stripped_value.startswith('"') and stripped_value.endswith('"')
+                        if len(stripped_value) >= 2 and (
+                            (stripped_value.startswith("'") and stripped_value.endswith("'"))
+                            or (stripped_value.startswith('"') and stripped_value.endswith('"'))
                         ):
                             all_options.append(f"{key.upper()} {value}")
                         else:
-                            all_options.append(f"{key.upper()} '{value}'")
+                            all_options.append(f"{key.upper()} '{escape_sql_string(value)}'")
                     else:
                         all_options.append(f"{key.upper()} {value}")
 
@@ -234,8 +240,22 @@ class DuckDBCredentials(Credentials):
     # which is the case in fully managed ducklake in MotherDuck.
     is_ducklake: Optional[bool] = None
 
+    # The access token to use when connecting to MotherDuck (i.e., when the
+    # path or an attached database uses the md: scheme); equivalent to
+    # setting motherduck_token in the settings dictionary.
+    motherduck_token: Optional[str] = None
+
     def __post_init__(self):
         self.settings = self.settings or {}
+
+        if self.motherduck_token:
+            existing_token = self.settings.get("motherduck_token")
+            if existing_token is not None and existing_token != self.motherduck_token:
+                raise DbtRuntimeError(
+                    "Conflicting values for motherduck_token found in the profile; "
+                    "please set it in only one place"
+                )
+            self.settings["motherduck_token"] = self.motherduck_token
         self.secrets = self.secrets or []
         self._secrets = []
 
@@ -319,7 +339,7 @@ class DuckDBCredentials(Credentials):
 
     @staticmethod
     def _is_motherduck(scheme: str) -> bool:
-        return scheme in {"md", "motherduck"}
+        return scheme in MOTHERDUCK_SCHEMES
 
     @staticmethod
     def path_derived_database_name(path: Optional[Any]) -> str:
@@ -334,6 +354,10 @@ class DuckDBCredentials(Credentials):
         elif parsed.scheme.lower() == "ducklake":
             parsed_ducklake = urlparse(inferred_db_name)
             inferred_db_name = parsed_ducklake.path
+        else:
+            # DuckDB names the catalog after the first non-empty dot-separated part
+            # of the file name, e.g. "my.db.duckdb" -> "my", ".hidden.duckdb" -> "hidden"
+            inferred_db_name = base_file.lstrip(".").split(".")[0]
 
         return inferred_db_name
 

@@ -237,6 +237,36 @@ def test_attachments():
         assert expected_sql[i] == attachment.to_sql()
 
 
+def test_attachment_strips_query_parameters_from_motherduck_paths():
+    assert (
+        Attachment(path="md:my_db?motherduck_token=abc123&user=1").to_sql()
+        == "ATTACH IF NOT EXISTS 'md:my_db'"
+    )
+    assert (
+        Attachment(path="motherduck:my_db?motherduck_token=abc123").to_sql()
+        == "ATTACH IF NOT EXISTS 'motherduck:my_db'"
+    )
+    assert (
+        Attachment(path="md:my_db?motherduck_token=ab#cd").to_sql()
+        == "ATTACH IF NOT EXISTS 'md:my_db'"
+    )
+    assert Attachment(path="md:my_db").to_sql() == "ATTACH IF NOT EXISTS 'md:my_db'"
+
+
+@pytest.mark.parametrize(
+    "path",
+    [
+        "postgresql://user@hostname/dbname?sslmode=require",
+        "https://example.com/db.duckdb?token=abc123",
+        "dbname=db host=h user=u password=aa?bb sslmode=require",
+        "dbname=db host=h user=u password=a#b?c sslmode=require",
+        "ducklake:postgres:dbname=meta host=h password=x?y",
+    ],
+)
+def test_attachment_preserves_query_parameters_for_non_motherduck_paths(path):
+    assert Attachment(path=path).to_sql() == f"ATTACH IF NOT EXISTS '{path}'"
+
+
 def test_attachments_with_options():
     # Test arbitrary options in options dict
     attachment = Attachment(
@@ -317,6 +347,22 @@ def test_infer_database_name_from_path():
     creds = DuckDBCredentials.from_dict(payload)
     assert creds.database == "f1234"
 
+    payload = {"path": "/tmp/analytics.duckdb"}
+    creds = DuckDBCredentials.from_dict(payload)
+    assert creds.database == "analytics"
+
+    payload = {"path": "/tmp/analytics.v2.duckdb"}
+    creds = DuckDBCredentials.from_dict(payload)
+    assert creds.database == "analytics"
+
+    payload = {"path": "my.db.duckdb"}
+    creds = DuckDBCredentials.from_dict(payload)
+    assert creds.database == "my"
+
+    payload = {"path": ".hidden.duckdb"}
+    creds = DuckDBCredentials.from_dict(payload)
+    assert creds.database == "hidden"
+
     payload = {"path": "md:?token=abc123"}
     creds = DuckDBCredentials.from_dict(payload)
     assert creds.database == "my_db"
@@ -335,6 +381,22 @@ def test_infer_database_name_from_path():
     }
     creds = DuckDBCredentials.from_dict(payload)
     assert creds.database == "remote"
+
+
+@pytest.mark.parametrize(
+    "filename", ["analytics.duckdb", "analytics.v2.duckdb", "my.db.duckdb", ".hidden.duckdb"]
+)
+def test_path_derived_database_name_matches_duckdb(tmp_path, filename):
+    path = str(tmp_path / filename)
+    with duckdb.connect(path) as conn:
+        catalog = conn.execute("SELECT current_database()").fetchone()[0]
+    assert DuckDBCredentials.path_derived_database_name(path) == catalog
+
+
+def test_database_matches_dotted_path():
+    payload = {"path": "/tmp/analytics.v2.duckdb", "database": "analytics"}
+    creds = DuckDBCredentials.from_dict(payload)
+    assert creds.database == "analytics"
 
 
 def test_database_matches_attach_alias():
@@ -425,3 +487,38 @@ def test_add_secret_with_list():
     allowed_hosts array ['host1', 'host2', 'host3']
 )"""
     assert sql == expected
+
+
+def test_motherduck_token_top_level():
+    creds = DuckDBCredentials(path="md:my_db", motherduck_token="quack")
+    assert creds.settings["motherduck_token"] == "quack"
+    # the auto-added motherduck plugin moves the token from the settings
+    # into the duckdb.connect config for non-attach connections
+    assert "motherduck" in [p.module for p in creds.plugins]
+    from dbt.adapters.duckdb.plugins import BasePlugin
+
+    plugin = BasePlugin.create("motherduck", credentials=creds)
+    config = {}
+    plugin.update_connection_config(creds, config)
+    assert config["motherduck_token"] == "quack"
+    assert "motherduck_token" not in creds.settings
+
+
+def test_motherduck_token_top_level_matching_settings():
+    creds = DuckDBCredentials(
+        path="md:my_db",
+        motherduck_token="quack",
+        settings={"motherduck_token": "quack"},
+    )
+    assert creds.settings["motherduck_token"] == "quack"
+
+
+def test_motherduck_token_conflict():
+    from dbt_common.exceptions import DbtRuntimeError
+
+    with pytest.raises(DbtRuntimeError):
+        DuckDBCredentials(
+            path="md:my_db",
+            motherduck_token="quack",
+            settings={"motherduck_token": "honk"},
+        )

@@ -126,6 +126,7 @@ class TestEphemeralDuckDB(BaseEphemeral):
 class TestIncrementalDuckDB(BaseIncremental):
     pass
 
+
 class TestBaseIncrementalNotSchemaChange(BaseIncrementalNotSchemaChange):
     pass
 

@@ -48,7 +48,7 @@ jobs:
           persist-credentials: false
 
       - name: Set up uv
-        uses: astral-sh/setup-uv@v9.0.0
+        uses: astral-sh/setup-uv@v10.3.0
         with:
           enable-cache: true
           python-version: '3.11'
@@ -71,7 +71,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ['3.10', '3.11', '3.12', '3.13']
+        python-version: ['3.11', '3.12', '3.13', '3.14']
 
     env:
       TOXENV: "unit"
@@ -84,7 +84,7 @@ jobs:
           persist-credentials: false
 
       - name: Set up uv (python ${{ matrix.python-version }})
-        uses: astral-sh/setup-uv@v9.0.0
+        uses: astral-sh/setup-uv@v10.3.0
         with:
           enable-cache: true
           python-version: ${{ matrix.python-version }}
@@ -123,7 +123,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ['3.10', '3.11', '3.12', '3.13']
+        python-version: ['3.11', '3.12', '3.13', '3.14']
 
     env:
       TOXENV: "functional"
@@ -139,7 +139,7 @@ jobs:
           persist-credentials: false
 
       - name: Set up uv (python ${{ matrix.python-version }})
-        uses: astral-sh/setup-uv@v9.0.0
+        uses: astral-sh/setup-uv@v10.3.0
         with:
           enable-cache: true
           python-version: ${{ matrix.python-version }}
@@ -163,6 +163,54 @@ jobs:
           name: functional_results_${{ matrix.python-version }}-${{ steps.date.outputs.date }}.csv
           path: functional_results.csv
 
+  ducklake:
+    name: DuckLake functional test / python ${{ matrix.python-version }}
+
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ['3.11', '3.12', '3.13', '3.14']
+
+    env:
+      TOXENV: "ducklake"
+      PYTEST_ADDOPTS: "-v --color=yes --csv ducklake_results.csv"
+      S3_MD_ORG_KEY: ${{ secrets.S3_MD_ORG_KEY }}
+      S3_MD_ORG_REGION: ${{ secrets.S3_MD_ORG_REGION }}
+      S3_MD_ORG_SECRET: ${{ secrets.S3_MD_ORG_SECRET }}
+
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Set up uv (python ${{ matrix.python-version }})
+        uses: astral-sh/setup-uv@v10.3.0
+        with:
+          enable-cache: true
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install python dependencies
+        run: |
+          uv tool install tox --with tox-uv
+          tox --version
+
+      - name: Run tox
+        run: tox
+
+      - name: Get current date
+        if: always()
+        id: date
+        run: echo "date=$(date +'%Y-%m-%dT%H_%M_%S')" >> $GITHUB_OUTPUT #no colons allowed for artifacts
+
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: ducklake_results_${{ matrix.python-version }}-${{ steps.date.outputs.date }}.csv
+          path: ducklake_results.csv
+
   filebased:
     name: file-based functional test / python ${{ matrix.python-version }}
 
@@ -171,7 +219,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ['3.10', '3.11', '3.12', '3.13']
+        python-version: ['3.11', '3.12', '3.13', '3.14']
 
     env:
       TOXENV: "filebased"
@@ -187,7 +235,7 @@ jobs:
           persist-credentials: false
 
       - name: Set up uv (python ${{ matrix.python-version }})
-        uses: astral-sh/setup-uv@v9.0.0
+        uses: astral-sh/setup-uv@v10.3.0
         with:
           enable-cache: true
           python-version: ${{ matrix.python-version }}
@@ -228,14 +276,6 @@ jobs:
     needs: [check-md-token]
     if: needs.check-md-token.outputs.exists == 'true'
 
-    # Tests share a single MotherDuck account/database (`md:test`), so concurrent
-    # runs across PRs/commits collide on catalog metadata and produce flaky
-    # failures. Serialize MotherDuck runs globally; queue rather than cancel so
-    # in-flight master runs aren't lost.
-    concurrency:
-      group: motherduck-functional-tests
-      cancel-in-progress: false
-
     runs-on: ubuntu-latest
 
     strategy:
@@ -258,7 +298,7 @@ jobs:
           persist-credentials: false
 
       - name: Set up uv (python ${{ matrix.python-version }})
-        uses: astral-sh/setup-uv@v9.0.0
+        uses: astral-sh/setup-uv@v10.3.0
         with:
           enable-cache: true
           python-version: ${{ matrix.python-version }}
@@ -282,6 +322,61 @@ jobs:
           name: motherduck_results_${{ matrix.python-version }}-${{ steps.date.outputs.date }}.csv
           path: motherduck_results.csv
 
+  motherduck-ducklake:
+    name: MotherDuck DuckLake functional test / python ${{ matrix.python-version }}
+    needs: [check-md-token]
+    if: needs.check-md-token.outputs.exists == 'true'
+
+    concurrency:
+      group: motherduck-functional-tests
+      cancel-in-progress: false
+
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ['3.11']
+
+    env:
+      TOXENV: "md-ducklake"
+      MOTHERDUCK_TOKEN: ${{ secrets.MOTHERDUCK_TOKEN_10 }}
+      PYTEST_ADDOPTS: "-v --color=yes --csv motherduck_ducklake_results.csv"
+      S3_MD_ORG_KEY: ${{ secrets.S3_MD_ORG_KEY }}
+      S3_MD_ORG_REGION: ${{ secrets.S3_MD_ORG_REGION }}
+      S3_MD_ORG_SECRET: ${{ secrets.S3_MD_ORG_SECRET }}
+
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Set up uv (python ${{ matrix.python-version }})
+        uses: astral-sh/setup-uv@v10.3.0
+        with:
+          enable-cache: true
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install python dependencies
+        run: |
+          uv tool install tox --with tox-uv
+          tox --version
+
+      - name: Run tox
+        run: tox
+
+      - name: Get current date
+        if: always()
+        id: date
+        run: echo "date=$(date +'%Y-%m-%dT%H_%M_%S')" >> $GITHUB_OUTPUT #no colons allowed for artifacts
+
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: motherduck_ducklake_results_${{ matrix.python-version }}-${{ steps.date.outputs.date }}.csv
+          path: motherduck_ducklake_results.csv
+
   buenavista:
     name: Buena Vista functional test / python ${{ matrix.python-version }}
 
@@ -303,7 +398,7 @@ jobs:
           persist-credentials: false
 
       - name: Set up uv (python ${{ matrix.python-version }})
-        uses: astral-sh/setup-uv@v9.0.0
+        uses: astral-sh/setup-uv@v10.3.0
         with:
           enable-cache: true
           python-version: ${{ matrix.python-version }}
@@ -335,7 +430,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ['3.10']
+        python-version: ['3.11']
 
     env:
       TOXENV: "fsspec"
@@ -348,7 +443,7 @@ jobs:
           persist-credentials: false
 
       - name: Set up uv (python ${{ matrix.python-version }})
-        uses: astral-sh/setup-uv@v9.0.0
+        uses: astral-sh/setup-uv@v10.3.0
         with:
           enable-cache: true
           python-version: ${{ matrix.python-version }}
@@ -394,7 +489,7 @@ jobs:
           persist-credentials: false
 
       - name: Set up uv (python ${{ matrix.python-version }})
-        uses: astral-sh/setup-uv@v9.0.0
+        uses: astral-sh/setup-uv@v10.3.0
         with:
           enable-cache: true
           python-version: ${{ matrix.python-version }}
@@ -432,7 +527,7 @@ jobs:
           fetch-depth: 0
 
       - name: Set up uv
-        uses: astral-sh/setup-uv@v9.0.0
+        uses: astral-sh/setup-uv@v10.3.0
         with:
           enable-cache: true
           python-version: '3.11'
@@ -466,11 +561,11 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
-        python-version: ['3.10', '3.11', '3.12', '3.13']
+        python-version: ['3.11', '3.12', '3.13', '3.14']
 
     steps:
       - name: Set up uv (python ${{ matrix.python-version }})
-        uses: astral-sh/setup-uv@v9.0.0
+        uses: astral-sh/setup-uv@v10.3.0
         with:
           enable-cache: true
           python-version: ${{ matrix.python-version }}
@@ -502,7 +597,7 @@ jobs:
   notify-failure:
     name: Send Slack notification on failure
     if: failure() && github.ref == 'refs/heads/master'
-    needs: [code-quality, unit, functional, filebased, motherduck, buenavista, fsspec, plugins, build, test-build]
+    needs: [code-quality, unit, functional, ducklake, filebased, motherduck, motherduck-ducklake, buenavista, fsspec, plugins, build, test-build]
     runs-on: ubuntu-latest
     steps:
       - name: Send Slack notification

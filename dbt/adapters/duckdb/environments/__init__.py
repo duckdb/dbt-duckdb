@@ -16,6 +16,7 @@ from ..constants import DEFAULT_TEMP_SCHEMA_NAME
 from ..credentials import DuckDBCredentials
 from ..credentials import Extension
 from ..plugins import BasePlugin
+from ..utils import escape_sql_string
 from ..utils import SourceConfig
 from ..utils import TargetConfig
 from dbt.adapters.contracts.connection import AdapterResponse
@@ -223,7 +224,7 @@ class Environment(abc.ABC):
             for key, value in creds.settings.items():
                 # Okay to set these as strings because DuckDB will cast them
                 # to the correct type
-                cursor.execute(f"SET {key} = '{value}'")
+                cursor.execute(f"SET {key} = '{escape_sql_string(value)}'")
 
         # update cursor if something is lost in the copy
         # of the parent connection

@@ -15,6 +15,7 @@ from tests.functional.adapter.indexes.fixtures import (
 INDEX_DEFINITION_PATTERN = re.compile(r"\((.*?)\)")
 
 
+@pytest.mark.skip_database_type("ducklake", reason="DuckLake does not support indexes")
 class TestIndex:
     @pytest.fixture(scope="class")
     def models(self):

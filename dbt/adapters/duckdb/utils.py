@@ -12,6 +12,11 @@ from dbt.adapters.contracts.relation import RelationConfig
 # from dbt.context.providers import RuntimeConfigObject
 
 
+def escape_sql_string(value: Any) -> str:
+    """Escape a config value for use inside a single-quoted DuckDB string literal."""
+    return str(value).replace("'", "''")
+
+
 @dataclass
 class SourceConfig:
     name: str

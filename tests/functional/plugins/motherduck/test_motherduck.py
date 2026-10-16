@@ -65,6 +65,7 @@ class TestMDPlugin:
                         "path": f"md:{test_database_name}",
                         "plugins": plugins,
                         "config_options": dbt_profile_target.get("config_options"),
+                        "is_ducklake": dbt_profile_target.get("is_ducklake"),
                     }
                 },
                 "target": "dev",
@@ -122,6 +123,26 @@ class TestMDPlugin:
         run_dbt()
         res = project.run_sql("SELECT count(*) FROM summary_of_logs_test", fetch="one")
         assert res == (70,)
+
+
+@pytest.mark.skip_profile("buenavista", "file", "memory")
+class TestMDPluginWithTopLevelToken(TestMDPlugin):
+    @pytest.fixture(scope="class")
+    def profiles_config_update(self, dbt_profile_target, test_database_name):
+        return {
+            "test": {
+                "outputs": {
+                    "dev": {
+                        "type": "duckdb",
+                        "path": f"md:{test_database_name}",
+                        "motherduck_token": dbt_profile_target.get("token"),
+                        "config_options": dbt_profile_target.get("config_options"),
+                        "is_ducklake": dbt_profile_target.get("is_ducklake"),
+                    }
+                },
+                "target": "dev",
+            }
+        }
 
 
 @pytest.fixture

@@ -8,6 +8,7 @@ from duckdb import DuckDBPyConnection
 from . import BasePlugin
 from dbt.adapters.duckdb.__version__ import version as __plugin_version__
 from dbt.adapters.duckdb.credentials import DuckDBCredentials
+from dbt.adapters.duckdb.utils import escape_sql_string
 from dbt.version import __version__
 
 CUSTOM_USER_AGENT = "custom_user_agent"
@@ -71,7 +72,7 @@ class Plugin(BasePlugin):
 
             # set MD config options and remove from settings
             for key, value in self.get_md_config_settings(config).items():
-                conn.execute(f"SET {key} = '{value}'")
+                conn.execute(f"SET {key} = '{escape_sql_string(value)}'")
                 if self.creds.settings is not None and key in self.creds.settings:
                     self.creds.settings.pop(key)
 
@@ -86,4 +87,10 @@ class Plugin(BasePlugin):
         # If a user specified MotherDuck config options via the plugin config,
         # pass it to the config kwarg in duckdb.connect.
         if not creds.is_motherduck_attach:
-            config.update(self.get_md_config_settings(self._config))
+            md_config = self.get_md_config_settings(self._config)
+            config.update(md_config)
+            # MotherDuck config options can only be set at connection init,
+            # so remove them from settings to prevent SET statements on cursors
+            for key in md_config:
+                if creds.settings is not None:
+                    creds.settings.pop(key, None)

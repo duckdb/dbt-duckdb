@@ -21,6 +21,7 @@ classifiers = [
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
 ]
 dependencies = [
     "dbt-common>=1,<2",
@@ -35,16 +36,16 @@ Homepage = "https://github.com/duckdb/dbt-duckdb"
 
 [project.optional-dependencies]
 glue = ["boto3", "mypy-boto3-glue"]
-md = ["duckdb==1.5.4"]
+md = ["duckdb==1.5.5"]
 
 [dependency-groups]
 dev = [
-    "dbt-core>=1.12.0,<2",
+    "dbt-core>=1.12.5,<2",
     "dbt-tests-adapter==1.20.0",
     "boto3",
     "mypy-boto3-glue",
     "pandas",
-    "pyarrow==24.0.0",
+    "pyarrow==25.0.1",
     "buenavista==0.5.0",
     "flaky",
     "freezegun==1.5.5",
@@ -61,8 +62,6 @@ dev = [
     "pytest",
     "pytest-cov",
     "pytest-dotenv",
-    "logbook<1.9",
-    "pytest-logbook",
     "pytest-csv",
     "pytest-xdist",
     "pytest-mock",
@@ -88,6 +87,7 @@ packages = ["dbt"]
 include = ["dbt", "tests", "README.md", "LICENSE", "CHANGELOG.md"]
 
 [tool.pytest.ini_options]
+addopts = "--strict-markers"
 testpaths = [
     "tests/functional",
     "tests/unit",
@@ -99,7 +99,8 @@ filterwarnings = [
 markers = [
     "with_s3_creds: marks tests that require S3 credentials",
     "requires_ducklake: marks tests that require the ducklake extension",
-    "skip_profile: marks tests to skip for a given profile type",
+    "skip_database_type(database_type): marks tests to skip for a given database type",
+    "skip_profile(profile): marks tests to skip for a given profile type",
 ]
 
 [tool.ruff]

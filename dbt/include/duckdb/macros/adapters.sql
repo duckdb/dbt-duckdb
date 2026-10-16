@@ -55,7 +55,8 @@
     (
     {% for i in user_provided_columns %}
       {% set col = user_provided_columns[i] %}
-      {{ col['name'] }} {{ "," if not loop.last }}
+      {% set col_name = adapter.quote(col['name']) if col.get('quote') else col['name'] %}
+      {{ col_name }} {{ "," if not loop.last }}
     {% endfor %}
   )
 {% endmacro %}
@@ -67,10 +68,10 @@
   {%- endif -%}
 
   {%- set raw = config.get('partitioned_by', none) -%}
-  {%- if raw is none -%}
+  {%- if raw is none or raw == '' -%}
     {%- set raw = config.get('partition_by', none) -%}
   {%- endif -%}
-  {%- if raw is none -%}
+  {%- if raw is none or raw == '' -%}
     {{ return(none) }}
   {%- endif -%}
 
@@ -94,12 +95,7 @@
     {{ return(none) }}
   {%- endif -%}
 
-  {%- set quoted = [] -%}
-  {%- for col in parts -%}
-    {%- set escaped = col | replace('"', '""') -%}
-    {%- do quoted.append(adapter.quote(escaped)) -%}
-  {%- endfor -%}
-  {{ return(quoted | join(', ')) }}
+  {{ return(parts | join(', ')) }}
 {%- endmacro %}
 
 
@@ -256,6 +252,20 @@ def materialize(df, con):
   );
 {% endmacro %}
 
+{% macro duckdb__get_empty_subquery_sql(select_sql, select_sql_header=none) %}
+    {#- get_column_schema_from_query wraps this in DESCRIBE (...), which cannot parse
+        an inlined sql_header (issue #515), so run the header separately to keep its
+        session effects visible to the describe -#}
+    {%- if select_sql_header is not none -%}
+      {%- do run_query(select_sql_header) -%}
+    {%- endif -%}
+    select * from (
+        {{ select_sql }}
+    ) as __dbt_sbq
+    where false
+    limit 0
+{% endmacro %}
+
 {% macro duckdb__get_columns_in_relation(relation) -%}
   {# DESCRIBE avoids the global information_schema.columns scan, which forces a full
      catalog load on attached catalogs like DuckLake (issue #762). DuckDB's column_type
@@ -309,6 +319,9 @@ def materialize(df, con):
 {% endmacro %}
 
 {% macro duckdb__make_temp_relation(base_relation, suffix) %}
+    {# Creates duckdb temporary tables, i.e. ephemeral per connection and on the temp.main schema.
+    Temporary tables are always allocated in the DuckdDB client's memory, even when called from a MotherDuck connection. #}
+
     {% set tmp_identifier = base_relation.identifier ~ suffix ~ py_current_timestring() %}
     {% do return(base_relation.incorporate(
                                   path={
@@ -316,6 +329,33 @@ def materialize(df, con):
                                     "schema": none,
                                     "database": none
                                   })) -%}
+{% endmacro %}
+
+{% macro duckdb__dispatch_temporary_relation(target_relation, batch_id='') %}
+    {# Prepares a relation that is meant to be temporary.
+
+     This macro is called when creating the temporary relations needed for incremental models and snapshots.
+
+     When running against duckdb,
+     it dispatches to standard dbt-core machinery to create a temporary table.
+     However, MotherDuck doesn't support server-side temporary tables,
+     so it dispatches to a fully qualified unique table relation under a temporary schema. #}
+
+    {% if adapter.is_motherduck() %}
+        {% set relation = target_relation.incorporate(
+            path=adapter.get_temp_relation_path(target_relation, batch_id)
+        ) %}
+        {% do run_query(create_schema(relation)) %}
+        {% if not adapter.disable_transactions() %}
+            {% do adapter.commit() %}
+        {% endif %}
+        {% do return({'relation': relation, 'temporary': false}) %}
+    {% else %}
+        {% do return({
+            'relation': make_temp_relation(target_relation),
+            'temporary': true
+        }) %}
+    {% endif %}
 {% endmacro %}
 
 {% macro duckdb__current_timestamp() -%}
