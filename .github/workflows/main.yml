@@ -379,6 +379,59 @@ jobs:
           name: motherduck_ducklake_results_${{ matrix.python-version }}-${{ steps.date.outputs.date }}.csv
           path: motherduck_ducklake_results.csv
 
+  motherduck-flights:
+    name: MotherDuck Flights functional test / python ${{ matrix.python-version }}
+    needs: [check-md-token]
+    if: needs.check-md-token.outputs.exists == 'true'
+
+    # Each test starts a real Flight, so keep them off each other's toes
+    concurrency:
+      group: motherduck-flights-tests
+      cancel-in-progress: false
+
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ['3.11']
+
+    env:
+      TOXENV: "md-flights"
+      MOTHERDUCK_TOKEN: ${{ secrets.MOTHERDUCK_TOKEN_10 }}
+      PYTEST_ADDOPTS: "-v --color=yes --csv motherduck_flights_results.csv"
+
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v7
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install python dependencies
+        run: |
+          python -m pip install tox
+          python -m pip --version
+          tox --version
+
+      - name: Run tox
+        run: tox
+
+      - name: Get current date
+        if: always()
+        id: date
+        run: echo "date=$(date +'%Y-%m-%dT%H_%M_%S')" >> $GITHUB_OUTPUT #no colons allowed for artifacts
+
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: motherduck_flights_results_${{ matrix.python-version }}-${{ steps.date.outputs.date }}.csv
+          path: motherduck_flights_results.csv
+
   buenavista:
     name: Buena Vista functional test / python ${{ matrix.python-version }}
 
@@ -600,7 +653,7 @@ jobs:
   notify-failure:
     name: Send Slack notification on failure
     if: failure() && github.ref == 'refs/heads/master'
-    needs: [code-quality, unit, functional, ducklake, filebased, motherduck, motherduck-ducklake, buenavista, fsspec, plugins, build, test-build]
+    needs: [code-quality, unit, functional, ducklake, filebased, motherduck, motherduck-ducklake, motherduck-flights, buenavista, fsspec, plugins, build, test-build]
     runs-on: ubuntu-latest
     steps:
       - name: Send Slack notification
