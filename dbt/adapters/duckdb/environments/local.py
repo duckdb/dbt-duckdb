@@ -117,7 +117,9 @@ class LocalEnvironment(Environment):
             if source_config.database:
                 q += "AND table_catalog = ?"
                 params.append(source_config.database)
-            if cursor.execute(q, params).fetchone()[0]:
+            # fetchall() drains the result; DuckDB 2.0 rejects register() on a cursor
+            # whose result was only partially fetched.
+            if cursor.execute(q, params).fetchall()[0][0]:
                 if save_mode == "error_if_exists":
                     raise Exception(f"Source {source_config.table_name()} already exists!")
                 else:
