@@ -38,6 +38,7 @@ jobs:
       S3_MD_ORG_KEY: ${{ secrets.S3_MD_ORG_KEY }}
       S3_MD_ORG_REGION: ${{ secrets.S3_MD_ORG_REGION }}
       S3_MD_ORG_SECRET: ${{ secrets.S3_MD_ORG_SECRET }}
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
     steps:
       - name: Check out the repository
