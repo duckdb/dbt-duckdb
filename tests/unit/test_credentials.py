@@ -522,3 +522,47 @@ def test_motherduck_token_conflict():
             motherduck_token="quack",
             settings={"motherduck_token": "honk"},
         )
+
+
+@pytest.mark.parametrize(
+    "key",
+    ["motherduck_token", "MOTHERDUCK_TOKEN", "token", "TOKEN"],
+)
+def test_motherduck_token_settings_aliases_removed_for_direct_connection(key):
+    from dbt.adapters.duckdb.environments import Environment
+
+    creds = DuckDBCredentials(path="md:my_db", settings={key: "quack", "threads": 2})
+    plugins = Environment.initialize_plugins(creds)
+    config = {}
+    for plugin in plugins.values():
+        plugin.update_connection_config(creds, config)
+    assert config["motherduck_token"] == "quack"
+    # init-only options must not be re-applied with SET statements on cursors
+    assert creds.settings == {"threads": 2}
+    cursor = mock.MagicMock()
+    Environment.initialize_cursor(creds, cursor)
+    assert [c.args[0] for c in cursor.execute.call_args_list] == ["SET threads = '2'"]
+
+
+@pytest.mark.parametrize(
+    "key",
+    ["motherduck_token", "MOTHERDUCK_TOKEN", "token", "TOKEN"],
+)
+def test_motherduck_token_settings_aliases_removed_for_attachment(key):
+    from dbt.adapters.duckdb.environments import Environment
+
+    creds = DuckDBCredentials(
+        path=":memory:",
+        attach=[Attachment(path="md:my_db")],
+        settings={key: "quack", "threads": 2},
+    )
+    plugins = Environment.initialize_plugins(creds)
+    conn = mock.MagicMock()
+    for plugin in plugins.values():
+        plugin.configure_connection(conn)
+    assert [c.args[0] for c in conn.execute.call_args_list] == ["SET motherduck_token = 'quack'"]
+    # init-only options must not be re-applied with SET statements on cursors
+    assert creds.settings == {"threads": 2}
+    cursor = mock.MagicMock()
+    Environment.initialize_cursor(creds, cursor)
+    assert [c.args[0] for c in cursor.execute.call_args_list] == ["SET threads = '2'"]
