@@ -45,7 +45,9 @@ class TestExternalUtils(unittest.TestCase):
             ("bar", {"delimiter": "|", "header": "0"}, "delimiter '|', header 0, format csv"),
             ("a.parquet", {"partition_by": "ds"}, "partition_by ds, format parquet"),
             ("b.csv", {"partition_by": "ds,category"}, "partition_by (ds,category), format csv, header 1"),
-            ("/path/to/c.csv", {"null": "\\N"}, "null '\\N', format csv, header 1")
+            ("/path/to/c.csv", {"null": "\\N"}, "null '\\N', format csv, header 1"),
+            ("/tmp/d.csv.gz", {}, "format csv, header 1"),
+            ("e.json.zst", {}, "format json"),
         ]
 
         for (loc, opts, expected) in data:

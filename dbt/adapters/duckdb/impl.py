@@ -235,7 +235,12 @@ class DuckDBAdapter(SQLAdapter):
     @available
     def external_write_options(self, write_location: str, rendered_options: dict) -> str:
         if "format" not in rendered_options:
-            ext = os.path.splitext(write_location)[1].lower()
+            root, ext = os.path.splitext(write_location)
+            # DuckDB infers the compression from a trailing .gz/.zst, so the
+            # format comes from the extension before it (e.g. "data.csv.gz")
+            if ext.lower() in (".gz", ".zst"):
+                ext = os.path.splitext(root)[1]
+            ext = ext.lower()
             if ext:
                 rendered_options["format"] = ext[1:]
             elif "delimiter" in rendered_options:
