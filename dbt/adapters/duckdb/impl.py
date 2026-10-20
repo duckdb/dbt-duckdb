@@ -452,19 +452,18 @@ class DuckDBAdapter(SQLAdapter):
     # lock for the whole materialization.
     _foreign_key_lock = threading.Lock()
 
-    def _needs_foreign_key_lock(self, model: Any) -> bool:
+    @staticmethod
+    def _key_constraint_types(model: Any) -> set:
         contract = getattr(model, "contract", None)
         if not (contract and contract.enforced):
-            return False
+            return set()
         constraints = list(getattr(model, "constraints", None) or [])
         for column in (getattr(model, "columns", None) or {}).values():
             constraints.extend(column.constraints or [])
-        types = {constraint.type for constraint in constraints}
-        if ConstraintType.foreign_key in types:
-            return True
-        if not types & {ConstraintType.primary_key, ConstraintType.unique}:
-            # nothing can reference a table without a primary key or unique constraint
-            return False
+        key_types = {ConstraintType.primary_key, ConstraintType.unique, ConstraintType.foreign_key}
+        return {constraint.type for constraint in constraints} & key_types
+
+    def _is_foreign_key_target(self, model: Any) -> bool:
         # Foreign keys cannot cross schemas in DuckDB, so only this schema can hold one
         _, table = self.execute(
             f"""
@@ -480,6 +479,25 @@ class DuckDBAdapter(SQLAdapter):
         )
         return len(table) > 0
 
+    def _acquire_foreign_key_lock(self, model: Any) -> bool:
+        """Take the foreign key lock if this model needs it, returning whether it does."""
+        types = self._key_constraint_types(model)
+        if not types:
+            # nothing can reference a table without a primary key or unique constraint
+            return False
+        self._foreign_key_lock.acquire()
+        # Check for references only while holding the lock: a foreign key model being
+        # built in another thread can hide its references from duckdb_constraints()
+        # until it commits.
+        try:
+            if ConstraintType.foreign_key in types or self._is_foreign_key_target(model):
+                return True
+        except BaseException:
+            self._foreign_key_lock.release()
+            raise
+        self._foreign_key_lock.release()
+        return False
+
     def pre_model_hook(self, config: Any) -> Any:
         """A hook for getting the temp schema name from the model config.
         Cleans up the remote temporary table on MotherDuck before running
@@ -491,9 +509,7 @@ class DuckDBAdapter(SQLAdapter):
                 TEMP_SCHEMA_NAME, self._temp_schema_name
             )
             self._clean_up_temp_relation_for_incremental(config)
-            if self._needs_foreign_key_lock(config.model):
-                self._foreign_key_lock.acquire()
-                holds_foreign_key_lock = True
+            holds_foreign_key_lock = self._acquire_foreign_key_lock(config.model)
         super().pre_model_hook(config)
         return holds_foreign_key_lock
 
