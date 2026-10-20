@@ -1,4 +1,5 @@
 import os
+import threading
 from collections import defaultdict
 from dataclasses import dataclass
 from datetime import datetime
@@ -444,17 +445,57 @@ class DuckDBAdapter(SQLAdapter):
                 )
                 self.drop_relation(temp_relation)
 
-    def pre_model_hook(self, config: Any) -> None:
+    # Creating or dropping a table with a foreign key also alters the table it
+    # references, so DuckDB raises a write-write conflict when two models that share
+    # a foreign key relationship are built in concurrent transactions. Models that
+    # declare a foreign key, or that a foreign key currently references, take this
+    # lock for the whole materialization.
+    _foreign_key_lock = threading.Lock()
+
+    def _needs_foreign_key_lock(self, model: Any) -> bool:
+        contract = getattr(model, "contract", None)
+        if not (contract and contract.enforced):
+            return False
+        constraints = list(getattr(model, "constraints", None) or [])
+        for column in (getattr(model, "columns", None) or {}).values():
+            constraints.extend(column.constraints or [])
+        types = {constraint.type for constraint in constraints}
+        if ConstraintType.foreign_key in types:
+            return True
+        if not types & {ConstraintType.primary_key, ConstraintType.unique}:
+            # nothing can reference a table without a primary key or unique constraint
+            return False
+        # Foreign keys cannot cross schemas in DuckDB, so only this schema can hold one
+        _, table = self.execute(
+            f"""
+            select 1 from duckdb_constraints()
+            where constraint_type = 'FOREIGN KEY'
+              and database_name = '{model.database}'
+              and schema_name = '{model.schema}'
+              and lower(referenced_table) = lower('{model.alias or model.name}')
+              and lower(table_name) <> lower(referenced_table)
+            limit 1
+            """,
+            fetch=True,
+        )
+        return len(table) > 0
+
+    def pre_model_hook(self, config: Any) -> Any:
         """A hook for getting the temp schema name from the model config.
         Cleans up the remote temporary table on MotherDuck before running
-        an incremental model.
+        an incremental model, and serializes models in foreign key relationships.
         """
+        holds_foreign_key_lock = False
         if hasattr(config, "model"):
             self._temp_schema_name = config.model.config.meta.get(
                 TEMP_SCHEMA_NAME, self._temp_schema_name
             )
             self._clean_up_temp_relation_for_incremental(config)
+            if self._needs_foreign_key_lock(config.model):
+                self._foreign_key_lock.acquire()
+                holds_foreign_key_lock = True
         super().pre_model_hook(config)
+        return holds_foreign_key_lock
 
     @available
     def batch_id_for_model(self, model: Any) -> str:
@@ -506,8 +547,12 @@ class DuckDBAdapter(SQLAdapter):
         """A hook for cleaning up the remote temporary table on MotherDuck if the
         incremental model materialization fails to do so.
         """
-        self._clean_up_temp_relation_for_incremental(config)
-        super().post_model_hook(config, context)
+        try:
+            self._clean_up_temp_relation_for_incremental(config)
+            super().post_model_hook(config, context)
+        finally:
+            if context is True:
+                self._foreign_key_lock.release()
 
 
 # Change `table_a/b` to `table_aaaaa/bbbbb` to avoid duckdb binding issues when relation_a/b

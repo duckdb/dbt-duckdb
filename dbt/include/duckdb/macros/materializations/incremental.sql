@@ -48,6 +48,10 @@
 
   {% if existing_relation is none %}
     {% set build_sql = create_table_as(False, target_relation, compiled_code, language, partitioned_by=partitioned_by, sorted_by=sorted_by) %}
+  {% elif full_refresh_mode and has_foreign_key_constraints() %}
+    {#-- Tables with foreign keys must not be renamed (see has_foreign_key_constraints) --#}
+    {% do drop_relation_for_rebuild(existing_relation) %}
+    {% set build_sql = create_table_as(False, target_relation, compiled_code, language, partitioned_by=partitioned_by, sorted_by=sorted_by) %}
   {% elif full_refresh_mode %}
     {% set build_sql = create_table_as(False, intermediate_relation, compiled_code, language, partitioned_by=partitioned_by, sorted_by=sorted_by) %}
     {% set need_swap = true %}
@@ -84,8 +88,11 @@
   {% endcall %}
 
   {% if need_swap %}
-      {#-- Drop indexes on target relation before renaming to backup to avoid dependency errors --#}
+      {#-- Drop indexes and foreign key dependents on target relation before renaming to backup to avoid dependency errors --#}
       {% do drop_indexes_on_relation(target_relation) %}
+      {% if may_be_foreign_key_target() %}
+        {% do drop_foreign_key_dependents(target_relation) %}
+      {% endif %}
       {% do adapter.rename_relation(target_relation, backup_relation) %}
       {% do adapter.rename_relation(intermediate_relation, target_relation) %}
       {% do to_drop.append(backup_relation) %}

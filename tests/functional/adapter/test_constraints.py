@@ -11,6 +11,7 @@ from dbt.tests.adapter.constraints.test_constraints import (
     BaseModelConstraintsRuntimeEnforcement,
 )
 from dbt.tests.util import run_dbt
+from dbt.tests.util import run_dbt_and_capture
 
 
 pytestmark = pytest.mark.skip_database_type(
@@ -209,3 +210,192 @@ models:
             fetch="all",
         )
         assert incremental_rows == [(1, "a", "x"), (1, "a", "x")]
+
+
+fk_parent_sql = """
+{{ config(materialized='table') }}
+select {{ var('parent_id', 1) }} as id
+"""
+
+fk_child_sql = """
+{{ config(materialized='table') }}
+select 10 as id, 1 as foo_id, 1 as bar_id
+"""
+
+fk_grandchild_sql = """
+-- depends_on: {{ ref('child') }}
+{{ config(materialized='table') }}
+select 10 as child_id
+"""
+
+fk_schema_yml = """
+version: 2
+
+models:
+  - name: foo
+    config:
+      contract: {enforced: true}
+    columns:
+      - name: id
+        data_type: int
+        constraints: [{type: primary_key}]
+  - name: bar
+    config:
+      contract: {enforced: true}
+    columns:
+      - name: id
+        data_type: int
+        constraints: [{type: primary_key}]
+  - name: child
+    config:
+      contract: {enforced: true}
+    columns:
+      - name: id
+        data_type: int
+        constraints: [{type: primary_key}]
+      - name: foo_id
+        data_type: int
+        constraints: [{type: foreign_key, to: ref('foo'), to_columns: [id]}]
+      - name: bar_id
+        data_type: int
+        constraints: [{type: foreign_key, to: ref('bar'), to_columns: [id]}]
+  - name: grandchild
+    config:
+      contract: {enforced: true}
+    columns:
+      - name: child_id
+        data_type: int
+        constraints: [{type: foreign_key, expression: "{schema}.child (id)"}]
+"""
+
+
+@pytest.mark.skip_profile("md", "buenavista")
+class TestForeignKeyRerun:
+    """Re-running models that a foreign key references (issue #425)."""
+
+    @pytest.fixture(scope="class")
+    def models(self, unique_schema):
+        return {
+            "foo.sql": fk_parent_sql,
+            "bar.sql": fk_parent_sql,
+            "child.sql": fk_child_sql,
+            "grandchild.sql": fk_grandchild_sql,
+            "schema.yml": fk_schema_yml.replace("{schema}", unique_schema),
+        }
+
+    def assert_all_tables_droppable(self, project):
+        # DuckDB keeps the name a foreign key table was created under on the table it
+        # references, so a table that was renamed into place leaves its parent impossible
+        # to drop (duckdb/duckdb#24648). Dropping everything checks we never do that.
+        for name in ["grandchild", "child", "foo", "bar"]:
+            project.run_sql(f"drop table {project.test_schema}.{name}")
+
+    def test_rerun(self, project):
+        for _ in range(3):
+            results = run_dbt(["run"])
+            assert len(results) == 4
+        # the dependents were rebuilt, with their foreign keys
+        fks = project.run_sql(
+            f"""
+            select table_name, referenced_table from duckdb_constraints()
+            where constraint_type = 'FOREIGN KEY' and schema_name = '{project.test_schema}'
+            order by all
+            """,
+            fetch="all",
+        )
+        assert [tuple(row) for row in fks] == [
+            ("child", "bar"),
+            ("child", "foo"),
+            ("grandchild", "child"),
+        ]
+        self.assert_all_tables_droppable(project)
+
+    def test_rerun_with_threads(self, project):
+        for _ in range(3):
+            results = run_dbt(["run", "--threads", "8"])
+            assert len(results) == 4
+        self.assert_all_tables_droppable(project)
+
+    def test_rerun_dependent_only(self, project):
+        run_dbt(["run"])
+        run_dbt(["run", "-s", "grandchild"])
+        self.assert_all_tables_droppable(project)
+
+    def test_unselected_dependent_is_an_error(self, project):
+        run_dbt(["run"])
+        _, log = run_dbt_and_capture(["run", "-s", "foo"], expect_pass=False)
+        assert "child (model child is not selected in this run)" in log
+        assert "grandchild (model grandchild is not selected in this run)" in log
+        # nothing was dropped
+        assert len(project.run_sql(f"select * from {project.test_schema}.grandchild", fetch="all")) == 1
+
+
+@pytest.mark.skip_profile("md", "buenavista")
+class TestForeignKeyDependentWithoutRef:
+    @pytest.fixture(scope="class")
+    def models(self, unique_schema):
+        return {
+            "foo.sql": fk_parent_sql,
+            "child.sql": "{{ config(materialized='table') }} select 1 as foo_id",
+            "schema.yml": """
+version: 2
+models:
+  - name: foo
+    config:
+      contract: {enforced: true}
+    columns:
+      - {name: id, data_type: int, constraints: [{type: primary_key}]}
+  - name: child
+    config:
+      contract: {enforced: true}
+    columns:
+      - name: foo_id
+        data_type: int
+        constraints: [{type: foreign_key, expression: "{schema}.foo (id)"}]
+""".replace("{schema}", unique_schema),
+        }
+
+    def test_dependent_without_ref_is_an_error(self, project):
+        # without a ref() dbt is free to build child before foo
+        run_dbt(["run", "-s", "foo"])
+        run_dbt(["run", "-s", "child"])
+        _, log = run_dbt_and_capture(["run", "-s", "foo", "child"], expect_pass=False)
+        assert "does not ref() the table its foreign key points at" in log
+
+
+@pytest.mark.skip_profile("md", "buenavista")
+class TestForeignKeyIncrementalDependent:
+    @pytest.fixture(scope="class")
+    def models(self):
+        return {
+            "foo.sql": fk_parent_sql,
+            "child.sql": """
+{{ config(materialized='incremental', on_schema_change='fail') }}
+select 1 as foo_id
+""",
+            "schema.yml": """
+version: 2
+models:
+  - name: foo
+    config:
+      contract: {enforced: true}
+    columns:
+      - {name: id, data_type: int, constraints: [{type: primary_key}]}
+  - name: child
+    config:
+      contract: {enforced: true}
+    columns:
+      - name: foo_id
+        data_type: int
+        constraints: [{type: foreign_key, to: ref('foo'), to_columns: [id]}]
+""",
+        }
+
+    def test_incremental_dependent(self, project):
+        run_dbt(["run"])
+        _, log = run_dbt_and_capture(["run"], expect_pass=False)
+        assert "is materialized as incremental and would lose its data" in log
+        for _ in range(2):
+            run_dbt(["run", "--full-refresh"])
+        for name in ["child", "foo"]:
+            project.run_sql(f"drop table {project.test_schema}.{name}")
