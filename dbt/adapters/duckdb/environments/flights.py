@@ -1,12 +1,16 @@
-"""Run dbt Python models on MotherDuck Flights instead of in the dbt process.
-A Flight is a single-file Python program that MotherDuck runs in its own
-container. dbt-core's compiled Python model only needs a DuckDB connection and a
-function mapping a relation name to a DataFrame, so the Flight source is that
-compiled code plus a generated main() supplying both. The lifecycle is expressed
-as MD_*_FLIGHT SQL functions, callable on any MotherDuck connection -- including
-one in SaaS mode, which is what lets Python models run there at all.
-"""
-
+# Run dbt Python models on MotherDuck Flights instead of in the dbt process.
+#
+# A Flight is a single-file Python program that MotherDuck runs in its own
+# container. dbt-core's compiled Python model only needs a DuckDB connection and
+# a function mapping a relation name to a DataFrame, so the Flight source is
+# that compiled code plus a generated main() supplying both. The lifecycle is
+# expressed as MD_*_FLIGHT SQL functions, callable on any MotherDuck connection
+# -- including one in SaaS mode, which is what lets Python models run there at
+# all.
+#
+# A comment rather than a module docstring on purpose: reorder-python-imports
+# strips the blank line a docstring needs before the first import and ruff-format
+# puts it back, so the two pre-commit hooks never converge on such a file.
 import re
 import time
 from dataclasses import dataclass
