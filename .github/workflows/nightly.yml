@@ -23,7 +23,7 @@ defaults:
 
 jobs:
   nightly:
-    name: nightly test / python ${{ matrix.python-version }}
+    name: ${{ matrix.toxenv }} test / python ${{ matrix.python-version }}
 
     runs-on: ubuntu-latest
 
@@ -31,9 +31,18 @@ jobs:
       fail-fast: false
       matrix:
         python-version: ['3.11', '3.12', '3.13', '3.14']
+        toxenv: ['nightly']
+        # the remaining suites only need one python version to catch DuckDB regressions
+        include:
+          - python-version: '3.13'
+            toxenv: 'nightly-file'
+          - python-version: '3.13'
+            toxenv: 'nightly-plugins'
+          - python-version: '3.13'
+            toxenv: 'nightly-ducklake'
 
     env:
-      TOXENV: "nightly"
+      TOXENV: ${{ matrix.toxenv }}
       PYTEST_ADDOPTS: "-v -rfs --color=yes --csv unit_results.csv"
       S3_MD_ORG_KEY: ${{ secrets.S3_MD_ORG_KEY }}
       S3_MD_ORG_REGION: ${{ secrets.S3_MD_ORG_REGION }}
@@ -67,7 +76,7 @@ jobs:
       - uses: actions/upload-artifact@v7
         if: always()
         with:
-          name: unit_results_${{ matrix.python-version }}-${{ steps.date.outputs.date }}.csv
+          name: ${{ matrix.toxenv }}_results_${{ matrix.python-version }}-${{ steps.date.outputs.date }}.csv
           path: unit_results.csv
 
   notify-failure:
