@@ -37,8 +37,12 @@ TERMINAL_STATUSES = frozenset({"SUCCEEDED", "FAILED", "CANCELLED"})
 MAX_SOURCE_BYTES = 200 * 1024
 MAX_REQUIREMENTS_BYTES = 20 * 1024
 
-# Flight names are shown in the MotherDuck UI; keep them bounded.
-MAX_FLIGHT_NAME_LENGTH = 120
+# Verified accepted by MotherDuck; a much longer name fails there with an
+# opaque internal error, so reject it here with something actionable instead.
+MAX_FLIGHT_NAME_LENGTH = 200
+
+# How long to wait for a cancelled run to actually stop before giving up on it.
+CANCEL_WAIT_SEC = 60
 
 # Where a failed run's logs live, unless `flights.log_url_template` says otherwise.
 DEFAULT_LOG_URL_TEMPLATE = "https://app.motherduck.com/flights/{flight_id}/runs/{run_number}"
@@ -95,11 +99,22 @@ def _distribution_name(requirement: str) -> Optional[str]:
 
 
 def sanitize_flight_name(name: str) -> str:
-    """Make a name safe and bounded, preserving anything already reasonable."""
+    """Make a name safe for MotherDuck, rejecting one it could not carry.
+
+    Deliberately not truncated: two models whose names agree up to the cut
+    would share one Flight and silently overwrite each other's source on every
+    run, which is far worse than being told to pick shorter names.
+    """
     name = re.sub(r"[^A-Za-z0-9_.-]+", "_", name).strip("_-")
     if not name:
         raise DbtRuntimeError("The flight_name macro returned an empty Flight name.")
-    return name[:MAX_FLIGHT_NAME_LENGTH]
+    if len(name) > MAX_FLIGHT_NAME_LENGTH:
+        raise DbtRuntimeError(
+            f"Flight name '{name}' is {len(name)} characters, over MotherDuck's "
+            f"{MAX_FLIGHT_NAME_LENGTH} character limit. Override the `duckdb__flight_name` "
+            "macro to give this project's Flights shorter names."
+        )
+    return name
 
 
 def settings_statements(settings: Optional[Dict[str, Any]]) -> List[str]:
@@ -414,12 +429,36 @@ class FlightRunner:
                 "SELECT * FROM MD_CANCEL_FLIGHT_RUN("
                 f"flight_id := '{flight_id}', run_number := {run_number})",
             )
-            return True
         except Exception as err:
             # Losing the race against a run that just finished is normal, and a
             # failed cancel must not mask the timeout being reported.
             logger.debug(f"Could not cancel flight run {run_number}: {err}")
             return False
+        return self._wait_until_stopped(cursor, flight_id, run_number)
+
+    def _wait_until_stopped(self, cursor, flight_id: str, run_number: int) -> bool:
+        """Wait for a cancelled run to actually reach a terminal status.
+
+        dbt drops the model's temp relation once this raises. A run still
+        writing at that point would recreate the table afterwards, and because
+        the relation name carries a per-invocation id, no later dbt run would
+        ever find it to clean up.
+        """
+        deadline = time.monotonic() + CANCEL_WAIT_SEC
+        while time.monotonic() < deadline:
+            row = self._execute(
+                cursor,
+                "SELECT status FROM MD_GET_FLIGHT_RUN("
+                f"flight_id := '{flight_id}', run_number := {run_number})",
+            ).fetchone()
+            if row and str(row[0]) in TERMINAL_STATUSES:
+                return True
+            time.sleep(self._config.poll_interval_sec)
+        logger.warning(
+            f"MotherDuck Flight run {run_number} did not stop within {CANCEL_WAIT_SEC}s "
+            "of being cancelled; it may leave a temp relation behind."
+        )
+        return False
 
     # -- diagnostics -------------------------------------------------------
 

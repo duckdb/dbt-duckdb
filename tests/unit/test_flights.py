@@ -5,6 +5,7 @@ from dbt_common.exceptions import DbtRuntimeError
 
 from dbt.adapters.duckdb.credentials import DuckDBCredentials, FlightConfig
 from dbt.adapters.duckdb.constants import FLIGHT_NAME_KEY
+from dbt.adapters.duckdb.environments import flights
 from dbt.adapters.duckdb.environments.flights import (
     FlightRunner,
     FlightSpec,
@@ -73,9 +74,24 @@ def test_flight_name_falls_back_when_the_macro_did_not_run():
     assert name == "dbt-my_project-my_db-main-my_model"
 
 
-def test_flight_name_is_sanitized_and_bounded():
+def test_flight_name_is_sanitized():
     assert sanitize_flight_name("dbt.dev schema/model") == "dbt.dev_schema_model"
-    assert len(sanitize_flight_name("x" * 300)) == 120
+
+
+def test_over_long_flight_name_is_rejected_not_truncated():
+    # Truncating would let two models whose names agree up to the cut share a
+    # Flight and overwrite each other's source on every run.
+    with pytest.raises(DbtRuntimeError, match="character limit"):
+        sanitize_flight_name("x" * 201)
+    assert len(sanitize_flight_name("x" * 200)) == 200
+
+
+def test_names_that_differ_only_past_the_limit_do_not_collide():
+    long_a = "dbt-" + "x" * 200 + "-model_a"
+    long_b = "dbt-" + "x" * 200 + "-model_b"
+    for name in (long_a, long_b):
+        with pytest.raises(DbtRuntimeError, match="character limit"):
+            sanitize_flight_name(name)
 
 
 def test_flight_name_rejects_an_empty_macro_result():
@@ -247,17 +263,26 @@ def test_failure_inlines_a_log_tail_when_asked():
     assert '"limit" := 20' in cursor.sql_containing("MD_GET_FLIGHT_LOGS")[0]
 
 
-def test_submit_cancels_the_run_when_it_times_out():
+def test_submit_cancels_the_run_and_waits_for_it_to_stop():
+    # An abandoned run would commit the table after dbt gave up on the node,
+    # and dbt drops the temp relation as soon as submit() raises -- so this
+    # has to wait for the run to actually stop, not just ask it to.
     cursor = _runner_cursor(status="RUNNING")
     cursor.responses["MD_CANCEL_FLIGHT_RUN"] = [(True,)]
+    # FakeCursor.fetchone() reads row 0, so each response is a list of rows
+    statuses = iter([[("RUNNING",)], [("CANCELLED",)]])
+    cursor.responses["MD_GET_FLIGHT_RUN"] = lambda: next(statuses, [("CANCELLED",)])
 
     with pytest.raises(DbtRuntimeError) as excinfo:
         # timeout_sec=0 means the deadline has already passed on the first poll
-        FlightRunner(FlightConfig(timeout_sec=0)).submit(cursor, parsed_model(), COMPILED_CODE)
+        FlightRunner(FlightConfig(timeout_sec=0, poll_interval_sec=0)).submit(
+            cursor, parsed_model(), COMPILED_CODE
+        )
 
-    # An abandoned run would commit the table after dbt gave up on the node
     assert cursor.sql_containing("MD_CANCEL_FLIGHT_RUN")
     assert "was cancelled" in str(excinfo.value)
+    # polled past the first RUNNING until it reported terminal
+    assert len(cursor.sql_containing("MD_GET_FLIGHT_RUN")) >= 2
 
 
 def test_submit_reports_a_failed_cancel_without_masking_the_timeout():
@@ -581,3 +606,16 @@ def test_a_short_version_row_is_not_treated_as_current():
     FlightRunner(config).submit(cursor, parsed_model(), COMPILED_CODE)
 
     assert cursor.sql_containing("MD_UPDATE_FLIGHT")
+
+
+def test_a_run_that_never_stops_is_reported_not_waited_on_forever(monkeypatch):
+    monkeypatch.setattr(flights, "CANCEL_WAIT_SEC", 0)
+    cursor = _runner_cursor(status="RUNNING")
+    cursor.responses["MD_CANCEL_FLIGHT_RUN"] = [(True,)]
+
+    with pytest.raises(DbtRuntimeError) as excinfo:
+        FlightRunner(FlightConfig(timeout_sec=0, poll_interval_sec=0)).submit(
+            cursor, parsed_model(), COMPILED_CODE
+        )
+
+    assert "could not be cancelled" in str(excinfo.value)
