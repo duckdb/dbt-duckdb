@@ -437,6 +437,7 @@ jobs:
     env:
       TOXENV: "fsspec"
       PYTEST_ADDOPTS: "-v --color=yes --csv fsspec_results.csv"
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
     steps:
       - name: Check out the repository
