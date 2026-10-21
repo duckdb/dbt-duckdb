@@ -585,7 +585,10 @@ def materialize(df, con):
 
 {% macro drop_relation_for_rebuild(relation) -%}
   {#-- Drop a relation inside the model's transaction so it can be rebuilt under the
-       same name, dropping anything whose foreign key references it first --#}
+       same name, dropping anything whose foreign key references it first. There is
+       no backup copy, so the transaction is required even with disable_transactions:
+       without it a failed build would leave the table empty or missing. --#}
+  {% do adapter.ensure_transaction() %}
   {% if relation.is_table and may_be_foreign_key_target() %}
     {% do drop_foreign_key_dependents(relation) %}
   {% endif %}

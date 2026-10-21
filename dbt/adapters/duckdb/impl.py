@@ -160,6 +160,19 @@ class DuckDBAdapter(SQLAdapter):
         return self.config.credentials.disable_transactions
 
     @available
+    def ensure_transaction(self) -> None:
+        """Open a transaction on this thread's connection if one is not already open.
+
+        Replacing a table in place (drop, then create under the same name) is only
+        safe inside a transaction: if the build fails, the rollback restores the old
+        table. This opens one even when disable_transactions is set; the materialization's
+        adapter.commit() closes it, and dbt rolls it back if the model fails.
+        """
+        connection = self.connections.get_thread_connection()
+        if not connection.transaction_open:
+            self.connections.begin()
+
+    @available
     def is_ducklake(self, relation: DuckDBRelation) -> bool:
         """Check if a relation's database is backed by a ducklake attachment."""
         if not relation or not relation.database:
