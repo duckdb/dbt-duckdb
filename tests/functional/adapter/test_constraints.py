@@ -345,6 +345,21 @@ class TestForeignKeyRerun:
         assert [tuple(row) for row in rows] == [(10, 1, 1)]
         self.assert_all_tables_droppable(project)
 
+    def test_failed_child_rebuild_after_parent_preserves_dependents(self, project):
+        run_dbt(["run"])
+        run_dbt(["run", "--vars", "{invalid_child: true}"], expect_pass=False)
+        child_rows = project.run_sql(
+            f"select * from {project.test_schema}.child",
+            fetch="all",
+        )
+        grandchild_rows = project.run_sql(
+            f"select * from {project.test_schema}.grandchild",
+            fetch="all",
+        )
+        assert [tuple(row) for row in child_rows] == [(10, 1, 1)]
+        assert [tuple(row) for row in grandchild_rows] == [(10,)]
+        self.assert_all_tables_droppable(project)
+
 
 @pytest.mark.skip_profile("md", "buenavista")
 class TestForeignKeyRemoval:
@@ -458,6 +473,18 @@ models:
             fetch="all",
         )
         assert [tuple(row) for row in rows] == [(1, 1)]
+        run_dbt(["run"])
+        foreign_keys = project.run_sql(
+            f"""
+            select referenced_table
+            from duckdb_constraints()
+            where schema_name = '{project.test_schema}'
+              and table_name = 'child'
+              and constraint_type = 'FOREIGN KEY'
+            """,
+            fetch="all",
+        )
+        assert {row[0] for row in foreign_keys} == {"foo", "bar"}
 
 
 @pytest.mark.skip_profile("md", "buenavista")

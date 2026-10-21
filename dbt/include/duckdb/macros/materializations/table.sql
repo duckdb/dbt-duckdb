@@ -17,7 +17,8 @@
   -- as above, the backup_relation should not already exist
   {%- set preexisting_backup_relation = load_cached_relation(backup_relation) -%}
   {%- set use_ducklake_table_workarounds = adapter.use_ducklake_table_workarounds(target_relation) -%}
-  {%- set build_in_place = has_foreign_key_constraints() -%}
+  {%- set build_in_place = has_foreign_key_constraints(existing_relation) -%}
+  {%- set dropped_dependents = [] -%}
   -- grab current tables grants config for comparision later on
   {% set grant_config = config.get('grants') %}
 
@@ -36,11 +37,12 @@
     {#-- Tables with foreign keys must not be renamed (see has_foreign_key_constraints),
          so replace the existing relation inside this transaction instead of swapping --#}
     {% if existing_relation is not none %}
-      {% do drop_relation_for_rebuild(existing_relation) %}
+      {% set dropped_dependents = drop_relation_for_rebuild(existing_relation) %}
     {% endif %}
     {% call statement('main', language=language) -%}
       {{- create_table_as(False, target_relation, compiled_code, language, partitioned_by=partitioned_by, sorted_by=sorted_by) }}
     {%- endcall %}
+    {% do restore_foreign_key_dependents(dropped_dependents) %}
   {% else %}
     -- build model
     {% call statement('main', language=language) -%}
@@ -51,13 +53,14 @@
     {% if existing_relation is not none %}
         {#-- Drop indexes and foreign key dependents before renaming to avoid dependency errors --#}
         {% do drop_indexes_on_relation(existing_relation) %}
-        {% if existing_relation.is_table and may_be_foreign_key_target() %}
-          {% do drop_foreign_key_dependents(existing_relation) %}
+        {% if existing_relation.is_table and may_be_foreign_key_target(existing_relation) %}
+          {% set dropped_dependents = drop_foreign_key_dependents(existing_relation) %}
         {% endif %}
         {{ adapter.rename_relation(existing_relation, backup_relation) }}
     {% endif %}
 
     {{ adapter.rename_relation(intermediate_relation, target_relation) }}
+    {% do restore_foreign_key_dependents(dropped_dependents) %}
   {% endif %}
 
   {% do create_indexes(target_relation) %}

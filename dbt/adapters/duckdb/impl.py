@@ -479,17 +479,37 @@ class DuckDBAdapter(SQLAdapter):
         )
         return len(table) > 0
 
+    def _existing_key_constraint_types(self, model: Any) -> set:
+        _, table = self.execute(
+            f"""
+            select distinct constraint_type from duckdb_constraints()
+            where database_name = '{model.database}'
+              and schema_name = '{model.schema}'
+              and lower(table_name) = lower('{model.alias or model.name}')
+              and constraint_type in ('PRIMARY KEY', 'UNIQUE', 'FOREIGN KEY')
+            """,
+            fetch=True,
+        )
+        by_name = {
+            "PRIMARY KEY": ConstraintType.primary_key,
+            "UNIQUE": ConstraintType.unique,
+            "FOREIGN KEY": ConstraintType.foreign_key,
+        }
+        return {by_name[row[0]] for row in table}
+
     def _acquire_foreign_key_lock(self, model: Any) -> bool:
         """Take the foreign key lock if this model needs it, returning whether it does."""
         types = self._key_constraint_types(model)
         if not types:
-            # nothing can reference a table without a primary key or unique constraint
-            return False
+            types = self._existing_key_constraint_types(model)
+            if not types:
+                return False
         self._foreign_key_lock.acquire()
         # Check for references only while holding the lock: a foreign key model being
         # built in another thread can hide its references from duckdb_constraints()
         # until it commits.
         try:
+            types |= self._existing_key_constraint_types(model)
             if ConstraintType.foreign_key in types or self._is_foreign_key_target(model):
                 return True
         except BaseException:

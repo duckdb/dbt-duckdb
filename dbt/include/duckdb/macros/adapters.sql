@@ -543,11 +543,25 @@ def materialize(df, con):
   {% set dropped = [] %}
   {% for table in dependents %}
     {% set dependent = api.Relation.create(database=relation.database, schema=relation.schema, identifier=table, type='table') %}
+    {% set backup = dependent.incorporate(path={'identifier': table ~ '__dbt_fk_backup'}, type='table') %}
+    {% do adapter.drop_relation(backup) %}
+    {% call statement('backup_foreign_key_dependent_' ~ loop.index) %}
+      create table {{ backup }} as select * from {{ dependent }}
+    {% endcall %}
     {{ log("Dropping " ~ dependent ~ " because it references " ~ relation ~ " through a foreign key; it is rebuilt later in this run", info=True) }}
     {% do adapter.drop_relation(dependent) %}
-    {% do dropped.append(dependent) %}
+    {% do dropped.append({'relation': dependent, 'backup': backup}) %}
   {% endfor %}
   {{ return(dropped) }}
+{%- endmacro %}
+
+{% macro restore_foreign_key_dependents(dropped) -%}
+  {#-- Keep dependent data available between model transactions. The selected model
+       rebuilds the constraints later in the run. #}
+  {% for item in dropped | reverse %}
+    {{ log("Restoring data for " ~ item['relation'] ~ "; its constraints are rebuilt later in this run", info=True) }}
+    {% do adapter.rename_relation(item['backup'], item['relation']) %}
+  {% endfor %}
 {%- endmacro %}
 
 {% macro enforced_constraint_types() -%}
@@ -567,27 +581,50 @@ def materialize(df, con):
   {{ return(types) }}
 {%- endmacro %}
 
-{% macro has_foreign_key_constraints() -%}
+{% macro existing_constraint_types(relation) -%}
+  {% if relation is none or not relation.is_table %}
+    {{ return([]) }}
+  {% endif %}
+  {% call statement('get_existing_constraint_types', fetch_result=True) %}
+    select distinct constraint_type
+    from duckdb_constraints()
+    where database_name = '{{ relation.database }}'
+      and schema_name = '{{ relation.schema }}'
+      and lower(table_name) = lower('{{ relation.identifier }}')
+  {% endcall %}
+  {% set types = [] %}
+  {% for row in load_result('get_existing_constraint_types').table %}
+    {% do types.append(row[0] | lower | replace(' ', '_')) %}
+  {% endfor %}
+  {{ return(types) }}
+{%- endmacro %}
+
+{% macro has_foreign_key_constraints(relation=none) -%}
   {#-- DuckDB records the name a foreign key table was created under on the table it
        references and does not update it on rename (duckdb/duckdb#24648), after which
        the referenced table can never be dropped. Tables with foreign keys therefore
        have to be created under their final name rather than renamed into place. #}
-  {{ return('foreign_key' in enforced_constraint_types()) }}
+  {{ return(
+    'foreign_key' in enforced_constraint_types()
+    or 'foreign_key' in existing_constraint_types(relation)
+  ) }}
 {%- endmacro %}
 
-{% macro may_be_foreign_key_target() -%}
+{% macro may_be_foreign_key_target(relation=none) -%}
   {#-- Only a table with a primary key or unique constraint can be referenced by a
-       foreign key, and a model only gets one through an enforced contract, so other
-       models can skip looking for foreign key dependents. #}
-  {% set types = enforced_constraint_types() %}
+       foreign key. Include the existing table so removing a key constraint still
+       handles its current dependents safely. #}
+  {% set types = enforced_constraint_types() + existing_constraint_types(relation) %}
   {{ return('primary_key' in types or 'unique' in types) }}
 {%- endmacro %}
 
 {% macro drop_relation_for_rebuild(relation) -%}
   {#-- Drop a relation inside the model's transaction so it can be rebuilt under the
        same name, dropping anything whose foreign key references it first --#}
-  {% if relation.is_table and may_be_foreign_key_target() %}
-    {% do drop_foreign_key_dependents(relation) %}
+  {% set dropped = [] %}
+  {% if relation.is_table and may_be_foreign_key_target(relation) %}
+    {% set dropped = drop_foreign_key_dependents(relation) %}
   {% endif %}
   {% do adapter.drop_relation(relation) %}
+  {{ return(dropped) }}
 {%- endmacro %}
