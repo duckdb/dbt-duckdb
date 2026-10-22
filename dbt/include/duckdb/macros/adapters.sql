@@ -585,18 +585,7 @@ def materialize(df, con):
   {% if relation is none or not relation.is_table %}
     {{ return([]) }}
   {% endif %}
-  {% call statement('get_existing_constraint_types', fetch_result=True) %}
-    select distinct constraint_type
-    from duckdb_constraints()
-    where database_name = '{{ relation.database }}'
-      and schema_name = '{{ relation.schema }}'
-      and lower(table_name) = lower('{{ relation.identifier }}')
-  {% endcall %}
-  {% set types = [] %}
-  {% for row in load_result('get_existing_constraint_types').table %}
-    {% do types.append(row[0] | lower | replace(' ', '_')) %}
-  {% endfor %}
-  {{ return(types) }}
+  {{ return(adapter.existing_key_constraint_types(relation)) }}
 {%- endmacro %}
 
 {% macro has_foreign_key_constraints(relation=none) -%}

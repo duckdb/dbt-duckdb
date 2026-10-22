@@ -97,6 +97,11 @@ class DuckDBAdapter(SQLAdapter):
     Column = DuckDBColumn
     Relation = DuckDBRelation
 
+    def __init__(self, config: Any, mp_context: Any) -> None:
+        super().__init__(config, mp_context)
+        self._key_constraints_by_schema: dict[tuple[str, str], dict[str, set[ConstraintType]]] = {}
+        self._key_constraint_cache_lock = threading.Lock()
+
     AdapterSpecificConfigs = DuckDBConfig
 
     _capabilities: CapabilityDict = CapabilityDict(
@@ -479,23 +484,42 @@ class DuckDBAdapter(SQLAdapter):
         )
         return len(table) > 0
 
-    def _existing_key_constraint_types(self, model: Any) -> set:
-        _, table = self.execute(
-            f"""
-            select distinct constraint_type from duckdb_constraints()
-            where database_name = '{model.database}'
-              and schema_name = '{model.schema}'
-              and lower(table_name) = lower('{model.alias or model.name}')
-              and constraint_type in ('PRIMARY KEY', 'UNIQUE', 'FOREIGN KEY')
-            """,
-            fetch=True,
-        )
+    def _existing_key_constraint_types(self, relation: Any) -> set:
         by_name = {
             "PRIMARY KEY": ConstraintType.primary_key,
             "UNIQUE": ConstraintType.unique,
             "FOREIGN KEY": ConstraintType.foreign_key,
         }
-        return {by_name[row[0]] for row in table}
+        database = (relation.database or "").lower()
+        schema = (relation.schema or "").lower()
+        identifier = (
+            getattr(relation, "identifier", None)
+            or getattr(relation, "alias", None)
+            or relation.name
+        ).lower()
+        schema_key = (database, schema)
+        with self._key_constraint_cache_lock:
+            if schema_key not in self._key_constraints_by_schema:
+                # Snapshot the schema before its first model runs. Constraints added
+                # during this run are already present in each model's current config.
+                _, table = self.execute(
+                    f"""
+                    select table_name, constraint_type from duckdb_constraints()
+                    where database_name = '{relation.database}'
+                      and schema_name = '{relation.schema}'
+                      and constraint_type in ('PRIMARY KEY', 'UNIQUE', 'FOREIGN KEY')
+                    """,
+                    fetch=True,
+                )
+                constraints_by_table: dict[str, set[ConstraintType]] = defaultdict(set)
+                for row in table:
+                    constraints_by_table[row[0].lower()].add(by_name[row[1]])
+                self._key_constraints_by_schema[schema_key] = constraints_by_table
+            return set(self._key_constraints_by_schema[schema_key].get(identifier, set()))
+
+    @available
+    def existing_key_constraint_types(self, relation: Any) -> list[str]:
+        return sorted(item.value for item in self._existing_key_constraint_types(relation))
 
     def _acquire_foreign_key_lock(self, model: Any) -> bool:
         """Take the foreign key lock if this model needs it, returning whether it does."""

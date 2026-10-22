@@ -79,6 +79,27 @@ class TestDuckDBAdapter(unittest.TestCase):
             get_cols.assert_not_called()
             alter.assert_not_called()
 
+    def test_existing_key_constraints_are_loaded_once_per_schema(self):
+        foo = DuckDBRelation.create(database="db", schema="main", identifier="foo")
+        bar = DuckDBRelation.create(database="db", schema="main", identifier="bar")
+        constraints = [
+            ("foo", "PRIMARY KEY"),
+            ("bar", "FOREIGN KEY"),
+        ]
+
+        with mock.patch.object(
+            self.adapter, "execute", return_value=(None, constraints)
+        ) as execute:
+            self.assertEqual(
+                self.adapter._existing_key_constraint_types(foo),
+                {ConstraintType.primary_key},
+            )
+            self.assertEqual(
+                self.adapter._existing_key_constraint_types(bar),
+                {ConstraintType.foreign_key},
+            )
+            execute.assert_called_once()
+
     def test_render_column_foreign_key_omits_database(self):
         constraint = ColumnLevelConstraint(
             type=ConstraintType.foreign_key,
