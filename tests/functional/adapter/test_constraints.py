@@ -556,3 +556,48 @@ models:
             run_dbt(["run", "--full-refresh"])
         for name in ["child", "foo"]:
             project.run_sql(f"drop table {project.test_schema}.{name}")
+
+
+fk_failing_child_sql = """
+{{ config(materialized='table') }}
+select {{ var('child_id', 10) }} as id,
+  {% if var('fail', false) %}cast(error('boom') as int){% else %}1{% endif %} as foo_id,
+  1 as bar_id
+"""
+
+
+@pytest.mark.skip_profile("md", "buenavista")
+class TestForeignKeyFailedRebuildWithoutTransactions:
+    """A table with a foreign key is dropped and recreated in place, so the rollback
+    is the only thing that keeps its old rows if the build fails. That has to hold
+    even when disable_transactions is set."""
+
+    @pytest.fixture(scope="class")
+    def profiles_config_update(self, dbt_profile_target, unique_schema):
+        target = {**dbt_profile_target, "schema": unique_schema, "disable_transactions": True}
+        return {
+            "test": {
+                "outputs": {"dev": target},
+                "target": "dev",
+            }
+        }
+
+    @pytest.fixture(scope="class")
+    def models(self):
+        return {
+            "foo.sql": fk_parent_sql,
+            "bar.sql": fk_parent_sql,
+            "child.sql": fk_failing_child_sql,
+            "schema.yml": fk_schema_yml.split("  - name: grandchild")[0],
+        }
+
+    def test_failed_rebuild_keeps_old_rows(self, project):
+        run_dbt(["run", "--vars", "{child_id: 7}"])
+        _, log = run_dbt_and_capture(["run", "-s", "child", "--vars", "{fail: true}"], expect_pass=False)
+        assert "disable_transactions is set, but dbt-duckdb uses a transaction" in log
+        rows = project.run_sql(f"select id from {project.test_schema}.child", fetch="all")
+        assert [tuple(row) for row in rows] == [(7,)]
+        # and the next run still works
+        run_dbt(["run"])
+        rows = project.run_sql(f"select id from {project.test_schema}.child", fetch="all")
+        assert [tuple(row) for row in rows] == [(10,)]
