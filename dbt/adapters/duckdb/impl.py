@@ -238,11 +238,16 @@ class DuckDBAdapter(SQLAdapter):
             root, ext = os.path.splitext(write_location)
             # DuckDB infers the compression from a trailing .gz/.zst, so the
             # format comes from the extension before it (e.g. "data.csv.gz")
-            if ext.lower() in (".gz", ".zst"):
+            compression = {".gz": "gzip", ".zst": "zstd"}.get(ext.lower())
+            if compression:
                 ext = os.path.splitext(root)[1]
             ext = ext.lower()
             if ext:
                 rendered_options["format"] = ext[1:]
+                # DuckDB's own inference is case-sensitive, so "data.CSV.GZ"
+                # would otherwise be written uncompressed
+                if compression and "compression" not in rendered_options:
+                    rendered_options["compression"] = compression
             elif "delimiter" in rendered_options:
                 rendered_options["format"] = "csv"
             else:
