@@ -1,8 +1,9 @@
 {% macro duckdb__create_schema(relation) -%}
   {%- call statement('create_schema') -%}
+    {% set database = adapter.escape_sql_string(relation.database) %}
     {% set sql %}
         select type from duckdb_databases()
-        where lower(database_name)='{{ relation.database | lower }}'
+        where lower(database_name) = lower('{{ database }}')
         and type != 'duckdb'
     {% endset %}
     {% set results = run_query(sql) %}
@@ -33,7 +34,7 @@
     select schema_name
     from system.information_schema.schemata
     {% if database is not none %}
-    where lower(catalog_name) = '{{ database | lower }}'
+    where lower(catalog_name) = lower('{{ adapter.escape_sql_string(database) }}')
     {% endif %}
   {% endset %}
   {{ return(run_query(sql)) }}
@@ -43,8 +44,8 @@
   {% set sql -%}
         select count(*)
         from system.information_schema.schemata
-        where lower(schema_name) = '{{ schema | lower }}'
-        and lower(catalog_name) = '{{ information_schema.database | lower }}'
+        where lower(schema_name) = lower('{{ adapter.escape_sql_string(schema) }}')
+        and lower(catalog_name) = lower('{{ adapter.escape_sql_string(information_schema.database) }}')
   {%- endset %}
   {{ return(run_query(sql)) }}
 {% endmacro %}
@@ -284,9 +285,11 @@ def materialize(df, con):
 {% endmacro %}
 
 {% macro duckdb__list_relations_without_caching(schema_relation) %}
+  {% set database = adapter.escape_sql_string(schema_relation.database) %}
+  {% set schema = adapter.escape_sql_string(schema_relation.schema) %}
   {% call statement('list_relations_without_caching', fetch_result=True) -%}
     select
-      '{{ schema_relation.database }}' as database,
+      '{{ database }}' as database,
       table_name as name,
       table_schema as schema,
       CASE table_type
@@ -295,8 +298,8 @@ def materialize(df, con):
         WHEN 'LOCAL TEMPORARY' THEN 'table'
         END as type
     from system.information_schema.tables
-    where lower(table_schema) = '{{ schema_relation.schema | lower }}'
-    and lower(table_catalog) = '{{ schema_relation.database | lower }}'
+    where lower(table_schema) = lower('{{ schema }}')
+    and lower(table_catalog) = lower('{{ database }}')
   {% endcall %}
   {{ return(load_result('list_relations_without_caching').table) }}
 {% endmacro %}
@@ -435,12 +438,15 @@ def materialize(df, con):
   {#-- auto_begin=False on these reads so this macro can run safely after
        adapter.commit() in a materialization cleanup without opening a new
        transaction that would later get rolled back at connection release. #}
+  {% set database = adapter.escape_sql_string(relation.database) %}
+  {% set schema = adapter.escape_sql_string(relation.schema) %}
+  {% set identifier = adapter.escape_sql_string(relation.identifier) %}
   {% call statement('get_indexes_on_relation', fetch_result=True, auto_begin=False) %}
     SELECT index_name
     FROM duckdb_indexes()
-    WHERE database_name = '{{ relation.database }}'
-      AND schema_name = '{{ relation.schema }}'
-      AND table_name = '{{ relation.identifier }}'
+    WHERE lower(database_name) = lower('{{ database }}')
+      AND lower(schema_name) = lower('{{ schema }}')
+      AND lower(table_name) = lower('{{ identifier }}')
   {% endcall %}
 
   {% set results = load_result('get_indexes_on_relation').table %}
@@ -460,19 +466,22 @@ def materialize(df, con):
        table models, or incremental models being fully refreshed, that are downstream
        of the model being built. Anything else is an error, so no data is lost.
        Foreign keys cannot cross schemas in DuckDB, so we only look in this one. #}
+  {% set database = adapter.escape_sql_string(relation.database) %}
+  {% set schema = adapter.escape_sql_string(relation.schema) %}
+  {% set identifier = adapter.escape_sql_string(relation.identifier) %}
   {% call statement('get_foreign_key_dependents', fetch_result=True) %}
     with recursive fks as (
       select table_name, referenced_table
       from duckdb_constraints()
       where constraint_type = 'FOREIGN KEY'
-        and database_name = '{{ relation.database }}'
-        and schema_name = '{{ relation.schema }}'
+        and lower(database_name) = lower('{{ database }}')
+        and lower(schema_name) = lower('{{ schema }}')
         and lower(table_name) <> lower(referenced_table)
     ),
     dependents(table_name, depth) as (
       select table_name, 1
       from fks
-      where lower(referenced_table) = lower('{{ relation.identifier }}')
+      where lower(referenced_table) = lower('{{ identifier }}')
       union
       select fks.table_name, dependents.depth + 1
       from fks
