@@ -165,11 +165,17 @@ class DuckDBAdapter(SQLAdapter):
 
         Replacing a table in place (drop, then create under the same name) is only
         safe inside a transaction: if the build fails, the rollback restores the old
-        table. This opens one even when disable_transactions is set; the materialization's
-        adapter.commit() closes it, and dbt rolls it back if the model fails.
+        table. This opens one even when disable_transactions is set, with a warning; the
+        materialization's adapter.commit() closes it, and dbt rolls it back if the model fails.
         """
         connection = self.connections.get_thread_connection()
         if not connection.transaction_open:
+            if self.disable_transactions():
+                DuckDBConnectionManager.warn_once(
+                    "disable_transactions is set, but dbt-duckdb uses a transaction to rebuild "
+                    "tables with foreign key constraints in place, so a failed build does not "
+                    "lose the existing table's data."
+                )
             self.connections.begin()
 
     @available

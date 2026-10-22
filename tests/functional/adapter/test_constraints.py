@@ -436,7 +436,8 @@ class TestForeignKeyFailedRebuildWithoutTransactions:
 
     def test_failed_rebuild_keeps_old_rows(self, project):
         run_dbt(["run", "--vars", "{child_id: 7}"])
-        run_dbt(["run", "-s", "child", "--vars", "{fail: true}"], expect_pass=False)
+        _, log = run_dbt_and_capture(["run", "-s", "child", "--vars", "{fail: true}"], expect_pass=False)
+        assert "disable_transactions is set, but dbt-duckdb uses a transaction" in log
         rows = project.run_sql(f"select id from {project.test_schema}.child", fetch="all")
         assert [tuple(row) for row in rows] == [(7,)]
         # and the next run still works
