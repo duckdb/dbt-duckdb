@@ -1,16 +1,9 @@
 {% macro duckdb__create_schema(relation) -%}
+  {% set attached_type = adapter.catalog_type(relation.database) %}
   {%- call statement('create_schema') -%}
-    {% set database = adapter.escape_sql_string(relation.database) %}
-    {% set sql %}
-        select type from duckdb_databases()
-        where lower(database_name) = lower('{{ database }}')
-        and type != 'duckdb'
-    {% endset %}
-    {% set results = run_query(sql) %}
-    {% if results|length == 0 %}
+    {% if attached_type in [none, 'duckdb', 'motherduck', 'remote'] %}
         create schema if not exists {{ relation.without_identifier() }}
     {% else %}
-        {% set attached_type = results.columns[0].values()[0] %}
         {% if attached_type == 'sqlite' and relation.schema != 'main' %}
             {{ exceptions.raise_compiler_error(
                 "Schema must be 'main' when writing to sqlite "

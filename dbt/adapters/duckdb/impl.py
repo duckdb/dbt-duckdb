@@ -528,6 +528,10 @@ class DuckDBAdapter(SQLAdapter):
     def _catalog_supports_foreign_keys(self, database: str) -> bool:
         return self._catalog_type(database) in self._foreign_key_catalog_types
 
+    @available
+    def catalog_type(self, database: str) -> Optional[str]:
+        return self._catalog_type(database)
+
     def _is_foreign_key_target(self, model: Any) -> bool:
         # Foreign keys cannot cross schemas in DuckDB, so only this schema can hold one
         database, schema, identifier = self._relation_components(model)
