@@ -30,10 +30,20 @@ config_write_partition_by_id_name = """
     {{ config(materialized="external", options={"partition_by": "id, name"}) }}
 """
 
+config_write_compressed_csv_location = """
+    {{ config(materialized="external", location="{{ adapter.external_root() }}/compressed.csv.gz") }}
+"""
+
 csv_delim_options_sql = config_write_csv_delim_options + model_base
 write_codec_options = config_write_codec_options + model_base
 config_write_partition_by_id_sql = config_write_partition_by_id + model_base
 config_write_partition_by_id_name_sql = config_write_partition_by_id_name + model_base
+config_write_compressed_csv_location_sql = config_write_compressed_csv_location + model_base
+
+config_write_upper_compressed_csv_location = """
+    {{ config(materialized="external", location="{{ adapter.external_root() }}/UPPER.CSV.GZ") }}
+"""
+config_write_upper_compressed_csv_location_sql = config_write_upper_compressed_csv_location + model_base
 
 
 class BaseExternalMaterializations:
@@ -53,6 +63,8 @@ class BaseExternalMaterializations:
             "write_codec_options.sql": write_codec_options,
             "config_write_partition_by_id.sql": config_write_partition_by_id_sql,
             "config_write_partition_by_id_name.sql": config_write_partition_by_id_name_sql,
+            "config_write_compressed_csv_location.sql": config_write_compressed_csv_location_sql,
+            "config_write_upper_compressed_csv_location.sql": config_write_upper_compressed_csv_location_sql,
             "schema.yml": schema_base_yml,
         }
 
@@ -78,7 +90,7 @@ class BaseExternalMaterializations:
         # run command
         results = run_dbt()
         # run result length
-        assert len(results) == 5
+        assert len(results) == 7
 
         # names exist in result nodes
         check_result_nodes_by_name(
@@ -89,6 +101,8 @@ class BaseExternalMaterializations:
                 "write_codec_options",
                 "config_write_partition_by_id",
                 "config_write_partition_by_id_name",
+                "config_write_compressed_csv_location",
+                "config_write_upper_compressed_csv_location",
             ],
         )
 
@@ -100,6 +114,8 @@ class BaseExternalMaterializations:
             "write_codec_options": "view",
             "config_write_partition_by_id": "view",
             "config_write_partition_by_id_name": "view",
+            "config_write_compressed_csv_location": "view",
+            "config_write_upper_compressed_csv_location": "view",
         }
         check_relation_types(project.adapter, expected)
 
@@ -117,12 +133,14 @@ class BaseExternalMaterializations:
                 "write_codec_options",
                 "config_write_partition_by_id",
                 "config_write_partition_by_id_name",
+                "config_write_compressed_csv_location",
+                "config_write_upper_compressed_csv_location",
             ],
         )
 
         # check relations in catalog
         catalog = run_dbt(["docs", "generate"])
-        assert len(catalog.nodes) == 6
+        assert len(catalog.nodes) == 8
         assert len(catalog.sources) == 1
 
 

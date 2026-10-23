@@ -100,7 +100,11 @@ class TestMDPluginSaaSMode:
             raise ValueError("SaaS mode was not set")
         result = run_dbt(expect_pass=False)
         expected_msg = "Python models are disabled when MotherDuck SaaS Mode is on."
-        assert [_res for _res in result.results if _res.status != RunStatus.Success][0].message == expected_msg
+        message = [_res for _res in result.results if _res.status != RunStatus.Success][0].message
+        # The error now also points at Flights, which are the supported way to
+        # run a Python model under SaaS mode.
+        assert message.startswith(expected_msg)
+        assert "submission_method: flight" in message
 
 
 @pytest.mark.skip_profile("buenavista", "file", "memory")
