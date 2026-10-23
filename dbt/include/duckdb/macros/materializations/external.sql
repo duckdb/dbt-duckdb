@@ -20,6 +20,13 @@
   {%- set parquet_read_options = config.get('parquet_read_options', {'union_by_name': False}) -%}
   {%- set json_read_options = config.get('json_read_options', {'auto_detect': True}) -%}
   {%- set csv_read_options = config.get('csv_read_options', {'auto_detect': True}) -%}
+  {#- DuckDB detects compression from a lower-case extension only, so pass the write compression to the readers -#}
+  {%- if rendered_options.get('compression') and 'compression' not in json_read_options -%}
+    {%- set json_read_options = dict(json_read_options, compression=rendered_options['compression']) -%}
+  {%- endif -%}
+  {%- if rendered_options.get('compression') and 'compression' not in csv_read_options -%}
+    {%- set csv_read_options = dict(csv_read_options, compression=rendered_options['compression']) -%}
+  {%- endif -%}
 
   -- set language - python or sql
   {%- set language = model['language'] -%}
