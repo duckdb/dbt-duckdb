@@ -1,9 +1,15 @@
 {% macro duckdb__create_schema(relation) -%}
-  {% set attached_type = adapter.catalog_type(relation.database) %}
   {%- call statement('create_schema') -%}
-    {% if attached_type in [none, 'duckdb', 'motherduck', 'remote'] %}
+    {% set sql %}
+        select type from duckdb_databases()
+        where lower(database_name)='{{ relation.database | lower }}'
+        and type != 'duckdb'
+    {% endset %}
+    {% set results = run_query(sql) %}
+    {% if results|length == 0 %}
         create schema if not exists {{ relation.without_identifier() }}
     {% else %}
+        {% set attached_type = results.columns[0].values()[0] %}
         {% if attached_type == 'sqlite' and relation.schema != 'main' %}
             {{ exceptions.raise_compiler_error(
                 "Schema must be 'main' when writing to sqlite "
@@ -27,7 +33,7 @@
     select schema_name
     from system.information_schema.schemata
     {% if database is not none %}
-    where lower(catalog_name) = lower('{{ adapter.escape_sql_string(database) }}')
+    where lower(catalog_name) = '{{ database | lower }}'
     {% endif %}
   {% endset %}
   {{ return(run_query(sql)) }}
@@ -37,8 +43,8 @@
   {% set sql -%}
         select count(*)
         from system.information_schema.schemata
-        where lower(schema_name) = lower('{{ adapter.escape_sql_string(schema) }}')
-        and lower(catalog_name) = lower('{{ adapter.escape_sql_string(information_schema.database) }}')
+        where lower(schema_name) = '{{ schema | lower }}'
+        and lower(catalog_name) = '{{ information_schema.database | lower }}'
   {%- endset %}
   {{ return(run_query(sql)) }}
 {% endmacro %}
@@ -278,11 +284,9 @@ def materialize(df, con):
 {% endmacro %}
 
 {% macro duckdb__list_relations_without_caching(schema_relation) %}
-  {% set database = adapter.escape_sql_string(schema_relation.database) %}
-  {% set schema = adapter.escape_sql_string(schema_relation.schema) %}
   {% call statement('list_relations_without_caching', fetch_result=True) -%}
     select
-      '{{ database }}' as database,
+      '{{ schema_relation.database }}' as database,
       table_name as name,
       table_schema as schema,
       CASE table_type
@@ -291,8 +295,8 @@ def materialize(df, con):
         WHEN 'LOCAL TEMPORARY' THEN 'table'
         END as type
     from system.information_schema.tables
-    where lower(table_schema) = lower('{{ schema }}')
-    and lower(table_catalog) = lower('{{ database }}')
+    where lower(table_schema) = '{{ schema_relation.schema | lower }}'
+    and lower(table_catalog) = '{{ schema_relation.database | lower }}'
   {% endcall %}
   {{ return(load_result('list_relations_without_caching').table) }}
 {% endmacro %}
@@ -431,15 +435,12 @@ def materialize(df, con):
   {#-- auto_begin=False on these reads so this macro can run safely after
        adapter.commit() in a materialization cleanup without opening a new
        transaction that would later get rolled back at connection release. #}
-  {% set database = adapter.escape_sql_string(relation.database) %}
-  {% set schema = adapter.escape_sql_string(relation.schema) %}
-  {% set identifier = adapter.escape_sql_string(relation.identifier) %}
   {% call statement('get_indexes_on_relation', fetch_result=True, auto_begin=False) %}
     SELECT index_name
     FROM duckdb_indexes()
-    WHERE lower(database_name) = lower('{{ database }}')
-      AND lower(schema_name) = lower('{{ schema }}')
-      AND lower(table_name) = lower('{{ identifier }}')
+    WHERE database_name = '{{ relation.database }}'
+      AND schema_name = '{{ relation.schema }}'
+      AND table_name = '{{ relation.identifier }}'
   {% endcall %}
 
   {% set results = load_result('get_indexes_on_relation').table %}
@@ -595,6 +596,9 @@ def materialize(df, con):
        references and does not update it on rename (duckdb/duckdb#24648), after which
        the referenced table can never be dropped. Tables with foreign keys therefore
        have to be created under their final name rather than renamed into place. #}
+  {% if not adapter.catalog_supports_foreign_keys(this.database) %}
+    {{ return(false) }}
+  {% endif %}
   {{ return(
     'foreign_key' in enforced_constraint_types()
     or 'foreign_key' in existing_constraint_types(relation)
@@ -605,6 +609,9 @@ def materialize(df, con):
   {#-- Only a table with a primary key or unique constraint can be referenced by a
        foreign key. Include the existing table so removing a key constraint still
        handles its current dependents safely. #}
+  {% if not adapter.catalog_supports_foreign_keys(this.database) %}
+    {{ return(false) }}
+  {% endif %}
   {% set types = enforced_constraint_types() + existing_constraint_types(relation) %}
   {{ return('primary_key' in types or 'unique' in types) }}
 {%- endmacro %}

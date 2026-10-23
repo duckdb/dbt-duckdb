@@ -553,8 +553,8 @@ class DuckDBAdapter(SQLAdapter):
         return self._catalog_type(database) in self._foreign_key_catalog_types
 
     @available
-    def catalog_type(self, database: str) -> Optional[str]:
-        return self._catalog_type(database)
+    def catalog_supports_foreign_keys(self, database: str) -> bool:
+        return self._catalog_supports_foreign_keys(database)
 
     def _is_foreign_key_target(self, model: Any) -> bool:
         # Foreign keys cannot cross schemas in DuckDB, so only this schema can hold one
@@ -610,15 +610,11 @@ class DuckDBAdapter(SQLAdapter):
 
     def _acquire_foreign_key_lock(self, model: Any) -> bool:
         """Take the foreign key lock if this model needs it, returning whether it does."""
-        types = self._key_constraint_types(model)
         database, _, _ = self._relation_components(model)
-        catalog_type = self._catalog_type(database)
-        if types and catalog_type not in self._foreign_key_catalog_types:
-            raise DbtRuntimeError(
-                "Primary key, unique, and foreign key constraints are only supported "
-                "for native DuckDB and MotherDuck catalogs; "
-                f"catalog {database!r} has type {catalog_type or 'unknown'!r}"
-            )
+        if not self._catalog_supports_foreign_keys(database):
+            # Other catalogs keep their constraints as declared, without our handling
+            return False
+        types = self._key_constraint_types(model)
         if not types:
             types = self._existing_key_constraint_types(model)
             if not types:

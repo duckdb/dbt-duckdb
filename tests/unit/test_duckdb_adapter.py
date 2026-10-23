@@ -152,21 +152,37 @@ class TestDuckDBAdapter(unittest.TestCase):
         with self.assertRaisesRegex(DbtRuntimeError, "database, schema, and identifier"):
             self.adapter._existing_key_constraint_types(relation)
 
-    def test_key_constraints_reject_non_native_catalog(self):
+    def test_key_constraints_skip_lock_on_non_native_catalog(self):
         model = mock.MagicMock()
         model.database = "lake"
         model.schema = "main"
         model.identifier = "model"
         model.contract.enforced = True
-        model.constraints = [mock.MagicMock(type=ConstraintType.primary_key)]
+        model.constraints = [mock.MagicMock(type=ConstraintType.foreign_key)]
         model.columns = {}
 
         with mock.patch.object(
             self.adapter,
             "execute",
             return_value=(None, [("lake", "iceberg")]),
-        ), self.assertRaisesRegex(DbtRuntimeError, "catalog 'lake' has type 'iceberg'"):
-            self.adapter._acquire_foreign_key_lock(model)
+        ) as execute:
+            self.assertFalse(self.adapter._acquire_foreign_key_lock(model))
+            execute.assert_called_once()
+            self.assertNotIn("duckdb_constraints()", execute.call_args.args[0])
+
+    def test_key_constraints_skip_lock_on_remote(self):
+        model = mock.MagicMock()
+        model.database = "db"
+        model.schema = "main"
+        model.identifier = "model"
+        model.contract.enforced = True
+        model.constraints = [mock.MagicMock(type=ConstraintType.primary_key)]
+        model.columns = {}
+        self.config.credentials.remote = mock.MagicMock()
+
+        with mock.patch.object(self.adapter, "execute") as execute:
+            self.assertFalse(self.adapter._acquire_foreign_key_lock(model))
+            execute.assert_not_called()
 
     def test_render_column_foreign_key_omits_database(self):
         constraint = ColumnLevelConstraint(
