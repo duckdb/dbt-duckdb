@@ -5,6 +5,7 @@ from unittest import mock
 from dbt_common.contracts.constraints import ColumnLevelConstraint
 from dbt_common.contracts.constraints import ConstraintType
 from dbt_common.contracts.constraints import ModelLevelConstraint
+from dbt_common.exceptions import DbtRuntimeError
 from dbt.flags import set_from_args
 from dbt.adapters.duckdb import DuckDBAdapter
 from dbt.adapters.duckdb.connections import DuckDBConnectionManager
@@ -78,6 +79,94 @@ class TestDuckDBAdapter(unittest.TestCase):
             self.assertIsNone(self.adapter.expand_column_types(mock.MagicMock(), mock.MagicMock()))
             get_cols.assert_not_called()
             alter.assert_not_called()
+
+    def test_existing_key_constraints_are_loaded_once_per_schema(self):
+        foo = DuckDBRelation.create(database="db", schema="main", identifier="foo")
+        bar = DuckDBRelation.create(database="db", schema="main", identifier="bar")
+        constraints = [
+            ("foo", "PRIMARY KEY"),
+            ("bar", "FOREIGN KEY"),
+        ]
+
+        with mock.patch.object(
+            self.adapter,
+            "execute",
+            side_effect=[
+                (None, [("db", "duckdb")]),
+                (None, constraints),
+            ],
+        ) as execute:
+            self.assertEqual(
+                self.adapter._existing_key_constraint_types(foo),
+                {ConstraintType.primary_key},
+            )
+            self.assertEqual(
+                self.adapter._existing_key_constraint_types(bar),
+                {ConstraintType.foreign_key},
+            )
+            self.assertEqual(execute.call_count, 2)
+
+    def test_existing_key_constraints_skip_non_native_catalog(self):
+        relation = DuckDBRelation.create(
+            database="lake", schema="main", identifier="iceberg_table"
+        )
+        with mock.patch.object(
+            self.adapter,
+            "execute",
+            return_value=(None, [("lake", "iceberg")]),
+        ) as execute:
+            self.assertEqual(self.adapter._existing_key_constraint_types(relation), set())
+            execute.assert_called_once()
+            self.assertNotIn("duckdb_constraints()", execute.call_args.args[0])
+
+    def test_foreign_key_lock_skips_remote_metadata_queries(self):
+        model = mock.MagicMock()
+        model.database = "db"
+        model.schema = "main"
+        model.identifier = "table"
+        model.contract.enforced = False
+        self.config.credentials.remote = mock.MagicMock()
+        with mock.patch.object(self.adapter, "execute") as execute:
+            self.assertFalse(self.adapter._acquire_foreign_key_lock(model))
+            execute.assert_not_called()
+
+    def test_existing_key_constraints_escape_catalog_names(self):
+        relation = DuckDBRelation.create(
+            database="d'b", schema="s'chema", identifier="table"
+        )
+        with mock.patch.object(
+            self.adapter,
+            "execute",
+            side_effect=[
+                (None, [("d'b", "duckdb")]),
+                (None, []),
+            ],
+        ) as execute:
+            self.assertEqual(self.adapter._existing_key_constraint_types(relation), set())
+            constraint_sql = execute.call_args_list[1].args[0]
+            self.assertIn("d''b", constraint_sql)
+            self.assertIn("s''chema", constraint_sql)
+
+    def test_existing_key_constraints_require_fully_qualified_relation(self):
+        relation = DuckDBRelation.create(database="db", identifier="table")
+        with self.assertRaisesRegex(DbtRuntimeError, "database, schema, and identifier"):
+            self.adapter._existing_key_constraint_types(relation)
+
+    def test_key_constraints_reject_non_native_catalog(self):
+        model = mock.MagicMock()
+        model.database = "lake"
+        model.schema = "main"
+        model.identifier = "model"
+        model.contract.enforced = True
+        model.constraints = [mock.MagicMock(type=ConstraintType.primary_key)]
+        model.columns = {}
+
+        with mock.patch.object(
+            self.adapter,
+            "execute",
+            return_value=(None, [("lake", "iceberg")]),
+        ), self.assertRaisesRegex(DbtRuntimeError, "catalog 'lake' has type 'iceberg'"):
+            self.adapter._acquire_foreign_key_lock(model)
 
     def test_render_column_foreign_key_omits_database(self):
         constraint = ColumnLevelConstraint(

@@ -220,6 +220,9 @@ select {{ var('parent_id', 1) }} as id
 fk_child_sql = """
 {{ config(materialized='table') }}
 select 10 as id, 1 as foo_id, 1 as bar_id
+{% if var('invalid_child', false) %}
+union all select 11 as id, 2 as foo_id, 1 as bar_id
+{% endif %}
 """
 
 fk_grandchild_sql = """
@@ -328,6 +331,160 @@ class TestForeignKeyRerun:
         assert "grandchild (model grandchild is not selected in this run)" in log
         # nothing was dropped
         assert len(project.run_sql(f"select * from {project.test_schema}.grandchild", fetch="all")) == 1
+
+    def test_failed_child_rebuild_rolls_back(self, project):
+        run_dbt(["run"])
+        run_dbt(
+            ["run", "-s", "child", "--vars", "{invalid_child: true}"],
+            expect_pass=False,
+        )
+        rows = project.run_sql(
+            f"select * from {project.test_schema}.child",
+            fetch="all",
+        )
+        assert [tuple(row) for row in rows] == [(10, 1, 1)]
+        self.assert_all_tables_droppable(project)
+
+    def test_failed_child_rebuild_after_parent_preserves_dependents(self, project):
+        run_dbt(["run"])
+        run_dbt(["run", "--vars", "{invalid_child: true}"], expect_pass=False)
+        child_rows = project.run_sql(
+            f"select * from {project.test_schema}.child",
+            fetch="all",
+        )
+        grandchild_rows = project.run_sql(
+            f"select * from {project.test_schema}.grandchild",
+            fetch="all",
+        )
+        assert [tuple(row) for row in child_rows] == [(10, 1, 1)]
+        assert [tuple(row) for row in grandchild_rows] == [(10,)]
+        self.assert_all_tables_droppable(project)
+
+
+@pytest.mark.skip_profile("md", "buenavista")
+class TestForeignKeyRemoval:
+    @pytest.fixture(scope="class")
+    def models(self):
+        return {
+            "foo.sql": fk_parent_sql,
+            "child.sql": """
+-- depends_on: {{ ref('foo') }}
+{{ config(materialized='table') }}
+select 1 as foo_id
+""",
+            "schema.yml": """
+version: 2
+models:
+  - name: foo
+    config:
+      contract: {enforced: true}
+    columns:
+      - {name: id, data_type: int, constraints: [{type: primary_key}]}
+  - name: child
+    config:
+      contract: {enforced: true}
+    columns:
+      - name: foo_id
+        data_type: int
+        constraints: [{type: foreign_key, to: ref('foo'), to_columns: [id]}]
+""",
+        }
+
+    def test_removing_foreign_key_does_not_leave_stale_reference(self, project):
+        run_dbt(["run"])
+        with open(f"{project.project_root}/models/schema.yml", "w") as schema_file:
+            schema_file.write(
+                """
+version: 2
+models:
+  - name: foo
+    config:
+      contract: {enforced: true}
+    columns:
+      - {name: id, data_type: int, constraints: [{type: primary_key}]}
+  - name: child
+    config:
+      contract: {enforced: true}
+    columns:
+      - {name: foo_id, data_type: int}
+"""
+            )
+        run_dbt(["run", "-s", "child"])
+        project.run_sql(f"drop table {project.test_schema}.child")
+        project.run_sql(f"drop table {project.test_schema}.foo")
+
+
+@pytest.mark.skip_profile("md", "buenavista")
+class TestForeignKeySharedDependentFailure:
+    @pytest.fixture(scope="class")
+    def models(self):
+        return {
+            "foo.sql": fk_parent_sql,
+            "bar.sql": """
+{{ config(materialized='table') }}
+select
+  {% if var('fail_bar', false) %}cast('invalid' as int){% else %}id{% endif %} as id
+from {{ ref('foo') }}
+""",
+            "child.sql": """
+{{ config(materialized='table') }}
+select 1 as foo_id, 1 as bar_id
+""",
+            "schema.yml": """
+version: 2
+models:
+  - name: foo
+    config:
+      contract: {enforced: true}
+    columns:
+      - {name: id, data_type: int, constraints: [{type: primary_key}]}
+  - name: bar
+    config:
+      contract: {enforced: true}
+    columns:
+      - {name: id, data_type: int, constraints: [{type: primary_key}]}
+  - name: child
+    config:
+      contract: {enforced: true}
+    columns:
+      - name: foo_id
+        data_type: int
+        constraints: [{type: foreign_key, to: ref('foo'), to_columns: [id]}]
+      - name: bar_id
+        data_type: int
+        constraints: [{type: foreign_key, to: ref('bar'), to_columns: [id]}]
+""",
+        }
+
+    def test_later_parent_failure_preserves_shared_dependent(self, project):
+        run_dbt(["run"])
+        run_dbt(["run", "--vars", "{fail_bar: true}"], expect_pass=False)
+        tables = project.run_sql(
+            f"""
+            select table_name
+            from duckdb_tables()
+            where schema_name = '{project.test_schema}'
+            """,
+            fetch="all",
+        )
+        assert ("child",) in [tuple(row) for row in tables]
+        rows = project.run_sql(
+            f"select * from {project.test_schema}.child",
+            fetch="all",
+        )
+        assert [tuple(row) for row in rows] == [(1, 1)]
+        run_dbt(["run"])
+        foreign_keys = project.run_sql(
+            f"""
+            select referenced_table
+            from duckdb_constraints()
+            where schema_name = '{project.test_schema}'
+              and table_name = 'child'
+              and constraint_type = 'FOREIGN KEY'
+            """,
+            fetch="all",
+        )
+        assert {row[0] for row in foreign_keys} == {"foo", "bar"}
 
 
 @pytest.mark.skip_profile("md", "buenavista")
