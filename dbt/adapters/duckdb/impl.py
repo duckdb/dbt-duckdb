@@ -236,6 +236,12 @@ class DuckDBAdapter(SQLAdapter):
 
     @available
     def external_write_options(self, write_location: str, rendered_options: dict) -> str:
+        # DuckDB's COPY options are case-insensitive, so normalize the keys in place
+        # for the checks below and for the callers that read the options afterwards
+        normalized = {k.lower(): v for k, v in rendered_options.items()}
+        rendered_options.clear()
+        rendered_options.update(normalized)
+
         if "format" not in rendered_options:
             root, ext = os.path.splitext(write_location)
             # DuckDB infers the compression from a trailing .gz/.zst, so the
@@ -266,7 +272,7 @@ class DuckDBAdapter(SQLAdapter):
 
         ret = []
         for k, v in rendered_options.items():
-            if k.lower() in {
+            if k in {
                 "delimiter",
                 "quote",
                 "escape",
@@ -279,6 +285,7 @@ class DuckDBAdapter(SQLAdapter):
 
     @available
     def external_read_location(self, write_location: str, rendered_options: dict) -> str:
+        rendered_options = {k.lower(): v for k, v in rendered_options.items()}
         if rendered_options.get("partition_by") or rendered_options.get("per_thread_output"):
             globs = [write_location, "*"]
             if rendered_options.get("partition_by"):

@@ -50,6 +50,9 @@ class TestExternalUtils(unittest.TestCase):
             ("e.json.zst", {}, "format json, compression zstd"),
             ("/tmp/F.CSV.GZ", {}, "format csv, compression gzip, header 1"),
             ("g.csv.gz", {"compression": "none"}, "compression none, format csv, header 1"),
+            ("h", {"FORMAT": "csv"}, "format csv, header 1"),
+            ("i.csv", {"Delimiter": "|", "HEADER": "0"}, "delimiter '|', header 0, format csv"),
+            ("j", {"PARTITION_BY": "ds,category"}, "partition_by (ds,category), format parquet"),
         ]
 
         for (loc, opts, expected) in data:
@@ -61,6 +64,14 @@ class TestExternalUtils(unittest.TestCase):
             ("bar", {"format": "csv", "delimiter": "|", "header": "0"}, "bar"),
             ("/tmp/a", {"partition_by": "ds", "format": "parquet"}, "/tmp/a/*/*.parquet"),
             ("b", {"partition_by": "ds,category"}, "b/*/*/*.parquet"),
+            ("c", {"PARTITION_BY": "ds", "FORMAT": "csv"}, "c/*/*.csv"),
+            ("d", {"Per_Thread_Output": "true"}, "d/*.parquet"),
         ]
         for (loc, opts, expected) in data:
             assert expected == self.adapter.external_read_location(loc, opts)
+
+    def test_external_write_options_normalizes_keys_in_place(self):
+        # the external materialization reads the format and compression back from the dict
+        opts = {"FORMAT": "CSV", "COMPRESSION": "gzip"}
+        self.adapter.external_write_options("out", opts)
+        assert opts == {"format": "CSV", "compression": "gzip"}
