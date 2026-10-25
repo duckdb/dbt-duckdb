@@ -32,6 +32,7 @@
   {{ drop_relation_if_exists(preexisting_backup_relation) }}
 
   {% set to_drop = [] %}
+  {% set dropped_dependents = [] %}
    -- if not using a temporary table we will update the temp relation to use a different temp schema ("dbt_temp" by default)
    -- for microbatch with concurrent batches, include batch timestamps in the identifier to avoid collisions
   {%- set batch_id = adapter.batch_id_for_model(model) -%}
@@ -47,6 +48,10 @@
   {{ run_hooks(pre_hooks, inside_transaction=True) }}
 
   {% if existing_relation is none %}
+    {% set build_sql = create_table_as(False, target_relation, compiled_code, language, partitioned_by=partitioned_by, sorted_by=sorted_by) %}
+  {% elif full_refresh_mode and has_foreign_key_constraints(existing_relation) %}
+    {#-- Tables with foreign keys must not be renamed (see has_foreign_key_constraints) --#}
+    {% set dropped_dependents = drop_relation_for_rebuild(existing_relation) %}
     {% set build_sql = create_table_as(False, target_relation, compiled_code, language, partitioned_by=partitioned_by, sorted_by=sorted_by) %}
   {% elif full_refresh_mode %}
     {% set build_sql = create_table_as(False, intermediate_relation, compiled_code, language, partitioned_by=partitioned_by, sorted_by=sorted_by) %}
@@ -84,12 +89,16 @@
   {% endcall %}
 
   {% if need_swap %}
-      {#-- Drop indexes on target relation before renaming to backup to avoid dependency errors --#}
+      {#-- Drop indexes and foreign key dependents on target relation before renaming to backup to avoid dependency errors --#}
       {% do drop_indexes_on_relation(target_relation) %}
+      {% if may_be_foreign_key_target(target_relation) %}
+        {% set dropped_dependents = drop_foreign_key_dependents(target_relation) %}
+      {% endif %}
       {% do adapter.rename_relation(target_relation, backup_relation) %}
       {% do adapter.rename_relation(intermediate_relation, target_relation) %}
       {% do to_drop.append(backup_relation) %}
   {% endif %}
+  {% do restore_foreign_key_dependents(dropped_dependents) %}
 
   {% set should_revoke = should_revoke(existing_relation, full_refresh_mode) %}
   {% do apply_grants(target_relation, grant_config, should_revoke=should_revoke) %}

@@ -1,4 +1,5 @@
 import os
+import threading
 from collections import defaultdict
 from dataclasses import dataclass
 from datetime import datetime
@@ -42,6 +43,7 @@ from dbt.adapters.contracts.relation import RelationType
 from dbt.adapters.duckdb.column import DuckDBColumn
 from dbt.adapters.duckdb.connections import DuckDBConnectionManager
 from dbt.adapters.duckdb.relation import DuckDBRelation
+from dbt.adapters.duckdb.utils import escape_sql_string
 from dbt.adapters.duckdb.utils import TargetConfig
 from dbt.adapters.duckdb.utils import TargetLocation
 from dbt.adapters.events.logging import AdapterLogger
@@ -97,6 +99,12 @@ class DuckDBAdapter(SQLAdapter):
     ConnectionManager = DuckDBConnectionManager
     Column = DuckDBColumn
     Relation = DuckDBRelation
+
+    def __init__(self, config: Any, mp_context: Any) -> None:
+        super().__init__(config, mp_context)
+        self._key_constraints_by_schema: dict[tuple[str, str], dict[str, set[ConstraintType]]] = {}
+        self._catalog_types: Optional[dict[str, str]] = None
+        self._key_constraint_cache_lock = threading.RLock()
 
     AdapterSpecificConfigs = DuckDBConfig
 
@@ -159,6 +167,29 @@ class DuckDBAdapter(SQLAdapter):
     @available
     def disable_transactions(self):
         return self.config.credentials.disable_transactions
+
+    @available
+    def escape_sql_string(self, value: Any) -> str:
+        return escape_sql_string(value)
+
+    @available
+    def ensure_transaction(self) -> None:
+        """Open a transaction on this thread's connection if one is not already open.
+
+        Replacing a table in place (drop, then create under the same name) is only
+        safe inside a transaction: if the build fails, the rollback restores the old
+        table. This opens one even when disable_transactions is set, with a warning; the
+        materialization's adapter.commit() closes it, and dbt rolls it back if the model fails.
+        """
+        connection = self.connections.get_thread_connection()
+        if not connection.transaction_open:
+            if self.disable_transactions():
+                DuckDBConnectionManager.warn_once(
+                    "disable_transactions is set, but dbt-duckdb uses a transaction to rebuild "
+                    "tables with foreign key constraints in place, so a failed build does not "
+                    "lose the existing table's data."
+                )
+            self.connections.begin()
 
     @available
     def is_ducklake(self, relation: DuckDBRelation) -> bool:
@@ -468,17 +499,154 @@ class DuckDBAdapter(SQLAdapter):
                 )
                 self.drop_relation(temp_relation)
 
-    def pre_model_hook(self, config: Any) -> None:
+    # Creating or dropping a table with a foreign key also alters the table it
+    # references, so DuckDB raises a write-write conflict when two models that share
+    # a foreign key relationship are built in concurrent transactions. Models that
+    # declare a foreign key, or that a foreign key currently references, take this
+    # lock for the whole materialization.
+    _foreign_key_lock = threading.Lock()
+    _foreign_key_catalog_types = {"duckdb", "motherduck"}
+
+    @staticmethod
+    def _key_constraint_types(model: Any) -> set:
+        contract = getattr(model, "contract", None)
+        if not (contract and contract.enforced):
+            return set()
+        constraints = list(getattr(model, "constraints", None) or [])
+        for column in (getattr(model, "columns", None) or {}).values():
+            constraints.extend(column.constraints or [])
+        key_types = {ConstraintType.primary_key, ConstraintType.unique, ConstraintType.foreign_key}
+        return {constraint.type for constraint in constraints} & key_types
+
+    @staticmethod
+    def _relation_components(relation: Any) -> tuple[str, str, str]:
+        database = getattr(relation, "database", None)
+        schema = getattr(relation, "schema", None)
+        identifier = (
+            getattr(relation, "identifier", None)
+            or getattr(relation, "alias", None)
+            or getattr(relation, "name", None)
+        )
+        if not database or not schema or not identifier:
+            raise DbtRuntimeError(
+                "Foreign key metadata requires a relation with a database, schema, "
+                f"and identifier; got {relation}"
+            )
+        return str(database), str(schema), str(identifier)
+
+    def _catalog_type(self, database: str) -> Optional[str]:
+        if self.config.credentials.remote:
+            # Buena Vista does not expose DuckDB catalog metadata through its cursor.
+            return "remote"
+        with self._key_constraint_cache_lock:
+            if self._catalog_types is None:
+                _, table = self.execute(
+                    "select database_name, type from duckdb_databases()",
+                    fetch=True,
+                )
+                self._catalog_types = {
+                    str(row[0]).casefold(): str(row[1]).casefold() for row in table
+                }
+            return self._catalog_types.get(database.casefold())
+
+    def _catalog_supports_foreign_keys(self, database: str) -> bool:
+        return self._catalog_type(database) in self._foreign_key_catalog_types
+
+    @available
+    def catalog_supports_foreign_keys(self, database: str) -> bool:
+        return self._catalog_supports_foreign_keys(database)
+
+    def _is_foreign_key_target(self, model: Any) -> bool:
+        # Foreign keys cannot cross schemas in DuckDB, so only this schema can hold one
+        database, schema, identifier = self._relation_components(model)
+        _, table = self.execute(
+            f"""
+            select 1 from duckdb_constraints()
+            where constraint_type = 'FOREIGN KEY'
+              and lower(database_name) = lower('{escape_sql_string(database)}')
+              and lower(schema_name) = lower('{escape_sql_string(schema)}')
+              and lower(referenced_table) = lower('{escape_sql_string(identifier)}')
+              and lower(table_name) <> lower(referenced_table)
+            limit 1
+            """,
+            fetch=True,
+        )
+        return len(table) > 0
+
+    def _existing_key_constraint_types(self, relation: Any) -> set:
+        by_name = {
+            "PRIMARY KEY": ConstraintType.primary_key,
+            "UNIQUE": ConstraintType.unique,
+            "FOREIGN KEY": ConstraintType.foreign_key,
+        }
+        database, schema, identifier = self._relation_components(relation)
+        if not self._catalog_supports_foreign_keys(database):
+            return set()
+        schema_key = (database.casefold(), schema.casefold())
+        with self._key_constraint_cache_lock:
+            if schema_key not in self._key_constraints_by_schema:
+                # Snapshot the schema before its first model runs. Constraints added
+                # during this run are already present in each model's current config.
+                _, table = self.execute(
+                    f"""
+                    select table_name, constraint_type from duckdb_constraints()
+                    where lower(database_name) = lower('{escape_sql_string(database)}')
+                      and lower(schema_name) = lower('{escape_sql_string(schema)}')
+                      and constraint_type in ('PRIMARY KEY', 'UNIQUE', 'FOREIGN KEY')
+                    """,
+                    fetch=True,
+                )
+                constraints_by_table: dict[str, set[ConstraintType]] = defaultdict(set)
+                for row in table:
+                    constraints_by_table[str(row[0]).casefold()].add(by_name[row[1]])
+                self._key_constraints_by_schema[schema_key] = constraints_by_table
+            return set(
+                self._key_constraints_by_schema[schema_key].get(identifier.casefold(), set())
+            )
+
+    @available
+    def existing_key_constraint_types(self, relation: Any) -> list[str]:
+        return sorted(item.value for item in self._existing_key_constraint_types(relation))
+
+    def _acquire_foreign_key_lock(self, model: Any) -> bool:
+        """Take the foreign key lock if this model needs it, returning whether it does."""
+        database, _, _ = self._relation_components(model)
+        if not self._catalog_supports_foreign_keys(database):
+            # Other catalogs keep their constraints as declared, without our handling
+            return False
+        types = self._key_constraint_types(model)
+        if not types:
+            types = self._existing_key_constraint_types(model)
+            if not types:
+                return False
+        self._foreign_key_lock.acquire()
+        # Check for references only while holding the lock: a foreign key model being
+        # built in another thread can hide its references from duckdb_constraints()
+        # until it commits.
+        try:
+            types |= self._existing_key_constraint_types(model)
+            if ConstraintType.foreign_key in types or self._is_foreign_key_target(model):
+                return True
+        except BaseException:
+            self._foreign_key_lock.release()
+            raise
+        self._foreign_key_lock.release()
+        return False
+
+    def pre_model_hook(self, config: Any) -> Any:
         """A hook for getting the temp schema name from the model config.
         Cleans up the remote temporary table on MotherDuck before running
-        an incremental model.
+        an incremental model, and serializes models in foreign key relationships.
         """
+        holds_foreign_key_lock = False
         if hasattr(config, "model"):
             self._temp_schema_name = config.model.config.meta.get(
                 TEMP_SCHEMA_NAME, self._temp_schema_name
             )
             self._clean_up_temp_relation_for_incremental(config)
+            holds_foreign_key_lock = self._acquire_foreign_key_lock(config.model)
         super().pre_model_hook(config)
+        return holds_foreign_key_lock
 
     @available
     def batch_id_for_model(self, model: Any) -> str:
@@ -530,8 +698,12 @@ class DuckDBAdapter(SQLAdapter):
         """A hook for cleaning up the remote temporary table on MotherDuck if the
         incremental model materialization fails to do so.
         """
-        self._clean_up_temp_relation_for_incremental(config)
-        super().post_model_hook(config, context)
+        try:
+            self._clean_up_temp_relation_for_incremental(config)
+            super().post_model_hook(config, context)
+        finally:
+            if context is True:
+                self._foreign_key_lock.release()
 
 
 # Change `table_a/b` to `table_aaaaa/bbbbb` to avoid duckdb binding issues when relation_a/b
