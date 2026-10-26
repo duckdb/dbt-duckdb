@@ -1,4 +1,4 @@
-1.11.1 (2026-10-25)
+1.11.1 (2026-10-26)
 -------------------
 
 - Added support for `motherduck_token` as a top-level profile property
