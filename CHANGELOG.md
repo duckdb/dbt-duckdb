@@ -1,3 +1,45 @@
+1.11.1 (2026-10-26)
+-------------------
+
+- Added support for `motherduck_token` as a top-level profile property
+- Fixed reruns of models referenced by a foreign key, which now rebuild the foreign key family instead of failing
+  (upgrading: databases built by earlier versions need a one-time rebuild, since the first rerun can fail with
+  `Could not drop the table because this table is main key table of the table "<name>__dbt_tmp"`; delete the
+  database file or `drop schema <schema> cascade`, then run `dbt run` again)
+- Fixed model-level foreign key rendering
+- Fixed `external` models whose location ends in a compression extension (e.g. `out.csv.gz`)
+- Fixed MotherDuck options set under alternate spellings (e.g. `MOTHERDUCK_TOKEN`, `token`) being re-issued as `SET` statements
+- Fixed database name derivation for file names with more than one dot, matching DuckDB
+- Fixed quoting of contract column names in the insert column list
+- Fixed `sql_header` on models with enforced contracts
+- Fixed TypeError when creating the postgres plugin
+- Added Python 3.14 to the CI matrix
+- Added support for running Python models via MotherDuck Flights
+
+1.11.0 (2026-08-07)
+-------------------
+
+- Restored transactional table materialization for DuckLake tables on DuckDB 1.5.3 and newer
+- Added support for DuckLake partition functions
+- Added DuckLake `partitioned_by` and `sorted_by` alter flows
+- Reduced DuckLake table materialization conflicts
+- Skipped `expand_column_types` on DuckDB to avoid slow DuckLake cold starts
+- Added `duckdb__date` dispatch macro and DuckDB catalog macro shims
+- Added service-account domain-wide delegation to the GSheet plugin
+- Used `DESCRIBE` in `get_columns_in_relation` to avoid loading the catalog
+- Fixed MotherDuck attach paths so only query parameters are stripped
+- Fixed escaping of single quotes in generated SQL for config values
+- Fixed commit when the connection has no open transaction
+- Fixed `__dbt_backup` leak on incremental full-refresh
+- Fixed `duckdb__create_schema` for non-DuckDB attached databases
+- Fixed `drop_indexes_on_relation` to use the full database.schema.index path
+- Fixed GSheet plugin `load()` for ranges without headers
+- Fixed missing `rollback` method on `DuckDBConnectionWrapper`
+- Fixed missing `@classmethod` on `is_cancelable` methods
+- Fixed duplicate `_capabilities` to restore `SchemaMetadataByRelations`
+- Documented persisted docs and the `retries` profile settings
+- Added CONTRIBUTING.md
+
 1.10.1 (2026-02-17)
 -------------------
 
