@@ -15,6 +15,7 @@
 - Fixed TypeError when creating the postgres plugin
 - Added Python 3.14 to the CI matrix
 - Added support for running Python models via MotherDuck Flights
+
 1.11.0 (2026-08-07)
 -------------------
 
