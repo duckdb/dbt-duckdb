@@ -15,6 +15,8 @@ from dbt_common.exceptions import DbtRuntimeError
 from ..constants import DEFAULT_TEMP_SCHEMA_NAME
 from ..credentials import DuckDBCredentials
 from ..credentials import Extension
+from ..extension_repositories import install_and_load_extension
+from ..extension_repositories import register_extension_repositories
 from ..plugins import BasePlugin
 from ..utils import escape_sql_string
 from ..utils import SourceConfig
@@ -163,6 +165,9 @@ class Environment(abc.ABC):
         else:
             conn = duckdb.connect(creds.path, read_only=False, config=config)
 
+        # register any custom extension repositories before we install from them
+        register_extension_repositories(conn, creds.extension_repositories or [])
+
         # install any extensions on the connection
         if creds.extensions is not None:
             for extension in creds.extensions:
@@ -174,8 +179,7 @@ class Environment(abc.ABC):
                         ext = Extension(**extension)
                     except Exception as e:
                         raise DbtRuntimeError(f"Failed to parse extension: {e}")
-                    conn.execute(f"install {ext.name} from {ext.repo}")
-                    conn.load_extension(ext.name)
+                    install_and_load_extension(conn, ext)
 
         # Create/update secrets on the database
         for sql in creds.secrets_sql():

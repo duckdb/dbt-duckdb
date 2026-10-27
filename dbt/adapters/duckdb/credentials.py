@@ -1,4 +1,5 @@
 import os
+import re
 from dataclasses import dataclass
 from dataclasses import field
 from typing import Any
@@ -161,6 +162,43 @@ class Extension(dbtClassMixin):
     repo: str
 
 
+# DuckDB only accepts letters, digits, '_' and '-' in extension repository names
+EXTENSION_REPOSITORY_NAME_PATTERN = re.compile(r"^[A-Za-z0-9_-]+$")
+
+# The repositories that DuckDB ships with; these cannot be (re)declared in a profile
+BUILTIN_EXTENSION_REPOSITORIES = frozenset(
+    ["core", "core_nightly", "community", "local_build_debug", "local_build_release"]
+)
+
+
+@dataclass
+class ExtensionRepository(dbtClassMixin):
+    """A custom, signed DuckDB (2.0+) extension repository to register on connect."""
+
+    # The name used to refer to the repository, e.g. `INSTALL a5 FROM query_farm`
+    name: str
+
+    # The URL prefix that the repository serves its extensions from
+    prefix: str
+
+    # An optional RSA public key (PEM, or the base64 body of the PEM) to pin;
+    # if it is omitted, DuckDB fetches the key from the repository on first use
+    public_key: Optional[str] = None
+
+    def __post_init__(self):
+        if not EXTENSION_REPOSITORY_NAME_PATTERN.match(self.name or ""):
+            raise DbtRuntimeError(
+                f"Invalid extension repository name '{self.name}': names can only "
+                "contain letters, digits, '_' and '-'"
+            )
+        if self.name in BUILTIN_EXTENSION_REPOSITORIES:
+            raise DbtRuntimeError(
+                f"Extension repository '{self.name}' is built into DuckDB and cannot be declared"
+            )
+        if not self.prefix:
+            raise DbtRuntimeError(f"Extension repository '{self.name}' must specify a prefix")
+
+
 @dataclass
 class FlightConfig(dbtClassMixin):
     """Settings for running Python models on MotherDuck Flights.
@@ -221,6 +259,10 @@ class DuckDBCredentials(Credentials):
 
     # any DuckDB extensions we want to install and load (httpfs, parquet, etc.)
     extensions: Optional[List[Union[str, Dict[str, str]]]] = None
+
+    # custom (DuckDB 2.0+) extension repositories to register before installing
+    # and loading the extensions above; see the ExtensionRepository dataclass
+    extension_repositories: Optional[List[ExtensionRepository]] = None
 
     # any additional pragmas we want to configure on our DuckDB connections;
     # a list of the built-in pragmas can be found here:
@@ -469,6 +511,7 @@ class DuckDBCredentials(Credentials):
             "path",
             "config_options",
             "extensions",
+            "extension_repositories",
             "settings",
             "external_root",
             "use_credential_provider",
