@@ -1,3 +1,5 @@
+import os
+
 import pytest
 from dbt.tests.util import run_dbt
 from dbt.adapters.duckdb.connections import DuckDBConnectionManager
@@ -14,12 +16,16 @@ WHERE conf = 'West'
 class TestFilesystems:
     @pytest.fixture(scope="class")
     def dbt_profile_target(self, dbt_profile_target):
+        github_fs = {"fs": "github", "org": "jwills", "repo": "nba_monte_carlo"}
+        # Unauthenticated GitHub API calls are capped at 60/hr per IP, which shared
+        # CI runners blow through; authenticate when a token is available.
+        token = os.getenv("GITHUB_TOKEN")
+        if token:
+            github_fs.update(username="x-access-token", token=token)
         return {
             "type": "duckdb",
             "path": dbt_profile_target.get("path", ":memory:"),
-            "filesystems": [
-                {"fs": "github", "org": "jwills", "repo": "nba_monte_carlo"}
-            ],
+            "filesystems": [github_fs],
         }
 
     @pytest.fixture(scope="class")

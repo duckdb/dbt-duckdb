@@ -2,6 +2,7 @@
 
   {%- set location = render(config.get('location', default=external_location(this, config))) -%})
   {%- set rendered_options = render_write_options(config) -%}
+  {%- set write_options = adapter.external_write_options(location, rendered_options) -%}
 
   {%- set format = config.get('format') -%}
   {%- set allowed_formats = ['csv', 'parquet', 'json'] -%}
@@ -10,15 +11,22 @@
           {{ exceptions.raise_compiler_error("Invalid format: " ~ format ~ ". Allowed formats are: " ~ allowed_formats | join(', ')) }}
       {%- endif -%}
   {%- else -%}
-    {%- set format = location.split('.')[-1].lower() if '.' in location else 'parquet' -%}
+    {#- read the files back in the format that external_write_options picked for the write -#}
+    {%- set format = rendered_options['format'] | lower -%}
     {%- set format = format if format in allowed_formats else 'parquet' -%}
   {%- endif -%}
 
-  {%- set write_options = adapter.external_write_options(location, rendered_options) -%}
   {%- set read_location = adapter.external_read_location(location, rendered_options) -%}
   {%- set parquet_read_options = config.get('parquet_read_options', {'union_by_name': False}) -%}
   {%- set json_read_options = config.get('json_read_options', {'auto_detect': True}) -%}
   {%- set csv_read_options = config.get('csv_read_options', {'auto_detect': True}) -%}
+  {#- DuckDB detects compression from a lower-case extension only, so pass the write compression to the readers -#}
+  {%- if rendered_options.get('compression') and 'compression' not in json_read_options -%}
+    {%- set json_read_options = dict(json_read_options, compression=rendered_options['compression']) -%}
+  {%- endif -%}
+  {%- if rendered_options.get('compression') and 'compression' not in csv_read_options -%}
+    {%- set csv_read_options = dict(csv_read_options, compression=rendered_options['compression']) -%}
+  {%- endif -%}
 
   -- set language - python or sql
   {%- set language = model['language'] -%}

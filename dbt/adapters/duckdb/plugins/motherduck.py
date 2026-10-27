@@ -31,16 +31,27 @@ class Plugin(BasePlugin):
         return {key: value[0] for key, value in parse_qs(urlparse(path).query).items()}
 
     @staticmethod
-    def get_md_config_settings(config):
+    def get_md_config_keys(name):
+        # The spellings a MotherDuck config option is accepted under
+        short_name = name.replace("motherduck_", "")
+        return [name, short_name, name.upper(), short_name.upper()]
+
+    @classmethod
+    def pop_md_settings(cls, settings, names):
+        # Remove every accepted spelling of the given MotherDuck config options,
+        # since they can only be set at initialization and must not be re-applied
+        # with SET statements on cursors
+        if settings is not None:
+            for name in names:
+                for key in cls.get_md_config_keys(name):
+                    settings.pop(key, None)
+
+    @classmethod
+    def get_md_config_settings(cls, config):
         # Get MotherDuck config settings
         md_config = {}
         for name in MOTHERDUCK_CONFIG_OPTIONS:
-            for key in [
-                name,
-                name.replace("motherduck_", ""),
-                name.upper(),
-                name.replace("motherduck_", "").upper(),
-            ]:
+            for key in cls.get_md_config_keys(name):
                 if key in config:
                     md_config[name] = config[key]
 
@@ -71,10 +82,10 @@ class Plugin(BasePlugin):
                 config.update(self.creds.settings)
 
             # set MD config options and remove from settings
-            for key, value in self.get_md_config_settings(config).items():
+            md_config = self.get_md_config_settings(config)
+            for key, value in md_config.items():
                 conn.execute(f"SET {key} = '{escape_sql_string(value)}'")
-                if self.creds.settings is not None and key in self.creds.settings:
-                    self.creds.settings.pop(key)
+            self.pop_md_settings(self.creds.settings, md_config)
 
     def update_connection_config(self, creds: DuckDBCredentials, config: Dict[str, Any]):
         user_agent = f"dbt/{__version__} dbt-duckdb/{__plugin_version__}"
@@ -91,6 +102,4 @@ class Plugin(BasePlugin):
             config.update(md_config)
             # MotherDuck config options can only be set at connection init,
             # so remove them from settings to prevent SET statements on cursors
-            for key in md_config:
-                if creds.settings is not None:
-                    creds.settings.pop(key, None)
+            self.pop_md_settings(creds.settings, md_config)

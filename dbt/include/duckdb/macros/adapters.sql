@@ -451,3 +451,181 @@ def materialize(df, con):
     {% endcall %}
   {% endfor %}
 {%- endmacro %}
+
+{% macro drop_foreign_key_dependents(relation) -%}
+  {#-- DuckDB will not rename or drop a table that a foreign key references, and it
+       cannot drop a foreign key constraint, so the tables whose foreign keys point at
+       `relation` (directly or transitively) have to be dropped before it is swapped.
+       We only drop tables this run is about to rebuild from scratch anyway: selected
+       table models, or incremental models being fully refreshed, that are downstream
+       of the model being built. Anything else is an error, so no data is lost.
+       Foreign keys cannot cross schemas in DuckDB, so we only look in this one. #}
+  {% set database = adapter.escape_sql_string(relation.database) %}
+  {% set schema = adapter.escape_sql_string(relation.schema) %}
+  {% set identifier = adapter.escape_sql_string(relation.identifier) %}
+  {% call statement('get_foreign_key_dependents', fetch_result=True) %}
+    with recursive fks as (
+      select table_name, referenced_table
+      from duckdb_constraints()
+      where constraint_type = 'FOREIGN KEY'
+        and lower(database_name) = lower('{{ database }}')
+        and lower(schema_name) = lower('{{ schema }}')
+        and lower(table_name) <> lower(referenced_table)
+    ),
+    dependents(table_name, depth) as (
+      select table_name, 1
+      from fks
+      where lower(referenced_table) = lower('{{ identifier }}')
+      union
+      select fks.table_name, dependents.depth + 1
+      from fks
+      join dependents on lower(fks.referenced_table) = lower(dependents.table_name)
+    )
+    {#-- One row per (dependent, table it references), deepest dependents first,
+         which is the order they have to be dropped in --#}
+    select d.table_name, d.depth, f.referenced_table
+    from (select table_name, max(depth) as depth from dependents group by table_name) d
+    join fks f on f.table_name = d.table_name
+    order by d.depth desc, d.table_name, f.referenced_table
+  {% endcall %}
+  {% set results = load_result('get_foreign_key_dependents').table %}
+  {% if results | length == 0 %}
+    {{ return([]) }}
+  {% endif %}
+
+  {% set dependents = [] %}
+  {% set referenced_by_table = {} %}
+  {% for row in results %}
+    {% if row[0] not in dependents %}
+      {% do dependents.append(row[0]) %}
+      {% do referenced_by_table.update({row[0]: []}) %}
+    {% endif %}
+    {% do referenced_by_table[row[0]].append(row[2] | lower) %}
+  {% endfor %}
+
+  {#-- Map each table in the chain back to the model that builds it --#}
+  {% set chain = {relation.identifier | lower: model.unique_id} %}
+  {% set nodes_by_table = {} %}
+  {% for node in graph.nodes.values() if node.resource_type == 'model'
+        and (node.database or '') | lower == (relation.database or '') | lower
+        and node.schema | lower == relation.schema | lower %}
+    {% for table in dependents if (node.alias or node.name) | lower == table | lower %}
+      {% do nodes_by_table.update({table: node}) %}
+      {% do chain.update({table | lower: node.unique_id}) %}
+    {% endfor %}
+  {% endfor %}
+
+  {% set problems = [] %}
+  {% for table in dependents %}
+    {% set node = nodes_by_table.get(table) %}
+    {#-- The model must ref() at least one table in the chain, so dbt rebuilds it after this one --#}
+    {% set upstream_ids = [] %}
+    {% for referenced in referenced_by_table[table] if referenced in chain %}
+      {% do upstream_ids.append(chain[referenced]) %}
+    {% endfor %}
+    {% if node is none %}
+      {% do problems.append(table ~ " (not built by a dbt model in this project)") %}
+    {% elif node.unique_id not in selected_resources %}
+      {% do problems.append(table ~ " (model " ~ node.name ~ " is not selected in this run)") %}
+    {% elif upstream_ids | select('in', node.depends_on.nodes) | list | length == 0 %}
+      {% do problems.append(table ~ " (model " ~ node.name ~ " does not ref() the table its foreign key points at, so dbt may not rebuild it afterwards; use `to: ref(...)` in the constraint)") %}
+    {% else %}
+      {% set full_refresh = node.config.full_refresh if node.config.full_refresh is not none else flags.FULL_REFRESH %}
+      {% if not (node.config.materialized == 'table' or (node.config.materialized == 'incremental' and full_refresh)) %}
+        {% do problems.append(table ~ " (model " ~ node.name ~ " is materialized as " ~ node.config.materialized ~ " and would lose its data; run with --full-refresh)") %}
+      {% endif %}
+    {% endif %}
+  {% endfor %}
+  {% if problems %}
+    {% do exceptions.raise_compiler_error(
+      "Cannot replace " ~ relation ~ " because DuckDB does not allow replacing a table that a foreign key "
+      ~ "references, and dbt-duckdb can only drop referencing tables that this run will rebuild. "
+      ~ "Problem tables: " ~ problems | join("; ")) %}
+  {% endif %}
+
+  {% set dropped = [] %}
+  {% for table in dependents %}
+    {% set dependent = api.Relation.create(database=relation.database, schema=relation.schema, identifier=table, type='table') %}
+    {% set backup = dependent.incorporate(path={'identifier': table ~ '__dbt_fk_backup'}, type='table') %}
+    {% do adapter.drop_relation(backup) %}
+    {% call statement('backup_foreign_key_dependent_' ~ loop.index) %}
+      create table {{ backup }} as select * from {{ dependent }}
+    {% endcall %}
+    {{ log("Dropping " ~ dependent ~ " because it references " ~ relation ~ " through a foreign key; it is rebuilt later in this run", info=True) }}
+    {% do adapter.drop_relation(dependent) %}
+    {% do dropped.append({'relation': dependent, 'backup': backup}) %}
+  {% endfor %}
+  {{ return(dropped) }}
+{%- endmacro %}
+
+{% macro restore_foreign_key_dependents(dropped) -%}
+  {#-- Keep dependent data available between model transactions. The selected model
+       rebuilds the constraints later in the run. #}
+  {% for item in dropped | reverse %}
+    {{ log("Restoring data for " ~ item['relation'] ~ "; its constraints are rebuilt later in this run", info=True) }}
+    {% do adapter.rename_relation(item['backup'], item['relation']) %}
+  {% endfor %}
+{%- endmacro %}
+
+{% macro enforced_constraint_types() -%}
+  {#-- The constraint types declared by this model's enforced contract --#}
+  {% set contract_config = config.get('contract') %}
+  {% set types = [] %}
+  {% if contract_config and contract_config.enforced %}
+    {% for constraint in model.get('constraints', []) %}
+      {% do types.append(constraint.type) %}
+    {% endfor %}
+    {% for column in model.get('columns', {}).values() %}
+      {% for constraint in column.get('constraints', []) %}
+        {% do types.append(constraint.type) %}
+      {% endfor %}
+    {% endfor %}
+  {% endif %}
+  {{ return(types) }}
+{%- endmacro %}
+
+{% macro existing_constraint_types(relation) -%}
+  {% if relation is none or not relation.is_table %}
+    {{ return([]) }}
+  {% endif %}
+  {{ return(adapter.existing_key_constraint_types(relation)) }}
+{%- endmacro %}
+
+{% macro has_foreign_key_constraints(relation=none) -%}
+  {#-- DuckDB records the name a foreign key table was created under on the table it
+       references and does not update it on rename (duckdb/duckdb#24648), after which
+       the referenced table can never be dropped. Tables with foreign keys therefore
+       have to be created under their final name rather than renamed into place. #}
+  {% if not adapter.catalog_supports_foreign_keys(this.database) %}
+    {{ return(false) }}
+  {% endif %}
+  {{ return(
+    'foreign_key' in enforced_constraint_types()
+    or 'foreign_key' in existing_constraint_types(relation)
+  ) }}
+{%- endmacro %}
+
+{% macro may_be_foreign_key_target(relation=none) -%}
+  {#-- Only a table with a primary key or unique constraint can be referenced by a
+       foreign key. Include the existing table so removing a key constraint still
+       handles its current dependents safely. #}
+  {% if not adapter.catalog_supports_foreign_keys(this.database) %}
+    {{ return(false) }}
+  {% endif %}
+  {% set types = enforced_constraint_types() + existing_constraint_types(relation) %}
+  {{ return('primary_key' in types or 'unique' in types) }}
+{%- endmacro %}
+
+{% macro drop_relation_for_rebuild(relation) -%}
+  {#-- Drop a relation inside the model's transaction so it can be rebuilt under the
+       same name, dropping anything whose foreign key references it first. The
+       transaction is required even with disable_transactions so a failed build rolls
+       back the target table and its dependent backups together. --#}
+  {% do adapter.ensure_transaction() %}
+  {% set dropped = [] %}
+  {% if relation.is_table and may_be_foreign_key_target(relation) %}
+    {% set dropped = drop_foreign_key_dependents(relation) %}
+  {% endif %}
+  {% do adapter.drop_relation(relation) %}
+  {{ return(dropped) }}
+{%- endmacro %}
