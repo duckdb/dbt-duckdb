@@ -135,10 +135,13 @@ class TestEmptyPythonModel:
 
     def test_run(self, project):
         run_dbt(["run"])
+        # Scope to this test's schema: on MotherDuck, system.information_schema spans
+        # every database, including ones that concurrent CI jobs are writing to
         result = project.run_sql(
-            """
+            f"""
             select column_name, data_type from system.information_schema.columns
-            where table_name='upstream_model' order by column_name
+            where table_schema='{project.test_schema}' and table_name='upstream_model'
+            order by column_name
             """,
             fetch="all",
         )
