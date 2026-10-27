@@ -17,7 +17,7 @@ name: Tests and Code Checks
 on:
   push:
     branches:
-      - "master"
+      - "main"
       - "develop"
       - "*.latest"
       - "releases/*"
@@ -653,7 +653,7 @@ jobs:
 
   notify-failure:
     name: Send Slack notification on failure
-    if: failure() && github.ref == 'refs/heads/master'
+    if: failure() && github.ref == 'refs/heads/main'
     needs: [code-quality, unit, functional, ducklake, filebased, motherduck, motherduck-ducklake, motherduck-flights, buenavista, fsspec, plugins, build, test-build]
     runs-on: ubuntu-latest
     steps:
