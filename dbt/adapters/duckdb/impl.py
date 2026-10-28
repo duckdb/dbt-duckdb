@@ -16,6 +16,7 @@ from dbt_common.contracts.constraints import ConstraintType
 from dbt_common.contracts.constraints import ModelLevelConstraint
 from dbt_common.dataclass_schema import dbtClassMixin
 from dbt_common.dataclass_schema import ValidationError
+from dbt_common.exceptions import CompilationError
 from dbt_common.exceptions import DbtDatabaseError
 from dbt_common.exceptions import DbtRuntimeError
 from dbt_common.utils import encoding as dbt_encoding
@@ -267,6 +268,23 @@ class DuckDBAdapter(SQLAdapter):
 
     @available
     def external_write_options(self, write_location: str, rendered_options: dict) -> str:
+        # DuckDB's COPY options are case-insensitive, so normalize the keys in place
+        # for the checks below and for the callers that read the options afterwards
+        normalized: dict[str, Any] = {}
+        original_keys: dict[str, str] = {}
+        for k, v in rendered_options.items():
+            key = k.lower()
+            if key in normalized:
+                # e.g. options={'FORMAT': 'parquet'} with the top-level format='csv'
+                raise CompilationError(
+                    f"The write options '{original_keys[key]}' and '{k}' set the same "
+                    "DuckDB option, which is case-insensitive; set it only once"
+                )
+            normalized[key] = v
+            original_keys[key] = k
+        rendered_options.clear()
+        rendered_options.update(normalized)
+
         if "format" not in rendered_options:
             root, ext = os.path.splitext(write_location)
             # DuckDB infers the compression from a trailing .gz/.zst, so the
@@ -297,7 +315,7 @@ class DuckDBAdapter(SQLAdapter):
 
         ret = []
         for k, v in rendered_options.items():
-            if k.lower() in {
+            if k in {
                 "delimiter",
                 "quote",
                 "escape",
@@ -310,6 +328,7 @@ class DuckDBAdapter(SQLAdapter):
 
     @available
     def external_read_location(self, write_location: str, rendered_options: dict) -> str:
+        rendered_options = {k.lower(): v for k, v in rendered_options.items()}
         if rendered_options.get("partition_by") or rendered_options.get("per_thread_output"):
             globs = [write_location, "*"]
             if rendered_options.get("partition_by"):

@@ -45,6 +45,17 @@ config_write_upper_compressed_csv_location = """
 """
 config_write_upper_compressed_csv_location_sql = config_write_upper_compressed_csv_location + model_base
 
+# DuckDB's COPY options are case-insensitive, so upper-case option names must work too
+config_write_upper_partition_by = """
+    {{ config(materialized="external", options={"PARTITION_BY": "id, name", "CODEC": "zstd"}) }}
+"""
+config_write_upper_partition_by_sql = config_write_upper_partition_by + model_base
+
+config_write_upper_format = """
+    {{ config(materialized="external", options={"FORMAT": "csv", "DELIMITER": "|"}) }}
+"""
+config_write_upper_format_sql = config_write_upper_format + model_base
+
 
 class BaseExternalMaterializations:
 
@@ -65,6 +76,8 @@ class BaseExternalMaterializations:
             "config_write_partition_by_id_name.sql": config_write_partition_by_id_name_sql,
             "config_write_compressed_csv_location.sql": config_write_compressed_csv_location_sql,
             "config_write_upper_compressed_csv_location.sql": config_write_upper_compressed_csv_location_sql,
+            "config_write_upper_partition_by.sql": config_write_upper_partition_by_sql,
+            "config_write_upper_format.sql": config_write_upper_format_sql,
             "schema.yml": schema_base_yml,
         }
 
@@ -90,7 +103,7 @@ class BaseExternalMaterializations:
         # run command
         results = run_dbt()
         # run result length
-        assert len(results) == 7
+        assert len(results) == 9
 
         # names exist in result nodes
         check_result_nodes_by_name(
@@ -103,6 +116,8 @@ class BaseExternalMaterializations:
                 "config_write_partition_by_id_name",
                 "config_write_compressed_csv_location",
                 "config_write_upper_compressed_csv_location",
+                "config_write_upper_partition_by",
+                "config_write_upper_format",
             ],
         )
 
@@ -116,6 +131,8 @@ class BaseExternalMaterializations:
             "config_write_partition_by_id_name": "view",
             "config_write_compressed_csv_location": "view",
             "config_write_upper_compressed_csv_location": "view",
+            "config_write_upper_partition_by": "view",
+            "config_write_upper_format": "view",
         }
         check_relation_types(project.adapter, expected)
 
@@ -135,12 +152,19 @@ class BaseExternalMaterializations:
                 "config_write_partition_by_id_name",
                 "config_write_compressed_csv_location",
                 "config_write_upper_compressed_csv_location",
+                "config_write_upper_partition_by",
+                "config_write_upper_format",
             ],
         )
 
+        # partitioned outputs default to a directory without a file extension
+        extroot = project.adapter.external_root()
+        assert os.path.isdir(os.path.join(extroot, "config_write_partition_by_id"))
+        assert os.path.isdir(os.path.join(extroot, "config_write_upper_partition_by"))
+
         # check relations in catalog
         catalog = run_dbt(["docs", "generate"])
-        assert len(catalog.nodes) == 8
+        assert len(catalog.nodes) == 10
         assert len(catalog.sources) == 1
 
 

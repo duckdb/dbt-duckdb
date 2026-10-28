@@ -3,6 +3,7 @@ from argparse import Namespace
 from unittest import mock
 
 from dbt.flags import set_from_args
+from dbt_common.exceptions import CompilationError
 from dbt.adapters.duckdb import DuckDBAdapter
 from tests.unit.utils import config_from_parts_or_dicts
 
@@ -50,6 +51,9 @@ class TestExternalUtils(unittest.TestCase):
             ("e.json.zst", {}, "format json, compression zstd"),
             ("/tmp/F.CSV.GZ", {}, "format csv, compression gzip, header 1"),
             ("g.csv.gz", {"compression": "none"}, "compression none, format csv, header 1"),
+            ("h", {"FORMAT": "csv"}, "format csv, header 1"),
+            ("i.csv", {"Delimiter": "|", "HEADER": "0"}, "delimiter '|', header 0, format csv"),
+            ("j", {"PARTITION_BY": "ds,category"}, "partition_by (ds,category), format parquet"),
         ]
 
         for (loc, opts, expected) in data:
@@ -61,6 +65,20 @@ class TestExternalUtils(unittest.TestCase):
             ("bar", {"format": "csv", "delimiter": "|", "header": "0"}, "bar"),
             ("/tmp/a", {"partition_by": "ds", "format": "parquet"}, "/tmp/a/*/*.parquet"),
             ("b", {"partition_by": "ds,category"}, "b/*/*/*.parquet"),
+            ("c", {"PARTITION_BY": "ds", "FORMAT": "csv"}, "c/*/*.csv"),
+            ("d", {"Per_Thread_Output": "true"}, "d/*.parquet"),
         ]
         for (loc, opts, expected) in data:
             assert expected == self.adapter.external_read_location(loc, opts)
+
+    def test_external_write_options_normalizes_keys_in_place(self):
+        # the external materialization reads the format and compression back from the dict
+        opts = {"FORMAT": "CSV", "COMPRESSION": "gzip"}
+        self.adapter.external_write_options("out", opts)
+        assert opts == {"format": "CSV", "compression": "gzip"}
+
+    def test_external_write_options_rejects_keys_that_differ_only_by_case(self):
+        # render_write_options adds the legacy top-level format after the options dict
+        opts = {"FORMAT": "parquet", "format": "csv"}
+        with self.assertRaisesRegex(CompilationError, "'FORMAT' and 'format'"):
+            self.adapter.external_write_options("out", opts)
