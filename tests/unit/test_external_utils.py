@@ -3,6 +3,7 @@ from argparse import Namespace
 from unittest import mock
 
 from dbt.flags import set_from_args
+from dbt_common.exceptions import CompilationError
 from dbt.adapters.duckdb import DuckDBAdapter
 from tests.unit.utils import config_from_parts_or_dicts
 
@@ -75,3 +76,9 @@ class TestExternalUtils(unittest.TestCase):
         opts = {"FORMAT": "CSV", "COMPRESSION": "gzip"}
         self.adapter.external_write_options("out", opts)
         assert opts == {"format": "CSV", "compression": "gzip"}
+
+    def test_external_write_options_rejects_keys_that_differ_only_by_case(self):
+        # render_write_options adds the legacy top-level format after the options dict
+        opts = {"FORMAT": "parquet", "format": "csv"}
+        with self.assertRaisesRegex(CompilationError, "'FORMAT' and 'format'"):
+            self.adapter.external_write_options("out", opts)
