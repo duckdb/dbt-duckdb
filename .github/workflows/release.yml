@@ -16,7 +16,7 @@ jobs:
         # hatch-vcs derives the release version from the pushed tag
         fetch-depth: 0
     - name: Set up uv
-      uses: astral-sh/setup-uv@v10.3.0
+      uses: astral-sh/setup-uv@v10.3.2
       with:
         # never build release artifacts from a (potentially poisoned) shared cache
         enable-cache: false
