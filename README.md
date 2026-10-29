@@ -474,7 +474,7 @@ to parse the source in a dbt model. The `formatter` configuration option for the
 we should use `newstyle` string formatting (the default), `oldstyle` string formatting, or `template` string
 formatting. You can read up on the strategies the various string formatting techniques use at this
 [Stack Overflow answer](https://stackoverflow.com/questions/13451989/pythons-many-ways-of-string-formatting-are-the-older-ones-going-to-be-depre) and see examples of their use
-in this [dbt-duckdb integration test](https://github.com/duckdb/dbt-duckdb/blob/master/tests/functional/adapter/test_sources.py).
+in this [dbt-duckdb integration test](https://github.com/duckdb/dbt-duckdb/blob/main/tests/functional/adapter/test_sources.py).
 
 #### Writing to external files
 

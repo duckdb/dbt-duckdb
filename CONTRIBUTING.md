@@ -91,10 +91,10 @@ tests/
 
 ## Pull Request Process
 
-1. Fork the repo and create a branch from `master`.
+1. Fork the repo and create a branch from `main`.
 2. Make your changes. Add or update tests for any new behavior.
 3. Ensure `pre-commit run --all-files` passes.
 4. Run the relevant test suite(s) to confirm nothing is broken.
-5. Open a PR against `master` with a clear description of the change.
+5. Open a PR against `main` with a clear description of the change.
 
 For bug fixes, include steps to reproduce or a failing test that your fix resolves. For new features, explain the use case and any configuration changes.
