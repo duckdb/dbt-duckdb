@@ -235,6 +235,7 @@ default:
 ```
 
 For DuckLake, use `ducklake:` for local; for MotherDuck-managed DuckLake use `md:` with `is_ducklake: true`.
+An attachment whose `type` (or `options.type`) is `ducklake` is recognized as a DuckLake database as well.
 
 ```yaml
 attach:

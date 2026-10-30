@@ -324,10 +324,16 @@ class DuckDBCredentials(Credentials):
                 is_ducklake_flag = getattr(attachment, "is_ducklake", None)
                 path = getattr(attachment, "path", None)
                 alias = getattr(attachment, "alias", None)
+                attach_type = getattr(attachment, "type", None)
+                if attach_type is None:
+                    attach_type = (getattr(attachment, "options", None) or {}).get("type")
 
-                # Detect ducklake by explicit type, or by path scheme. Be lenient on case.
-                if (isinstance(is_ducklake_flag, bool) and is_ducklake_flag) or (
-                    isinstance(path, str) and "ducklake:" in path.lower()
+                # Detect ducklake by the is_ducklake flag, the attachment type
+                # (ATTACH ... (TYPE ducklake)), or the path scheme. Be lenient on case.
+                if (
+                    (isinstance(is_ducklake_flag, bool) and is_ducklake_flag)
+                    or (isinstance(attach_type, str) and attach_type.lower() == "ducklake")
+                    or (isinstance(path, str) and "ducklake:" in path.lower())
                 ):
                     if alias:
                         self._ducklake_dbs.add(alias)
