@@ -114,6 +114,33 @@ default:
   target: dev
 ```
 
+With DuckDB 2.0 or later, you can also install and load extensions from a [custom, signed extension repository](https://duckdb.org/docs/2.0/extensions/extension_repositories)
+by declaring it in the `extension_repositories` field and then referring to it by name in `extensions`:
+
+```
+default:
+  outputs:
+    dev:
+      type: duckdb
+      path: /tmp/dbt.duckdb
+      extension_repositories:
+        - name: query_farm
+          prefix: https://duckdb-extensions.query.farm
+          # Optional: pin the repository's public key instead of fetching it on first use
+          # public_key: "{{ env_var('QUERY_FARM_PUBKEY') }}"
+      extensions:
+        - httpfs
+        - name: a5
+          repo: query_farm
+  target: dev
+```
+
+dbt-duckdb registers each repository before it installs any extensions, setting `allow_extension_repositories = 'allowed'`
+if it needs to create one. Registered repositories persist (in DuckDB's `extension_repository_directory`), so on later runs
+dbt-duckdb reuses a repository with the same name, and raises an error instead of changing its trust configuration if its
+`prefix` or pinned `public_key` doesn't match the profile. Use `DROP EXTENSION REPOSITORY` to reset one. Declaring repositories is
+an error if `allow_extension_repositories` is set to `'forbidden'`.
+
 To use the [DuckDB Secrets Manager](https://duckdb.org/docs/configuration/secrets_manager.html), you can use the `secrets` field. For example, to be able to connect to S3 and read/write
 Parquet files using an AWS access key and secret, your profile would look something like this:
 
