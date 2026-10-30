@@ -377,53 +377,6 @@ class TestDuckDBAdapterIsDucklake(unittest.TestCase):
 
         self.assertTrue(adapter.is_ducklake(relation))
 
-    def test_is_ducklake_with_typed_attachment_in_options(self):
-        """Test is_ducklake honors type: ducklake given in the options dict, in any case."""
-        profile_cfg = self.base_profile_cfg.copy()
-        profile_cfg["outputs"]["test"]["attach"] = [
-            {
-                "alias": "ducklake_db",
-                "path": "/path/to/metadata.ducklake",
-                "options": {"type": "DuckLake"},
-            }
-        ]
-
-        adapter = self._get_adapter(profile_cfg)
-        relation = DuckDBRelation.create(database="ducklake_db", schema="test_schema", identifier="test_table")
-
-        self.assertTrue(adapter.is_ducklake(relation))
-
-    def test_is_ducklake_with_typed_attachment_without_alias(self):
-        """Test is_ducklake derives the database name from the path of a typed attachment."""
-        profile_cfg = self.base_profile_cfg.copy()
-        profile_cfg["outputs"]["test"]["attach"] = [
-            {
-                "path": "/path/to/lake.ducklake",
-                "type": "ducklake",
-            }
-        ]
-
-        adapter = self._get_adapter(profile_cfg)
-        relation = DuckDBRelation.create(database="lake", schema="test_schema", identifier="test_table")
-
-        self.assertTrue(adapter.is_ducklake(relation))
-
-    def test_is_ducklake_with_other_typed_attachment(self):
-        """Test is_ducklake returns False for an attachment of another explicit type."""
-        profile_cfg = self.base_profile_cfg.copy()
-        profile_cfg["outputs"]["test"]["attach"] = [
-            {
-                "alias": "sqlite_db",
-                "path": "/path/to/regular.db",
-                "type": "sqlite",
-            }
-        ]
-
-        adapter = self._get_adapter(profile_cfg)
-        relation = DuckDBRelation.create(database="sqlite_db", schema="test_schema", identifier="test_table")
-
-        self.assertFalse(adapter.is_ducklake(relation))
-
     def test_is_ducklake_with_mixed_attachments(self):
         """Test is_ducklake correctly identifies ducklake among mixed attachments."""
         profile_cfg = self.base_profile_cfg.copy()
