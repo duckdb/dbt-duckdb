@@ -445,6 +445,23 @@ def test_database_matches_attach_alias_no_alias():
     assert "Inconsistency detected between 'path' and 'database' fields" in str(exc.value)
 
 
+def test_ducklake_dbs_from_attachment_type():
+    """Attachments declared with type: ducklake are tracked as DuckLake databases."""
+    creds = DuckDBCredentials.from_dict(
+        {
+            "path": ":memory:",
+            "attach": [
+                {"path": "/tmp/meta.ducklake", "alias": "typed_lake", "type": "ducklake"},
+                {"path": "/tmp/lake.ducklake", "options": {"type": "DUCKLAKE"}},
+                {"path": "ducklake:/tmp/prefixed.ducklake", "alias": "prefixed_lake"},
+                {"path": "/tmp/other.db", "alias": "other", "type": "sqlite"},
+            ],
+        }
+    )
+
+    assert creds._ducklake_dbs == {"typed_lake", "lake", "prefixed_lake"}
+
+
 def test_add_ducklake_secret_with_map():
     """Test ducklake secret with metadata_parameters as a map."""
     creds = DuckDBCredentials(
