@@ -135,8 +135,8 @@ default:
   target: dev
 ```
 
-dbt-duckdb registers each repository before it installs any extensions, setting `allow_extension_repositories = 'allowed'`
-if it needs to create one. Registered repositories persist (in DuckDB's `extension_repository_directory`), so on later runs
+dbt-duckdb registers each repository before it installs any extensions, and sets `allow_extension_repositories = 'allowed'`
+on the connection, since DuckDB requires it to install from a custom repository. Repository names are case-insensitive. Registered repositories persist (in DuckDB's `extension_repository_directory`), so on later runs
 dbt-duckdb reuses a repository with the same name, and raises an error instead of changing its trust configuration if its
 `prefix` or pinned `public_key` doesn't match the profile. Use `DROP EXTENSION REPOSITORY` to reset one. Declaring repositories is
 an error if `allow_extension_repositories` is set to `'forbidden'`.

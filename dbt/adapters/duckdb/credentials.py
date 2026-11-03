@@ -191,6 +191,8 @@ class ExtensionRepository(dbtClassMixin):
                 f"Invalid extension repository name '{self.name}': names can only "
                 "contain letters, digits, '_' and '-'"
             )
+        # DuckDB lower-cases repository names, even quoted ones
+        self.name = self.name.lower()
         if self.name in BUILTIN_EXTENSION_REPOSITORIES:
             raise DbtRuntimeError(
                 f"Extension repository '{self.name}' is built into DuckDB and cannot be declared"

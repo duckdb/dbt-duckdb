@@ -153,12 +153,14 @@ def test_register_and_reuse(tmp_path):
     assert _repositories(conn) == {"repo": PREFIX}
     conn.close()
 
-    # Repositories persist; reusing a matching one must not require opting in again
+    # Repositories persist; reusing one still opts the new connection in, since
+    # installing from a custom repository requires 'allowed'
     conn = _connect(tmp_path)
     er.register_extension_repositories(conn, repos)
-    assert conn.execute("SELECT current_setting('allow_extension_repositories')").fetchone()[
-        0
-    ] == "undecided"
+    assert (
+        conn.execute("SELECT current_setting('allow_extension_repositories')").fetchone()[0]
+        == "allowed"
+    )
 
     # The base64 body of the key and a trailing slash on the prefix still match
     body = "".join(line for line in KEY_1.splitlines() if "-----" not in line)
@@ -214,3 +216,41 @@ def test_initialize_db_registers_repositories(tmp_path):
     )
     conn = Environment.initialize_db(creds)
     assert _repositories(conn) == {"repo": PREFIX}
+
+
+def test_repository_names_are_lower_cased():
+    assert ExtensionRepository(name="MyRepo", prefix=PREFIX).name == "myrepo"
+    with pytest.raises(DbtRuntimeError, match="built into DuckDB"):
+        ExtensionRepository(name="Community", prefix=PREFIX)
+
+    conn = mock.Mock()
+    with mock.patch.object(er.duckdb, "__version__", "2.0.0"):
+        er.install_and_load_extension(conn, Extension(name="a5", repo="MyRepo"))
+    assert conn.execute.call_args_list == [
+        mock.call('INSTALL a5 FROM "myrepo"'),
+        mock.call('LOAD a5 FROM "myrepo"'),
+    ]
+
+
+@requires_duckdb_2
+def test_mixed_case_repository_name(tmp_path):
+    repos = [ExtensionRepository(name="MyRepo", prefix=PREFIX, public_key=KEY_1)]
+    conn = _connect(tmp_path)
+    er.register_extension_repositories(conn, repos)
+    assert _repositories(conn) == {"myrepo": PREFIX}
+    # ...and it is found again on the next run
+    er.register_extension_repositories(conn, repos)
+
+
+@requires_duckdb_2
+def test_duplicate_repository_names(tmp_path):
+    conn = _connect(tmp_path)
+    with pytest.raises(DbtRuntimeError, match="more than once: repo"):
+        er.register_extension_repositories(
+            conn,
+            [
+                ExtensionRepository(name="repo", prefix=PREFIX),
+                ExtensionRepository(name="Repo", prefix=PREFIX + "/other"),
+            ],
+        )
+    assert _repositories(conn) == {}

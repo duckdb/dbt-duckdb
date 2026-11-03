@@ -87,6 +87,18 @@ def register_extension_repositories(conn, repos: Sequence[ExtensionRepository]):
             "is set to 'forbidden' on this connection"
         )
 
+    names = [repo.name for repo in repos]
+    duplicates = sorted({name for name in names if names.count(name) > 1})
+    if duplicates:
+        raise DbtRuntimeError(
+            f"Extension repositories are declared more than once: {', '.join(duplicates)}"
+        )
+
+    # Declaring a repository in the profile is an explicit opt-in to using it; DuckDB
+    # needs 'allowed' to install from a repository, not just to create one
+    if str(allowed).lower() != "allowed":
+        conn.execute("SET allow_extension_repositories = 'allowed'")
+
     existing = _existing_repositories(conn)
     missing = []
     for repo in repos:
@@ -95,12 +107,6 @@ def register_extension_repositories(conn, repos: Sequence[ExtensionRepository]):
         else:
             missing.append(repo)
 
-    if not missing:
-        return
-
-    # Declaring a repository in the profile is an explicit opt-in to adding it
-    if str(allowed).lower() != "allowed":
-        conn.execute("SET allow_extension_repositories = 'allowed'")
     for repo in missing:
         conn.execute(create_repository_sql(repo))
 
@@ -114,15 +120,17 @@ def register_extension_repositories(conn, repos: Sequence[ExtensionRepository]):
 def install_and_load_extension(conn, ext: Extension):
     """Install and load an extension that is configured as a name/repo pair."""
     custom_repo = (
-        ext.repo not in BUILTIN_EXTENSION_REPOSITORIES
+        ext.repo.lower() not in BUILTIN_EXTENSION_REPOSITORIES
         and EXTENSION_REPOSITORY_NAME_PATTERN.match(ext.repo)
         and supports_extension_repositories()
     )
     if custom_repo:
         # DuckDB stores extensions from custom repositories separately, so a bare
-        # LOAD would not find them: the repository is needed for both steps
-        conn.execute(f'INSTALL {ext.name} FROM "{ext.repo}"')
-        conn.execute(f'LOAD {ext.name} FROM "{ext.repo}"')
+        # LOAD would not find them: the repository is needed for both steps. Repository
+        # names are case-insensitive and stored in lower case.
+        repo = ext.repo.lower()
+        conn.execute(f'INSTALL {ext.name} FROM "{repo}"')
+        conn.execute(f'LOAD {ext.name} FROM "{repo}"')
     else:
         conn.execute(f"install {ext.name} from {ext.repo}")
         conn.load_extension(ext.name)
