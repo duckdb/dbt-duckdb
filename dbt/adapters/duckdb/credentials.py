@@ -427,24 +427,30 @@ class DuckDBCredentials(Credentials):
         path = data.get("path")
         path_db_name = cls.path_derived_database_name(path)
 
-        # Check if the database field matches any attach alias
-        attach_aliases = []
-        if data.get("attach"):
-            for attach_data in data["attach"]:
-                if isinstance(attach_data, dict) and attach_data.get("alias"):
-                    attach_aliases.append(attach_data["alias"])
+        # The database field may also name an attached database: by its alias, or when
+        # no alias is given, by the name DuckDB derives from its path (the same rule
+        # that is used for the primary database)
+        attached_db_names = []
+        for attach_data in data.get("attach") or []:
+            if not isinstance(attach_data, dict):
+                continue
+            if attach_data.get("alias"):
+                attached_db_names.append(attach_data["alias"])
+            elif attach_data.get("path"):
+                attached_db_names.append(cls.path_derived_database_name(attach_data["path"]))
 
         database_from_data = data.get("database")
-        database_matches_attach_alias = database_from_data in attach_aliases
+        database_matches_attachment = database_from_data in attached_db_names
 
         if path_db_name and "database" not in data:
             data["database"] = path_db_name
         elif path_db_name and data["database"] != path_db_name:
-            # Allow database name to differ from path_db if it matches an attach alias
-            if not data.get("remote") and not database_matches_attach_alias:
+            # Allow database name to differ from path_db if it names an attached database
+            if not data.get("remote") and not database_matches_attachment:
                 raise DbtRuntimeError(
                     "Inconsistency detected between 'path' and 'database' fields in profile; "
-                    f"the 'database' property must be set to '{path_db_name}' to match the 'path'"
+                    f"the 'database' property must be set to '{path_db_name}' to match the "
+                    "'path', or to the name of one of the attached databases"
                 )
         elif not path_db_name:
             raise DbtRuntimeError(

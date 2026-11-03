@@ -445,6 +445,43 @@ def test_database_matches_attach_alias_no_alias():
     assert "Inconsistency detected between 'path' and 'database' fields" in str(exc.value)
 
 
+@pytest.mark.parametrize(
+    "attach_path, database",
+    [
+        ("/tmp/secondary.db", "secondary"),
+        ("/tmp/other.duckdb", "other"),
+        ("s3://bucket/even/this/works.duckdb", "works"),
+        ("md:my_db", "my_db"),
+        ("ducklake:/tmp/lake.ducklake", "lake"),
+    ],
+)
+def test_database_matches_unaliased_attachment_name(attach_path, database):
+    """An attachment without an alias is reachable by the name DuckDB derives from its path,
+    so the database field may name it the same way."""
+    payload = {
+        "path": "/tmp/primary.db",
+        "database": database,
+        "attach": [{"path": attach_path}],
+    }
+    creds = DuckDBCredentials.from_dict(payload)
+    assert creds.database == database
+
+
+def test_database_does_not_match_aliased_attachment_by_path_name():
+    """Once an attachment has an alias, DuckDB no longer registers it under its path-derived
+    name, so the database field cannot refer to it that way."""
+    from dbt_common.exceptions import DbtRuntimeError
+
+    payload = {
+        "path": "/tmp/primary.db",
+        "database": "secondary",
+        "attach": [{"path": "/tmp/secondary.db", "alias": "my_alias"}],
+    }
+    with pytest.raises(DbtRuntimeError) as exc:
+        DuckDBCredentials.from_dict(payload)
+    assert "Inconsistency detected between 'path' and 'database' fields" in str(exc.value)
+
+
 def test_ducklake_dbs_from_attachment_type():
     """Attachments declared with type: ducklake are tracked as DuckLake databases."""
     creds = DuckDBCredentials.from_dict(

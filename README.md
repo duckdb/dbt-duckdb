@@ -247,7 +247,8 @@ attach:
 
 The attached databases may be referred to in your dbt sources and models by either the basename of the database file minus its suffix (e.g., `/tmp/other.duckdb` is the `other` database
 and `s3://yep/even/this/works.duckdb` is the `works` database) or by an alias that you specify (so the `./yet/another.duckdb` database in the above configuration is referred to
-as `yet_another` instead of `another`.) Note that these additional databases do not necessarily have to be DuckDB files: DuckDB's storage and catalog engines are pluggable, and
+as `yet_another` instead of `another`.) The `database` property of the profile may also be set to one of these names to make an attached database the
+default target for your models. Note that these additional databases do not necessarily have to be DuckDB files: DuckDB's storage and catalog engines are pluggable, and
 DuckDB ships with support for reading and writing from attached databases. You can indicate the type of the database you are connecting to via the `type` argument,
 which currently supports `duckdb`, `sqlite` and `postgres`.
 
