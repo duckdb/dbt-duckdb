@@ -21,13 +21,13 @@ versions of DuckDB will continue to work with the adapter as they are released.
 
 A super-minimal dbt-duckdb profile only needs *one* setting:
 
-````
+```yml
 default:
   outputs:
     dev:
       type: duckdb
   target: dev
-````
+```
 
 This will run your dbt-duckdb pipeline against an in-memory DuckDB database that will not be persisted after your run completes. This may
 not seem very useful at first, but it turns out to be a powerful tool for a) testing out data pipelines, either locally or in CI jobs and
@@ -37,7 +37,17 @@ in dbt-duckdb are provided in the docs on [reading and writing external files](#
 To have your dbt pipeline persist relations in a DuckDB file, set the `path` field in your profile to the path
 of the DuckDB file that you would like to read and write on your local filesystem. (For in-memory pipelines, the `path`
 is automatically set to the special value `:memory:`). By default, the `path` is relative to your `profiles.yml` file location.
-If the database doesn't exist at the specified `path`, DuckDB will automatically create it.
+If the database doesn't exist at the specified `path`, DuckDB will automatically create it. E.g.:
+
+```yml
+default:
+  outputs:
+    dev:
+      type: duckdb
+       path: "dbt.duckdb"                   # local database
+       # path: "ducklake:my_lake.ducklake"  # local DuckLake
+  target: dev
+```
 
 `dbt-duckdb` also supports common profile fields like `schema` and `threads`, but the `database` property is special: its value is automatically set
 to the basename of the file in the `path` argument with the suffix removed. For example, if the `path` is `/tmp/a/dbfile.duckdb`, the `database`
@@ -76,20 +86,21 @@ default:
   target: dev
 ```
 
-MotherDuck databases generally work the same way as local DuckDB databases from the perspective of dbt, but
-there are a [few differences to be aware of](https://motherduck.com/docs/architecture-and-capabilities#considerations-and-limitations):
-1. MotherDuck is compatible with client DuckDB versions 0.10.2 and newer.
-1. MotherDuck preloads a set of the most common DuckDB extensions for you, but does not support loading custom extensions or user-defined functions.
+To connect to [DuckLakes hosted on MotherDuck](https://motherduck.com/docs/concepts/ducklake/) you need to declare them as DuckLakes with `is_ducklake: true` in your `profiles.yml`.
 
-As of `dbt-duckdb` 1.9.6, you can also connect to a DuckDB instance running [hosted DuckLake on MotherDuck](https://motherduck.com/blog/ducklake-motherduck/) by creating a DuckLake on MotherDuck and then setting `is_ducklake: true` in your `profiles.yml`.
-
-```sql
--- to use create your own database in MotherDuck first
-CREATE DATABASE my_ducklake
-  (TYPE ducklake, DATA_PATH 's3://...')
+```yml
+default:
+  outputs:
+    dev:
+      type: duckdb
+      path: "md:my_ducklake"
+      is_ducklake: true
+      motherduck_token: "{{ env_var('MOTHERDUCK_TOKEN') }}"
+  target: dev
 ```
 
-An example profile is shown below under "Attaching Additional Databases". DuckLake must be identified so that safe DDL operations are applied by dbt.
+MotherDuck databases generally work the same way as local DuckDB databases from the perspective of dbt, but
+there are a [few differences to be aware of](https://motherduck.com/docs/architecture-and-capabilities#considerations-and-limitations):
 
 #### DuckDB Extensions, Settings, and Filesystems
 
@@ -234,13 +245,13 @@ default:
             enable_fsst: true
 ```
 
-For DuckLake, use `ducklake:` for local; for MotherDuck-managed DuckLake use `md:` with `is_ducklake: true`.
+For DuckLake, use `ducklake:` for local lakes. For MotherDuck-managed DuckLake use `md:` with `is_ducklake: true`.
 An attachment whose `type` (or `options.type`) is `ducklake` is recognized as a DuckLake database as well.
 
 ```yaml
 attach:
-  - path: "ducklake:my_ducklake.ddb"
-  - path: "md:my_other_ducklake"
+  - path: "ducklake:my_ducklake.ddb" # local
+  - path: "md:my_other_ducklake"     # MotherDuck
     is_ducklake: true
 ```
 
