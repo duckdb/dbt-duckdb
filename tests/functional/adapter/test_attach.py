@@ -220,3 +220,19 @@ class TestForeignKeyOnAttachedDatabase:
         ).fetchall()
         db.close()
         assert ("FOREIGN KEY",) in constraints
+
+
+fk_custom_schema_yml = fk_schema_yml.replace(
+    "      database: attach_test\n", "      database: attach_test\n      schema: fk_schema\n"
+).replace('expression: "main.fk_target (col)"', 'expression: "fk_target (col)"')
+
+
+@pytest.mark.skip_profile("memory", "buenavista", "md")
+class TestUnqualifiedForeignKeyInCustomSchemaOnAttachedDatabase(TestForeignKeyOnAttachedDatabase):
+    @pytest.fixture(scope="class")
+    def models(self):
+        return {
+            "schema.yml": fk_custom_schema_yml,
+            "fk_target.sql": "select 1 as col",
+            "fk_source.sql": "-- depends_on: {{ ref('fk_target') }}\nselect 1 as col",
+        }
