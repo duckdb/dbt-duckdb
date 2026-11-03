@@ -18,6 +18,13 @@ from dbt.adapters.duckdb.utils import escape_sql_string
 
 MOTHERDUCK_SCHEMES = {"md", "motherduck"}
 
+# Attachment types whose catalog is stored by DuckDB itself. When such an attachment
+# has no alias, DuckDB registers it under the name derived from its path, so the
+# profile's `database` may refer to it by that name. For other types (postgres,
+# sqlite, ...) the path is a DSN or a foreign file and the registered name is not
+# reliably path-derived, so those attachments must be aliased to be targeted.
+DUCKDB_BACKED_ATTACHMENT_TYPES = {"duckdb", "ducklake"}
+
 
 @dataclass
 class Attachment(dbtClassMixin):
@@ -421,30 +428,51 @@ class DuckDBCredentials(Credentials):
 
         return inferred_db_name
 
+    @staticmethod
+    def _is_duckdb_backed_attachment(attach_data: Dict[Any, Any]) -> bool:
+        """Whether DuckDB stores the catalog of this attachment itself, in which case an
+        unaliased attachment is registered under its path-derived name. The type may be
+        given either as the `type` field or as `options: {type: ...}`, as in to_sql()."""
+        attach_type = attach_data.get("type")
+        if attach_type is None:
+            options = attach_data.get("options")
+            if isinstance(options, dict):
+                attach_type = options.get("type")
+        if attach_type is None:
+            return True
+        return str(attach_type).lower() in DUCKDB_BACKED_ATTACHMENT_TYPES
+
     @classmethod
     def __pre_deserialize__(cls, data: Dict[Any, Any]) -> Dict[Any, Any]:
         data = super().__pre_deserialize__(data)
         path = data.get("path")
         path_db_name = cls.path_derived_database_name(path)
 
-        # Check if the database field matches any attach alias
-        attach_aliases = []
-        if data.get("attach"):
-            for attach_data in data["attach"]:
-                if isinstance(attach_data, dict) and attach_data.get("alias"):
-                    attach_aliases.append(attach_data["alias"])
+        # The database field may also name an attached database: by its alias, or, when
+        # no alias is given and the attachment is DuckDB-backed (no `type`, or one of
+        # DUCKDB_BACKED_ATTACHMENT_TYPES), by the name DuckDB derives from its path.
+        # Attachments of any other type must be aliased to be referred to here.
+        attached_db_names = []
+        for attach_data in data.get("attach") or []:
+            if not isinstance(attach_data, dict):
+                continue
+            if attach_data.get("alias"):
+                attached_db_names.append(attach_data["alias"])
+            elif attach_data.get("path") and cls._is_duckdb_backed_attachment(attach_data):
+                attached_db_names.append(cls.path_derived_database_name(attach_data["path"]))
 
         database_from_data = data.get("database")
-        database_matches_attach_alias = database_from_data in attach_aliases
+        database_matches_attachment = database_from_data in attached_db_names
 
         if path_db_name and "database" not in data:
             data["database"] = path_db_name
         elif path_db_name and data["database"] != path_db_name:
-            # Allow database name to differ from path_db if it matches an attach alias
-            if not data.get("remote") and not database_matches_attach_alias:
+            # Allow database name to differ from path_db if it names an attached database
+            if not data.get("remote") and not database_matches_attachment:
                 raise DbtRuntimeError(
                     "Inconsistency detected between 'path' and 'database' fields in profile; "
-                    f"the 'database' property must be set to '{path_db_name}' to match the 'path'"
+                    f"the 'database' property must be set to '{path_db_name}' to match the "
+                    "'path', or to the name of one of the attached databases"
                 )
         elif not path_db_name:
             raise DbtRuntimeError(

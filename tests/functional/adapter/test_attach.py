@@ -143,3 +143,62 @@ class TestIndexOnAttachedDatabase:
         # "Catalog Error: Index ... does not exist!".
         rerun_results = run_dbt()
         assert len(rerun_results) == 1
+
+
+target_db_model_sql = """
+    {{ config(materialized='table') }}
+    SELECT 1 as id
+"""
+
+
+@pytest.mark.skip_profile("memory", "buenavista", "md")
+class TestAttachedDatabaseAsTarget:
+    """The profile's `database` may name an attached database. Without an alias the
+    attachment is registered under the name DuckDB derives from its path, and the
+    profile must accept that name just as it accepts an alias."""
+
+    @pytest.fixture(scope="class")
+    def attach_test_db(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            path = os.path.join(temp_dir, "attach_test.duckdb")
+            db = duckdb.connect(path)
+            db.close()
+            yield path
+
+    @pytest.fixture(scope="class")
+    def profiles_config_update(self, dbt_profile_target, attach_test_db):
+        return {
+            "test": {
+                "outputs": {
+                    "dev": {
+                        "type": "duckdb",
+                        "path": dbt_profile_target.get("path", ":memory:"),
+                        "database": "attach_test",
+                        "attach": [{"path": attach_test_db}],
+                    }
+                },
+                "target": "dev",
+            }
+        }
+
+    @pytest.fixture(scope="class")
+    def models(self):
+        return {"target_db_model.sql": target_db_model_sql}
+
+    def test_models_land_in_attached_database(self, project, attach_test_db):
+        results = run_dbt()
+        assert len(results) == 1
+
+        DuckDBConnectionManager.close_all_connections()
+
+        # the model lands in the attached database, not in the one named by `path`
+        db = duckdb.connect(attach_test_db)
+        try:
+            ret = db.execute("SELECT id FROM target_db_model").fetchall()
+        finally:
+            db.close()
+        assert ret == [(1,)]
+
+        # re-running against the attached target works as well
+        rerun_results = run_dbt()
+        assert len(rerun_results) == 1
