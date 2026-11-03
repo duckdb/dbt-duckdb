@@ -446,25 +446,69 @@ def test_database_matches_attach_alias_no_alias():
 
 
 @pytest.mark.parametrize(
-    "attach_path, database",
+    "attachment, database",
     [
-        ("/tmp/secondary.db", "secondary"),
-        ("/tmp/other.duckdb", "other"),
-        ("s3://bucket/even/this/works.duckdb", "works"),
-        ("md:my_db", "my_db"),
-        ("ducklake:/tmp/lake.ducklake", "lake"),
+        ({"path": "/tmp/secondary.db"}, "secondary"),
+        ({"path": "/tmp/other.duckdb"}, "other"),
+        ({"path": "/tmp/other.duckdb", "type": "duckdb"}, "other"),
+        ({"path": "/tmp/other.duckdb", "options": {"type": "duckdb"}}, "other"),
+        ({"path": "s3://bucket/even/this/works.duckdb"}, "works"),
+        ({"path": "md:my_db"}, "my_db"),
+        ({"path": "ducklake:/tmp/lake.ducklake"}, "lake"),
+        ({"path": "ducklake:/tmp/lake.ducklake", "type": "ducklake"}, "lake"),
+        ({"path": "ducklake:sqlite:/tmp/lake.sqlite", "type": "DuckLake"}, "lake"),
     ],
 )
-def test_database_matches_unaliased_attachment_name(attach_path, database):
-    """An attachment without an alias is reachable by the name DuckDB derives from its path,
-    so the database field may name it the same way."""
+def test_database_matches_unaliased_attachment_name(attachment, database):
+    """A DuckDB-backed attachment without an alias is registered under the name DuckDB
+    derives from its path, so the database field may name it the same way."""
     payload = {
         "path": "/tmp/primary.db",
         "database": database,
-        "attach": [{"path": attach_path}],
+        "attach": [attachment],
     }
     creds = DuckDBCredentials.from_dict(payload)
     assert creds.database == database
+
+
+@pytest.mark.parametrize(
+    "attachment, database",
+    [
+        ({"path": "postgresql://user@localhost:5432/secondary", "type": "postgres"}, "secondary"),
+        ({"path": "dbname=secondary host=localhost", "type": "postgres"}, "secondary"),
+        (
+            {"path": "dbname=secondary host=localhost", "type": "postgres"},
+            "dbname=secondary host=localhost",
+        ),
+        ({"path": "postgresql://user@localhost:5432/secondary", "options": {"type": "postgres"}}, "secondary"),
+        ({"path": "/tmp/secondary.sqlite", "type": "sqlite"}, "secondary"),
+    ],
+)
+def test_database_does_not_match_unaliased_non_duckdb_attachment(attachment, database):
+    """For attachments that are not DuckDB-backed the path is a DSN or a foreign file and the
+    name DuckDB registers is not reliably path-derived, so the path-derived name is not accepted
+    and the attachment has to be aliased to be used as the target database."""
+    from dbt_common.exceptions import DbtRuntimeError
+
+    payload = {
+        "path": "/tmp/primary.db",
+        "database": database,
+        "attach": [attachment],
+    }
+    with pytest.raises(DbtRuntimeError) as exc:
+        DuckDBCredentials.from_dict(payload)
+    assert "Inconsistency detected between 'path' and 'database' fields" in str(exc.value)
+
+
+def test_database_matches_aliased_non_duckdb_attachment():
+    """An alias is honoured regardless of the attachment type."""
+    payload = {
+        "path": "/tmp/primary.db",
+        "database": "pg",
+        "attach": [{"path": "dbname=secondary host=localhost", "type": "postgres", "alias": "pg"}],
+    }
+    creds = DuckDBCredentials.from_dict(payload)
+    assert creds.database == "pg"
 
 
 def test_database_does_not_match_aliased_attachment_by_path_name():

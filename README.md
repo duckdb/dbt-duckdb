@@ -250,7 +250,8 @@ and `s3://yep/even/this/works.duckdb` is the `works` database) or by an alias th
 as `yet_another` instead of `another`.) The `database` property of the profile may also be set to one of these names to make an attached database the
 default target for your models. Note that these additional databases do not necessarily have to be DuckDB files: DuckDB's storage and catalog engines are pluggable, and
 DuckDB ships with support for reading and writing from attached databases. You can indicate the type of the database you are connecting to via the `type` argument,
-which currently supports `duckdb`, `sqlite` and `postgres`.
+which currently supports `duckdb`, `sqlite` and `postgres`. For an attachment of a type other than `duckdb` (or `ducklake`), the `path` is typically a connection string
+rather than a database file, so such an attachment can only be used as the profile's `database` through an `alias`.
 
 ##### Arbitrary ATTACH Options
 
