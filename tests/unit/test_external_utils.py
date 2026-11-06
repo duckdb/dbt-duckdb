@@ -67,9 +67,24 @@ class TestExternalUtils(unittest.TestCase):
             ("b", {"partition_by": "ds,category"}, "b/*/*/*.parquet"),
             ("c", {"PARTITION_BY": "ds", "FORMAT": "csv"}, "c/*/*.csv"),
             ("d", {"Per_Thread_Output": "true"}, "d/*.parquet"),
+            # DuckDB appends the compression extension to CSV and JSON files
+            ("e", {"partition_by": "ds", "format": "csv", "compression": "gzip"}, "e/*/*.csv.gz"),
+            ("f", {"per_thread_output": "true", "format": "json", "compression": "zstd"}, "f/*.json.zst"),
+            ("g", {"PARTITION_BY": "ds", "FORMAT": "csv", "COMPRESSION": "GZIP"}, "g/*/*.csv.gz"),
+            # a quoted value, as written in options={"compression": "'gzip'"}
+            ("g2", {"partition_by": "ds", "format": "csv", "compression": "'gzip'"}, "g2/*/*.csv.gz"),
+            ("g3", {"per_thread_output": "true", "format": "json", "compression": '"zstd"'}, "g3/*.json.zst"),
+            # but not to Parquet, which compresses internally
+            ("h", {"partition_by": "ds", "format": "parquet", "compression": "gzip"}, "h/*/*.parquet"),
+            ("i", {"partition_by": "ds", "format": "csv", "compression": "none"}, "i/*/*.csv"),
+            ("j", {"partition_by": "ds", "format": "csv", "compression": "auto"}, "j/*/*.csv"),
+            # file_extension replaces the format's extension
+            ("k", {"partition_by": "ds", "format": "csv", "file_extension": "txt"}, "k/*/*.txt"),
+            ("l", {"partition_by": "ds", "format": "csv", "file_extension": ".txt", "compression": "gzip"}, "l/*/*.txt.gz"),
+            ("m", {"partition_by": "ds", "format": "csv", "file_extension": "txt.gz", "compression": "gzip"}, "m/*/*.txt.gz"),
         ]
         for (loc, opts, expected) in data:
-            assert expected == self.adapter.external_read_location(loc, opts)
+            assert expected == self.adapter.external_read_location(loc, opts), (loc, opts)
 
     def test_external_write_options_normalizes_keys_in_place(self):
         # the external materialization reads the format and compression back from the dict

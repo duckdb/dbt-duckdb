@@ -1023,7 +1023,7 @@ requires-dist = [
     { name = "dbt-adapters", specifier = ">=1,<2" },
     { name = "dbt-common", specifier = ">=1,<2" },
     { name = "dbt-core", specifier = ">=1.8.0" },
-    { name = "duckdb", specifier = ">=1.0.0" },
+    { name = "duckdb", specifier = ">=1.1.0" },
     { name = "duckdb", marker = "extra == 'md'", specifier = "==1.5.6" },
     { name = "mypy-boto3-glue", marker = "extra == 'glue'" },
 ]

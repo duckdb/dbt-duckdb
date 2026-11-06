@@ -266,6 +266,11 @@ class DuckDBAdapter(SQLAdapter):
     def get_binding_char(self):
         return DuckDBConnectionManager.env().get_binding_char()
 
+    # The extension DuckDB appends to each CSV or JSON file it writes with this
+    # compression; Parquet files compress internally and keep their extension
+    _compression_extensions = {"gzip": ".gz", "zstd": ".zst"}
+    _extension_compressions = {ext: name for name, ext in _compression_extensions.items()}
+
     @available
     def external_write_options(self, write_location: str, rendered_options: dict) -> str:
         # DuckDB's COPY options are case-insensitive, so normalize the keys in place
@@ -289,7 +294,7 @@ class DuckDBAdapter(SQLAdapter):
             root, ext = os.path.splitext(write_location)
             # DuckDB infers the compression from a trailing .gz/.zst, so the
             # format comes from the extension before it (e.g. "data.csv.gz")
-            compression = {".gz": "gzip", ".zst": "zstd"}.get(ext.lower())
+            compression = self._extension_compressions.get(ext.lower())
             if compression:
                 ext = os.path.splitext(root)[1]
             ext = ext.lower()
@@ -334,8 +339,20 @@ class DuckDBAdapter(SQLAdapter):
             if rendered_options.get("partition_by"):
                 partition_by = str(rendered_options.get("partition_by"))
                 globs.extend(["*"] * len(partition_by.split(",")))
-            return ".".join(["/".join(globs), str(rendered_options.get("format", "parquet"))])
+            return "/".join(globs) + self._external_file_extension(rendered_options)
         return write_location
+
+    @classmethod
+    def _external_file_extension(cls, rendered_options: dict) -> str:
+        """The extension of the files a partitioned or per-thread COPY writes."""
+        file_format = str(rendered_options.get("format", "parquet")).lower()
+        extension = str(rendered_options.get("file_extension") or file_format).lstrip(".")
+        if file_format in {"csv", "json"}:
+            compression = str(rendered_options.get("compression", "")).strip("'\"").lower()
+            suffix = cls._compression_extensions.get(compression, "")
+            if suffix and not extension.endswith(suffix):
+                extension += suffix
+        return "." + extension
 
     @available
     def warn_once(self, msg: str):

@@ -56,6 +56,18 @@ config_write_upper_format = """
 """
 config_write_upper_format_sql = config_write_upper_format + model_base
 
+# DuckDB appends the compression extension to each CSV or JSON file it writes, so the
+# view over a partitioned or per-thread output has to look for "*.csv.gz", not "*.csv"
+config_write_compressed_partition_by = """
+    {{ config(materialized="external", format="csv", options={"partition_by": "id", "compression": "gzip"}) }}
+"""
+config_write_compressed_partition_by_sql = config_write_compressed_partition_by + model_base
+
+config_write_compressed_per_thread_output = """
+    {{ config(materialized="external", format="json", options={"per_thread_output": "true", "compression": "zstd"}) }}
+"""
+config_write_compressed_per_thread_output_sql = config_write_compressed_per_thread_output + model_base
+
 
 class BaseExternalMaterializations:
 
@@ -78,6 +90,8 @@ class BaseExternalMaterializations:
             "config_write_upper_compressed_csv_location.sql": config_write_upper_compressed_csv_location_sql,
             "config_write_upper_partition_by.sql": config_write_upper_partition_by_sql,
             "config_write_upper_format.sql": config_write_upper_format_sql,
+            "config_write_compressed_partition_by.sql": config_write_compressed_partition_by_sql,
+            "config_write_compressed_per_thread_output.sql": config_write_compressed_per_thread_output_sql,
             "schema.yml": schema_base_yml,
         }
 
@@ -103,7 +117,7 @@ class BaseExternalMaterializations:
         # run command
         results = run_dbt()
         # run result length
-        assert len(results) == 9
+        assert len(results) == 11
 
         # names exist in result nodes
         check_result_nodes_by_name(
@@ -118,6 +132,8 @@ class BaseExternalMaterializations:
                 "config_write_upper_compressed_csv_location",
                 "config_write_upper_partition_by",
                 "config_write_upper_format",
+                "config_write_compressed_partition_by",
+                "config_write_compressed_per_thread_output",
             ],
         )
 
@@ -133,6 +149,8 @@ class BaseExternalMaterializations:
             "config_write_upper_compressed_csv_location": "view",
             "config_write_upper_partition_by": "view",
             "config_write_upper_format": "view",
+            "config_write_compressed_partition_by": "view",
+            "config_write_compressed_per_thread_output": "view",
         }
         check_relation_types(project.adapter, expected)
 
@@ -154,6 +172,8 @@ class BaseExternalMaterializations:
                 "config_write_upper_compressed_csv_location",
                 "config_write_upper_partition_by",
                 "config_write_upper_format",
+                "config_write_compressed_partition_by",
+                "config_write_compressed_per_thread_output",
             ],
         )
 
@@ -164,7 +184,7 @@ class BaseExternalMaterializations:
 
         # check relations in catalog
         catalog = run_dbt(["docs", "generate"])
-        assert len(catalog.nodes) == 10
+        assert len(catalog.nodes) == 12
         assert len(catalog.sources) == 1
 
 
