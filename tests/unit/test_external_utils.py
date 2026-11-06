@@ -71,6 +71,9 @@ class TestExternalUtils(unittest.TestCase):
             ("e", {"partition_by": "ds", "format": "csv", "compression": "gzip"}, "e/*/*.csv.gz"),
             ("f", {"per_thread_output": "true", "format": "json", "compression": "zstd"}, "f/*.json.zst"),
             ("g", {"PARTITION_BY": "ds", "FORMAT": "csv", "COMPRESSION": "GZIP"}, "g/*/*.csv.gz"),
+            # a quoted value, as written in options={"compression": "'gzip'"}
+            ("g2", {"partition_by": "ds", "format": "csv", "compression": "'gzip'"}, "g2/*/*.csv.gz"),
+            ("g3", {"per_thread_output": "true", "format": "json", "compression": '"zstd"'}, "g3/*.json.zst"),
             # but not to Parquet, which compresses internally
             ("h", {"partition_by": "ds", "format": "parquet", "compression": "gzip"}, "h/*/*.parquet"),
             ("i", {"partition_by": "ds", "format": "csv", "compression": "none"}, "i/*/*.csv"),
