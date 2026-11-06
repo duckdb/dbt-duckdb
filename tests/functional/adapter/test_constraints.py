@@ -212,6 +212,77 @@ models:
         assert incremental_rows == [(1, "a", "x"), (1, "a", "x")]
 
 
+
+class TestContractStructQuotedFieldNames:
+    @pytest.fixture(scope="class")
+    def models(self):
+        # DuckDB quotes struct keys that need it, so the key-type pairs in
+        # STRUCT("first name" VARCHAR, "a,b" INTEGER, ...) must be split on
+        # the commas and spaces outside the quotes.
+        model_sql = """
+select {
+    'first name': 'ann',
+    'a,b': 1,
+    'order': {'x y': 2.5::decimal(10, 2), z: true}
+} as payload
+"""
+        return {
+            "struct_table.sql": model_sql,
+            "struct_mismatch.sql": model_sql,
+            "schema.yml": """
+version: 2
+models:
+  - name: struct_table
+    config:
+      materialized: table
+      contract:
+        enforced: true
+    columns:
+      - name: payload
+        data_type: struct("first name" varchar, "a,b" integer, "order" struct("x y" decimal(10, 2), z boolean))
+  - name: struct_mismatch
+    config:
+      materialized: table
+      contract:
+        enforced: true
+    columns:
+      - name: payload
+        data_type: struct("first name" integer, "a,b" integer, "order" struct("x y" decimal(10, 2), z boolean))
+""",
+        }
+
+    @pytest.fixture(scope="class")
+    def snapshots(self):
+        return {
+            "struct_snapshot.sql": """
+{% snapshot struct_snapshot %}
+{{ config(unique_key='id', strategy='check', check_cols='all') }}
+select 1 as id, {'a,b': 1, 'first name': 'ann'} as payload
+{% endsnapshot %}
+""",
+        }
+
+    def test_contract_struct_quoted_field_names(self, project):
+        results = run_dbt(["run", "--select", "struct_table"])
+        assert len(results) == 1
+        rows = project.run_sql(
+            f"select payload.\"first name\", payload.\"a,b\", payload.\"order\".\"x y\" "
+            f"from {project.test_schema}.struct_table",
+            fetch="all",
+        )
+        assert [tuple(map(str, row)) for row in rows] == [("ann", "1", "2.50")]
+
+        # a mismatched field is reported by its full path, not a fragment of it
+        _, log_output = run_dbt_and_capture(
+            ["run", "--select", "struct_mismatch"], expect_pass=False
+        )
+        assert "payload.first name" in log_output
+        assert "list index out of range" not in log_output
+
+        results = run_dbt(["snapshot"])
+        assert len(results) == 1
+
+
 fk_parent_sql = """
 {{ config(materialized='table') }}
 select {{ var('parent_id', 1) }} as id
