@@ -2,6 +2,7 @@ import re
 from dataclasses import dataclass
 from dataclasses import field
 from typing import List
+from typing import Tuple
 
 from dbt.adapters.base.column import Column
 
@@ -15,39 +16,19 @@ class DuckDBColumn(Column):
             self._parse_struct_fields()
 
     def _parse_struct_fields(self):
-        # In DuckDB, structs are defined as STRUCT(key1 type1, key2 type2, ...)
-        # We need to extract the key-type pairs from the struct definition
-        # e.g., STRUCT(a VARCHAR, b INTEGER) -> ["a VARCHAR", "b INTEGER"]
-        # We can't just split by comma, because types can contain commas
-        # e.g. DECIMAL(10, 2)
-        # The following logic will handle nested structs and complex types
+        # In DuckDB, structs are defined as STRUCT(key1 type1, key2 type2, ...).
+        # We need to extract the key-type pairs from the struct definition,
+        # e.g., STRUCT(a VARCHAR, b INTEGER) -> ["a VARCHAR", "b INTEGER"].
+        # Types can contain commas (DECIMAL(10, 2)) and nested structs, and keys
+        # that need quoting come back double-quoted with embedded quotes doubled,
+        # e.g. STRUCT("first name" VARCHAR, "a,b" INTEGER), so commas and spaces
+        # only separate fields when they sit outside quotes and parentheses.
         match = re.match(r"STRUCT\((.*)\)", self.dtype, re.IGNORECASE)
         if not match:
             return
 
-        content = match.group(1)
-
-        fields = []
-        paren_level = 0
-        current_field = ""
-        for char in content:
-            if char == "(":
-                paren_level += 1
-            elif char == ")":
-                paren_level -= 1
-
-            if char == "," and paren_level == 0:
-                fields.append(current_field.strip())
-                current_field = ""
-            else:
-                current_field += char
-        fields.append(current_field.strip())
-
-        for f in fields:
-            # Split on the first space to separate the name from the type
-            parts = f.split(" ", 1)
-            col_name = parts[0]
-            col_type = parts[1]
+        for field_def in _split_struct_fields(match.group(1)):
+            col_name, col_type = _split_field_name(field_def)
             self.fields.append(DuckDBColumn(column=col_name, dtype=col_type))
 
     def is_float(self):
@@ -110,3 +91,38 @@ class DuckDBColumn(Column):
                     )
                 )
         return flat_columns
+
+
+_QUOTED_FIELD_NAME = re.compile(r'"((?:[^"]|"")*)"\s*(.*)', re.DOTALL)
+
+
+def _split_struct_fields(content: str) -> List[str]:
+    """Split a struct body on the commas outside quotes and parentheses."""
+    fields = []
+    paren_level = 0
+    in_quotes = False
+    current_field = ""
+    for char in content:
+        if char == '"':
+            in_quotes = not in_quotes
+        elif not in_quotes:
+            if char == "(":
+                paren_level += 1
+            elif char == ")":
+                paren_level -= 1
+            elif char == "," and paren_level == 0:
+                fields.append(current_field.strip())
+                current_field = ""
+                continue
+        current_field += char
+    fields.append(current_field.strip())
+    return [f for f in fields if f]
+
+
+def _split_field_name(field_def: str) -> Tuple[str, str]:
+    """Split a 'name TYPE' field definition, unquoting a quoted name."""
+    quoted = _QUOTED_FIELD_NAME.match(field_def)
+    if quoted:
+        return quoted.group(1).replace('""', '"'), quoted.group(2)
+    col_name, _, col_type = field_def.partition(" ")
+    return col_name, col_type
