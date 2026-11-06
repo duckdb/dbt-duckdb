@@ -1,8 +1,11 @@
-import re
+import threading
 from dataclasses import dataclass
 from dataclasses import field
+from typing import Any
 from typing import List
-from typing import Tuple
+from typing import Optional
+
+import duckdb
 
 from dbt.adapters.base.column import Column
 
@@ -16,20 +19,16 @@ class DuckDBColumn(Column):
             self._parse_struct_fields()
 
     def _parse_struct_fields(self):
-        # In DuckDB, structs are defined as STRUCT(key1 type1, key2 type2, ...).
-        # We need to extract the key-type pairs from the struct definition,
-        # e.g., STRUCT(a VARCHAR, b INTEGER) -> ["a VARCHAR", "b INTEGER"].
-        # Types can contain commas (DECIMAL(10, 2)) and nested structs, and keys
-        # that need quoting come back double-quoted with embedded quotes doubled,
-        # e.g. STRUCT("first name" VARCHAR, "a,b" INTEGER), so commas and spaces
-        # only separate fields when they sit outside quotes and parentheses.
-        match = re.match(r"STRUCT\((.*)\)", self.dtype, re.IGNORECASE)
-        if not match:
+        # Let DuckDB parse the type, so quoted keys (spaces, commas, reserved
+        # words, doubled quotes), nested structs and parameterized types such as
+        # DECIMAL(10, 2) come back as (name, type) pairs. A type DuckDB cannot
+        # resolve on its own, such as a user-defined ENUM, is left unflattened,
+        # and so is a list of structs, STRUCT(...)[], which is not a struct.
+        struct_type = _parse_type(self.dtype)
+        if struct_type is None or struct_type.id != "struct":
             return
-
-        for field_def in _split_struct_fields(match.group(1)):
-            col_name, col_type = _split_field_name(field_def)
-            self.fields.append(DuckDBColumn(column=col_name, dtype=col_type))
+        for name, child_type in struct_type.children:
+            self.fields.append(DuckDBColumn(column=name, dtype=str(child_type)))
 
     def is_float(self):
         return self.dtype.lower() in {
@@ -69,60 +68,33 @@ class DuckDBColumn(Column):
         return self.dtype.lower().startswith("struct")
 
     def flatten(self) -> List["DuckDBColumn"]:
-        if not self.is_struct():
+        if not self.fields:
             return [self]
 
         flat_columns: List["DuckDBColumn"] = []
         for column_field in self.fields:
-            if column_field.is_struct():
-                # Recursively flatten nested structs
-                for nested_field in column_field.flatten():
-                    flat_columns.append(
-                        DuckDBColumn(
-                            column=f"{self.column}.{nested_field.column}",
-                            dtype=nested_field.dtype,
-                        )
-                    )
-            else:
+            # a nested struct flattens recursively; any other field returns itself
+            for nested_field in column_field.flatten():
                 flat_columns.append(
                     DuckDBColumn(
-                        column=f"{self.column}.{column_field.column}",
-                        dtype=column_field.dtype,
+                        column=f"{self.column}.{nested_field.column}",
+                        dtype=nested_field.dtype,
                     )
                 )
         return flat_columns
 
 
-_QUOTED_FIELD_NAME = re.compile(r'"((?:[^"]|"")*)"\s*(.*)', re.DOTALL)
+_type_parser: Optional[duckdb.DuckDBPyConnection] = None
+_type_parser_lock = threading.Lock()
 
 
-def _split_struct_fields(content: str) -> List[str]:
-    """Split a struct body on the commas outside quotes and parentheses."""
-    fields = []
-    paren_level = 0
-    in_quotes = False
-    current_field = ""
-    for char in content:
-        if char == '"':
-            in_quotes = not in_quotes
-        elif not in_quotes:
-            if char == "(":
-                paren_level += 1
-            elif char == ")":
-                paren_level -= 1
-            elif char == "," and paren_level == 0:
-                fields.append(current_field.strip())
-                current_field = ""
-                continue
-        current_field += char
-    fields.append(current_field.strip())
-    return [f for f in fields if f]
-
-
-def _split_field_name(field_def: str) -> Tuple[str, str]:
-    """Split a 'name TYPE' field definition, unquoting a quoted name."""
-    quoted = _QUOTED_FIELD_NAME.match(field_def)
-    if quoted:
-        return quoted.group(1).replace('""', '"'), quoted.group(2)
-    col_name, _, col_type = field_def.partition(" ")
-    return col_name, col_type
+def _parse_type(dtype: str) -> Optional[Any]:
+    """Parse a type string with a private in-memory connection, or return None."""
+    global _type_parser
+    with _type_parser_lock:
+        if _type_parser is None:
+            _type_parser = duckdb.connect(":memory:")
+        try:
+            return _type_parser.sqltype(dtype)
+        except duckdb.Error:
+            return None

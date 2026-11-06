@@ -62,20 +62,20 @@ def test_flatten_simple_struct():
     flattened = column.flatten()
     assert len(flattened) == 2
     assert flattened[0].column == "struct_test.a"
-    assert flattened[0].dtype == "integer"
+    assert flattened[0].dtype == "INTEGER"
     assert flattened[1].column == "struct_test.b"
-    assert flattened[1].dtype == "varchar"
+    assert flattened[1].dtype == "VARCHAR"
 
 def test_flatten_nested_struct():
     column = DuckDBColumn(column="struct_test", dtype="struct(a integer, b struct(c integer, d varchar))")
     flattened = column.flatten()
     assert len(flattened) == 3
     assert flattened[0].column == "struct_test.a"
-    assert flattened[0].dtype == "integer"
+    assert flattened[0].dtype == "INTEGER"
     assert flattened[1].column == "struct_test.b.c"
-    assert flattened[1].dtype == "integer"
+    assert flattened[1].dtype == "INTEGER"
     assert flattened[2].column == "struct_test.b.d"
-    assert flattened[2].dtype == "varchar"
+    assert flattened[2].dtype == "VARCHAR"
 
 def test_flatten_non_struct():
     column = DuckDBColumn(column="integer_test", dtype="integer")
@@ -100,7 +100,7 @@ def test_flatten_non_struct():
     # parameterized types keep their own commas
     (
         'STRUCT("x, y" DECIMAL(10,2), z DECIMAL(10, 2))',
-        [("struct_test.x, y", "DECIMAL(10,2)"), ("struct_test.z", "DECIMAL(10, 2)")],
+        [("struct_test.x, y", "DECIMAL(10,2)"), ("struct_test.z", "DECIMAL(10,2)")],
     ),
     # a quoted field name holding a nested struct is still flattened
     (
@@ -119,3 +119,19 @@ def test_flatten_quoted_struct_field_names(dtype, expected):
     flattened = column.flatten()
     assert [(c.column, c.dtype) for c in flattened] == expected
 
+
+@pytest.mark.parametrize("dtype, expected", [
+    # a list of structs is a list, not a struct
+    ("STRUCT(a INTEGER, b VARCHAR)[]", [("struct_test", "STRUCT(a INTEGER, b VARCHAR)[]")]),
+    # a type DuckDB cannot resolve on its own is left as one column
+    ("STRUCT(a mood, b INTEGER)", [("struct_test", "STRUCT(a mood, b INTEGER)")]),
+    ("STRUCT(a INTEGER", [("struct_test", "STRUCT(a INTEGER")]),
+    # non-struct children keep their own type, commas included
+    (
+        "STRUCT(m MAP(VARCHAR, INTEGER), l STRUCT(x INTEGER)[])",
+        [("struct_test.m", "MAP(VARCHAR, INTEGER)"), ("struct_test.l", "STRUCT(x INTEGER)[]")],
+    ),
+])
+def test_flatten_leaves_non_struct_types_whole(dtype, expected):
+    column = DuckDBColumn(column="struct_test", dtype=dtype)
+    assert [(c.column, c.dtype) for c in column.flatten()] == expected
