@@ -39,7 +39,8 @@
   {% set temporary_relation = duckdb__dispatch_temporary_relation(target_relation, batch_id) %}
   {% set temp_relation = temporary_relation.relation %}
   {% set temporary = temporary_relation.temporary %}
-  {% if not temporary %}
+  {# py_write_table creates a regular table for the staging relation, so it has to be dropped like a non-temporary one #}
+  {% if not temporary or language == 'python' %}
     {% do to_drop.append(temp_relation) %}
   {% endif %}
 
