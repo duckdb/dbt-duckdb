@@ -17,8 +17,11 @@
           schema=upstream['schema'],
           identifier=upstream['alias']
         ) -%}
-        {%- set location = upstream.config.get('location', external_location(upstream_rel, upstream.config)) -%}
+        {%- set location = render(upstream.config.get('location', external_location(upstream_rel, upstream.config))) -%}
         {%- set rendered_options = render_write_options(upstream.config) -%}
+        {#- normalize the options and infer the format and compression the files were written with -#}
+        {%- do adapter.external_write_options(location, rendered_options) -%}
+        {%- set format = external_read_format(upstream.config, rendered_options) -%}
         {%- set upstream_location = adapter.external_read_location(location, rendered_options) -%}
         {% if upstream_rel.schema not in upstream_schemas %}
           {% call statement('main', language='sql') -%}
@@ -28,7 +31,7 @@
         {% endif %}
         {% call statement('main', language='sql') -%}
           create or replace view {{ upstream_rel }} as (
-            select * from '{{ upstream_location }}'
+            select * from {{ external_read_function(upstream_location, format, upstream.config, rendered_options) }}
           );
         {%- endcall %}
       {%- endif %}
