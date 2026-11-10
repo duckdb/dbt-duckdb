@@ -39,10 +39,10 @@
   {% set temporary_relation = duckdb__dispatch_temporary_relation(target_relation, batch_id) %}
   {% set temp_relation = temporary_relation.relation %}
   {% set temporary = temporary_relation.temporary %}
-  {# py_write_table creates a regular table for the staging relation, so it has to be dropped like a non-temporary one #}
-  {% if not temporary or language == 'python' %}
+  {% if not temporary %}
     {% do to_drop.append(temp_relation) %}
   {% endif %}
+  {% set python_staging_relation = none %}
 
   {{ run_hooks(pre_hooks, inside_transaction=False) }}
   -- `BEGIN` happens here:
@@ -63,6 +63,10 @@
       {% call statement("pre", language=language) %}
         {{- build_python }}
       {% endcall %}
+      {# py_write_table creates a regular table for the staging relation even when it is meant to be temporary #}
+      {% if temporary %}
+        {% set python_staging_relation = temp_relation %}
+      {% endif %}
     {% else %} {# SQL #}
       {% do run_query(create_table_as(temporary, temp_relation, compiled_code, language, partitioned_by=none, sorted_by=none)) %}
     {% endif %}
@@ -123,6 +127,13 @@
       {% endif %}
       {% do adapter.drop_relation(rel) %}
   {% endfor %}
+  {% if python_staging_relation is not none %}
+    {#-- The relation is unqualified, so drop_relation cannot tell whether it resolves to a DuckLake
+         catalog, which rejects CASCADE. The staging table has no dependents, so a plain drop is enough. --#}
+    {% call statement('drop_python_staging_relation', auto_begin=False) -%}
+      drop table if exists {{ python_staging_relation }}
+    {%- endcall %}
+  {% endif %}
 
   {{ run_hooks(post_hooks, inside_transaction=False) }}
 
