@@ -362,6 +362,10 @@ def materialize(df, con):
   now()
 {%- endmacro %}
 
+{% macro duckdb__current_timestamp_in_utc_backcompat() -%}
+  ({{ current_timestamp() }} at time zone 'utc')::{{ type_timestamp() }}
+{%- endmacro %}
+
 {% macro duckdb__snapshot_string_as_time(timestamp) -%}
     {%- set result = "'" ~ timestamp ~ "'::timestamp" -%}
     {{ return(result) }}
