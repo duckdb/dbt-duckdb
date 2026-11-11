@@ -27,6 +27,9 @@ class TestCurrentTimestamps(BaseCurrentTimestamps):
         """
 
 
+# Buena Vista runs the queries on its own server session, so the profile's
+# TimeZone setting never reaches it.
+@pytest.mark.skip_profile("buenavista")
 class TestCurrentTimestampInUtcWithLocalTimeZone:
     """current_timestamp_in_utc_backcompat() must return UTC wall-clock time even
     when the session TimeZone is not UTC (DuckDB defaults it to the local zone)."""
