@@ -6,6 +6,8 @@
 
   {%- set format = external_read_format(config, rendered_options) -%}
   {%- set read_location = adapter.external_read_location(location, rendered_options) -%}
+  {#- partitioned and per-thread outputs are read back through a glob, which needs at least one file -#}
+  {%- set is_partitioned = rendered_options.get('partition_by') or rendered_options.get('per_thread_output') -%}
 
   -- set language - python or sql
   {%- set language = model['language'] -%}
@@ -46,22 +48,26 @@
     {{- create_table_as(False, temp_relation, compiled_code, language) }}
   {%- endcall %}
 
-  -- check if relation is empty
-  {%- set count_query -%}
-    select count(*) as row_count from {{ temp_relation }}
-  {%- endset -%}
-  {%- set row_count = run_query(count_query) -%}
+  -- Empty, non-partitioned Parquet files retain their schema, so write them as-is.
+  -- Other formats and partitioned datasets need a sentinel row so DuckDB can
+  -- recover the source columns when the file-backed view is created.
+  {%- set wrote_sentinel = false -%}
+  {% if format != 'parquet' or is_partitioned %}
+    {%- set count_query -%}
+      select count(*) as row_count from {{ temp_relation }}
+    {%- endset -%}
+    {%- set wrote_sentinel = run_query(count_query)[0][0] == 0 -%}
 
-  -- if relation is empty, write a non-empty table with column names and null values
-  {% call statement('main', language='sql') -%}
-    {% if row_count[0][0] == 0 %}
-    insert into {{ temp_relation }} values (
-      {%- for col in get_columns_in_relation(temp_relation) -%}
-      NULL,
-      {%- endfor -%}
-    )
+    {% if wrote_sentinel %}
+      {% call statement('main', language='sql') -%}
+        insert into {{ temp_relation }} values (
+          {%- for col in get_columns_in_relation(temp_relation) -%}
+          NULL,
+          {%- endfor -%}
+        )
+      {%- endcall %}
     {% endif %}
-  {%- endcall %}
+  {% endif %}
 
   -- write a temp relation into file
   {{ write_to_file(temp_relation, location, write_options) }}
@@ -70,8 +76,8 @@
   {% call statement('main', language='sql') -%}
     create or replace view {{ intermediate_relation }} as (
       select * from {{ external_read_function(read_location, format, config, rendered_options) }}
-      -- if relation is empty, filter by all columns having null values
-      {% if row_count[0][0] == 0 %}
+      -- drop the sentinel row written for an empty relation
+      {% if wrote_sentinel %}
         where 1
         {%- for col in get_columns_in_relation(temp_relation) -%}
           {{ '' }} AND "{{ col.column }}" is not NULL

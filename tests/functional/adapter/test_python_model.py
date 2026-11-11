@@ -109,6 +109,13 @@ class TestBasePythonIncremental(BasePythonIncrementalTests):
             )[0]
             == 7
         )
+        # the staging table of each incremental run must not be left behind
+        leftover_tables = project.run_sql(
+            "select table_name from duckdb_tables() "
+            f"where starts_with(table_name, '{model_to_test}__dbt_tmp')",
+            fetch="all",
+        )
+        assert leftover_tables == []
 
 
 empty_upstream_model_python = """

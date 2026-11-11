@@ -143,6 +143,61 @@ class TestIncrementalOnSchemaChangeQuotingTrue(BaseIncrementalOnSchemaChangeSetu
         assert status == RunStatus.Success
 
 
+# sync_all_columns also changes the type of existing columns; the default
+# alter_column_type adds, copies, drops and renames, which DuckDB cannot commit
+models__incremental_sync_all_columns_type_change = """
+{{
+    config(
+        materialized='incremental',
+        unique_key='id',
+        on_schema_change='sync_all_columns'
+    )
+}}
+
+{% if is_incremental() %}
+
+select 2 as id,
+       'twenty' as amount,
+       cast(2.5 as double) as "unit price",
+       'n' as note
+
+{% else %}
+
+select 1 as id,
+       10 as amount,
+       5 as "unit price",
+       'a' as label
+
+{% endif %}
+"""
+
+
+@pytest.mark.skip_database_type(
+    "ducklake", reason="DuckLake only allows a limited set of column type promotions"
+)
+class TestIncrementalSyncAllColumnsTypeChange:
+    @pytest.fixture(scope="class")
+    def models(self):
+        return {
+            "incremental_sync_all_columns_type_change.sql": models__incremental_sync_all_columns_type_change,
+        }
+
+    def test_sync_all_columns_changes_column_types(self, project):
+        run_dbt(["run"])
+        run_dbt(["run"])
+
+        relation = relation_from_name(project.adapter, "incremental_sync_all_columns_type_change")
+        columns = project.run_sql(f"describe {relation}", fetch="all")
+        assert [(row[0], row[1]) for row in columns] == [
+            ("id", "INTEGER"),
+            ("amount", "VARCHAR"),
+            ("unit price", "DOUBLE"),
+            ("note", "VARCHAR"),
+        ]
+        rows = project.run_sql(f"select * from {relation} order by id", fetch="all")
+        assert rows == [(1, "10", 5.0, None), (2, "twenty", 2.5, "n")]
+
+
 # Test models for merge strategy testing
 _model_source = """
 SELECT 1 AS id, 'Alice' AS name, 25 AS age, 'Engineer' AS job

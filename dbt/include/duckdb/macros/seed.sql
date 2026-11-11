@@ -11,8 +11,9 @@
     {% if config.get('fast', true) %}
         {% set seed_file_path = adapter.get_seed_file_path(model) %}
         {% set delimiter = config.get('delimiter', ',') %}
+        {#- dbt's CSV reader treats empty cells and 'null' as NULL; match it for the usual spellings -#}
         {% set sql %}
-          COPY {{ this.render() }} FROM '{{ seed_file_path }}' (FORMAT CSV, HEADER TRUE, DELIMITER '{{ delimiter }}')
+          COPY {{ this.render() }} FROM '{{ seed_file_path }}' (FORMAT CSV, HEADER TRUE, DELIMITER '{{ delimiter }}', NULLSTR ['', 'null', 'NULL', 'Null'])
         {% endset %}
         {% do adapter.add_query(sql, abridge_sql_log=True) %}
         {{ return(sql) }}
