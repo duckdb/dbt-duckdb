@@ -20,6 +20,7 @@ from dbt_common.exceptions import CompilationError
 from dbt_common.exceptions import DbtDatabaseError
 from dbt_common.exceptions import DbtRuntimeError
 from dbt_common.utils import encoding as dbt_encoding
+from dbt_common.utils import filter_null_values
 from packaging.version import Version
 
 from .constants import DEFAULT_TEMP_SCHEMA_NAME
@@ -146,6 +147,16 @@ class DuckDBAdapter(SQLAdapter):
         # be extremely slow against attached catalogs (e.g. DuckLake on Postgres) where
         # an unfiltered information_schema.columns scan triggers a full metastore load.
         return
+
+    def _make_match_kwargs(self, database: str, schema: str, identifier: str) -> dict[str, str]:
+        # The base implementation lower-cases the parts that are not quoted, as Postgres
+        # folds unquoted names to lower case. DuckDB keeps the case of unquoted names
+        # (`create table MODEL` creates "MODEL"), so folding them here makes the next
+        # run's lookup of a mixed-case model, schema or database fail with an
+        # approximate-match error against the relation it created.
+        return filter_null_values(
+            {"database": database, "schema": schema, "identifier": identifier}
+        )
 
     def get_columns_in_relation(self, relation: BaseRelation) -> List[BaseColumn]:
         # DESCRIBE (see issue #762) raises on a missing relation; preserve the old
