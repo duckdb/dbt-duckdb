@@ -17,7 +17,7 @@
   -- as above, the backup_relation should not already exist
   {%- set preexisting_backup_relation = load_cached_relation(backup_relation) -%}
   {%- set use_ducklake_table_workarounds = adapter.use_ducklake_table_workarounds(target_relation) -%}
-  {%- set build_in_place = has_foreign_key_constraints(existing_relation) -%}
+  {%- set build_in_place = adapter.is_ducklake(target_relation) or has_foreign_key_constraints(existing_relation) -%}
   {%- set dropped_dependents = [] -%}
   -- grab current tables grants config for comparision later on
   {% set grant_config = config.get('grants') %}
@@ -34,8 +34,9 @@
   {%- set sorted_by = duckdb__get_sorted_by(target_relation, false) -%}
 
   {% if build_in_place %}
-    {#-- Tables with foreign keys must not be renamed (see has_foreign_key_constraints),
-         so replace the existing relation inside this transaction instead of swapping --#}
+    {#-- Tables with foreign keys must not be renamed (see has_foreign_key_constraints).
+         DuckLake tables must be created under their final name so their physical paths
+         do not retain intermediate suffixes. --#}
     {% if existing_relation is not none %}
       {% set dropped_dependents = drop_relation_for_rebuild(existing_relation) %}
     {% endif %}
