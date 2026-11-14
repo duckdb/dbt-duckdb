@@ -54,3 +54,29 @@
     {# Return SQL so we can render it out into the compiled files #}
     {{ return(statements[0]) }}
 {% endmacro %}
+
+{% macro duckdb__create_csv_table(model, agate_table) %}
+  {#- dbt's default, with declared column_types passed through duckdb__seed_column_type -#}
+  {%- set column_override = model['config'].get('column_types', {}) -%}
+  {%- set quote_seed_column = model['config'].get('quote_columns', None) -%}
+
+  {% set sql %}
+    create table {{ this.render() }} (
+        {%- for col_name in agate_table.column_names -%}
+            {%- if col_name in column_override -%}
+                {%- set type = duckdb__seed_column_type(column_override[col_name]) -%}
+            {%- else -%}
+                {%- set type = adapter.convert_type(agate_table, loop.index0) -%}
+            {%- endif -%}
+            {%- set column_name = (col_name | string) -%}
+            {{ adapter.quote_seed_column(column_name, quote_seed_column) }} {{ type }} {%- if not loop.last -%}, {%- endif -%}
+        {%- endfor -%}
+    )
+  {% endset %}
+
+  {% call statement('_') -%}
+    {{ sql }}
+  {%- endcall %}
+
+  {{ return(sql) }}
+{% endmacro %}
