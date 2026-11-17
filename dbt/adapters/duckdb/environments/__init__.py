@@ -210,6 +210,45 @@ class Environment(abc.ABC):
             # a no-op, which will prevent the write-write conflict.
             conn.execute("CREATE SCHEMA IF NOT EXISTS {}".format(DEFAULT_TEMP_SCHEMA_NAME))
 
+        # The same write-write conflict applies when the target database is an
+        # attached catalog (e.g. Quack): each incremental model runs
+        # CREATE SCHEMA IF NOT EXISTS <target>.dbt_temp in its own transaction,
+        # and the second one conflicts with the first. Pre-create the temp
+        # schema in the target database once, here, so the per-model statement
+        # is a no-op. This mirrors duckdb__create_schema, which only creates
+        # schemas for attached catalogs whose type is not sqlite/mysql.
+        # The target is an attached database when creds.database names one of
+        # the attachments (by alias, or by path-derived name for DuckDB-backed
+        # attachments); comparing against the primary path-derived name is not
+        # reliable, since database defaults to "main" when creds are built
+        # directly instead of deserialized from a profile.
+        attached_db_names = set()
+        for attachment in creds.attach or []:
+            if attachment.alias:
+                attached_db_names.add(attachment.alias.lower())
+            elif DuckDBCredentials._is_duckdb_backed_attachment(
+                {"type": attachment.type, "options": attachment.options}
+            ):
+                attached_db_names.add(
+                    DuckDBCredentials.path_derived_database_name(attachment.path).lower()
+                )
+        if target_db := (creds.database or "").lower():
+            if target_db in attached_db_names:
+                row = conn.execute(
+                    "SELECT type FROM duckdb_databases() WHERE lower(database_name) = ?",
+                    [target_db],
+                ).fetchone()
+                if row is not None and str(row[0]).lower() not in (
+                    "sqlite",
+                    "mysql",
+                ):
+                    quoted_db = '"' + creds.database.replace('"', '""') + '"'
+                    conn.execute(
+                        "CREATE SCHEMA IF NOT EXISTS {}.{}".format(
+                            quoted_db, DEFAULT_TEMP_SCHEMA_NAME
+                        )
+                    )
+
         return conn
 
     @classmethod
