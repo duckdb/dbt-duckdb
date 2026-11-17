@@ -147,5 +147,17 @@ class BasePlugin:
         """
         pass
 
+    def modify_cursor(self, cursor):
+        """
+        Return the cursor that dbt-duckdb should use in place of the given one.
+        This method may be overridden by subclasses to wrap the cursor, e.g. to
+        rewrite the SQL passed to its execute method.
+
+        :param cursor: A DuckDBPyConnection instance, or a cursor returned by
+            another plugin's modify_cursor.
+        :return: The cursor to use. Defaults to the given cursor.
+        """
+        return cursor
+
     def default_materialization(self):
         return "table"
