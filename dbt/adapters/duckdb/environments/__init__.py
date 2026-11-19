@@ -210,6 +210,24 @@ class Environment(abc.ABC):
             # a no-op, which will prevent the write-write conflict.
             conn.execute("CREATE SCHEMA IF NOT EXISTS {}".format(DEFAULT_TEMP_SCHEMA_NAME))
 
+        # The same conflict happens when the target database is an attached catalog
+        # that runs each cursor in its own transaction, such as Quack (#882), so create
+        # the temp schema there as well. sqlite and mysql catalogs have no schemas to
+        # create (see duckdb__create_schema).
+        if creds.attach and creds.database:
+            target = conn.execute(
+                "SELECT database_name FROM duckdb_databases() "
+                "WHERE lower(database_name) = lower(?) AND database_name != current_database() "
+                "AND NOT readonly AND type NOT IN ('sqlite', 'mysql')",
+                [creds.database],
+            ).fetchone()
+            if target:
+                conn.execute(
+                    'CREATE SCHEMA IF NOT EXISTS "{}".{}'.format(
+                        target[0].replace('"', '""'), DEFAULT_TEMP_SCHEMA_NAME
+                    )
+                )
+
         return conn
 
     @classmethod
