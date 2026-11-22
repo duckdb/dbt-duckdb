@@ -50,8 +50,14 @@
 
   {% if existing_relation is none %}
     {% set build_sql = create_table_as(False, target_relation, compiled_code, language, partitioned_by=partitioned_by, sorted_by=sorted_by) %}
-  {% elif full_refresh_mode and has_foreign_key_constraints(existing_relation) %}
-    {#-- Tables with foreign keys must not be renamed (see has_foreign_key_constraints) --#}
+  {% elif full_refresh_mode and (has_foreign_key_constraints(existing_relation) or (adapter.is_ducklake(target_relation) and language == 'sql')) %}
+    {#-- Tables with foreign keys must not be renamed (see has_foreign_key_constraints).
+         DuckLake tables must be created under their final name so their physical paths
+         do not retain intermediate suffixes. Building in place also avoids the
+         intermediate-table rename, which fails intermittently under concurrent
+         DuckLake commits ("Table with name X__dbt_tmp does not exist", #748).
+         A Python model can write its data through its own cursor, which does not see a
+         drop made inside this transaction, so DuckLake builds only SQL models in place. --#}
     {% set dropped_dependents = drop_relation_for_rebuild(existing_relation) %}
     {% set build_sql = create_table_as(False, target_relation, compiled_code, language, partitioned_by=partitioned_by, sorted_by=sorted_by) %}
   {% elif full_refresh_mode %}
