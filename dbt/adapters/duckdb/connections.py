@@ -131,6 +131,16 @@ class DuckDBConnectionManager(SQLConnectionManager):
     def close_all_connections(cls):
         with cls._LOCK:
             if cls._ENV is not None:
+                try:
+                    # Actually release the environment instead of just
+                    # dropping the reference: closing it checkpoints the
+                    # database and frees the connection, so the next
+                    # invocation (or a fresh connection) sees the latest
+                    # committed data instead of relying on the garbage
+                    # collector to get around to it.
+                    cls._ENV.close()
+                except Exception as e:
+                    logger.debug(f"Ignoring error while closing DuckDB environment: {e}")
                 cls._ENV = None
 
     def execute(

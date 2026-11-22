@@ -7,6 +7,9 @@ from .. import credentials
 from .. import utils
 from dbt.adapters.contracts.connection import AdapterResponse
 from dbt.adapters.contracts.connection import Connection
+from dbt.adapters.events.logging import AdapterLogger
+
+logger = AdapterLogger("DuckDB")
 
 
 class DuckDBCursorWrapper:
@@ -58,11 +61,41 @@ class LocalEnvironment(Environment):
         )
         self._REGISTERED_DF: dict = {}
 
+    def checkpoint(self):
+        """Flush the write-ahead log into the database file.
+
+        The shared connection stays open between dbt invocations in the same
+        process (keep_open defaults to true), so without an explicit
+        checkpoint committed changes sit in the WAL and are never merged
+        into the database file. A fresh connection that cannot replay the
+        WAL then sees stale data from a previous run
+        (https://github.com/duckdb/dbt-duckdb/issues/703). Checkpointing
+        here makes committed data visible to any new connection, matching
+        the outcome of running the CLI once per invocation.
+
+        This is best-effort: CHECKPOINT raises if a transaction is open on
+        the connection, in which case the data stays in the WAL until the
+        transaction commits and the next checkpoint runs.
+        """
+        if self.conn is None:
+            return
+        try:
+            self.conn.execute("CHECKPOINT")
+        except Exception as e:
+            logger.debug(f"Ignoring error while checkpointing DuckDB database: {e}")
+
     def notify_closed(self):
         with self.lock:
             self.handle_count -= 1
-            if self.handle_count == 0 and not self._keep_open:
-                self.close()
+            if self.handle_count == 0:
+                if self._keep_open:
+                    # The connection stays open for the next invocation, so
+                    # flush the WAL now: dbt's cleanup closes every handle
+                    # at the end of a command, which makes this the boundary
+                    # between one dbtRunner() invocation and the next.
+                    self.checkpoint()
+                else:
+                    self.close()
 
     @classmethod
     def is_cancelable(cls):
@@ -168,6 +201,10 @@ class LocalEnvironment(Environment):
 
     def close(self):
         if self.conn:
+            # Flush committed changes into the database file before
+            # releasing the connection, so fresh connections see the latest
+            # data even if they cannot replay the WAL.
+            self.checkpoint()
             self.conn.close()
             self.conn = None
 
