@@ -17,7 +17,10 @@
   -- as above, the backup_relation should not already exist
   {%- set preexisting_backup_relation = load_cached_relation(backup_relation) -%}
   {%- set use_ducklake_table_workarounds = adapter.use_ducklake_table_workarounds(target_relation) -%}
-  {%- set build_in_place = adapter.is_ducklake(target_relation) or has_foreign_key_constraints(existing_relation) -%}
+  {#-- A Python model can write its data through its own cursor, which does not see a
+       drop made inside this transaction, so DuckLake builds only SQL models in place --#}
+  {%- set build_in_place = (adapter.is_ducklake(target_relation) and language == 'sql')
+        or has_foreign_key_constraints(existing_relation) -%}
   {%- set dropped_dependents = [] -%}
   -- grab current tables grants config for comparision later on
   {% set grant_config = config.get('grants') %}

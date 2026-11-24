@@ -4,6 +4,8 @@ import inspect
 import duckdb
 import pytest
 
+from dbt.adapters.duckdb.credentials import DuckDBCredentials
+from dbt.adapters.duckdb.environments import Environment
 from dbt.adapters.duckdb.plugins import BasePlugin
 
 
@@ -76,3 +78,37 @@ class TestPostgresPlugin:
         plugin._set_extension_settings(conn)
 
         conn.execute.assert_called_once_with("SET pg_application_name = 'dbt''s run';")
+
+
+class RewritingCursor:
+    def __init__(self, cursor):
+        self._cursor = cursor
+
+    def execute(self, sql, bindings=None):
+        return self._cursor.execute(sql.replace("41", "42"), bindings)
+
+    def __getattr__(self, name):
+        return getattr(self._cursor, name)
+
+
+class RewritingPlugin(BasePlugin):
+    def modify_cursor(self, cursor):
+        return RewritingCursor(cursor)
+
+
+class TestModifyCursor:
+    def test_default_returns_same_cursor(self):
+        plugin = BasePlugin("base", {})
+        cursor = object()
+
+        assert plugin.modify_cursor(cursor) is cursor
+
+    def test_initialize_cursor_uses_modified_cursor(self):
+        creds = DuckDBCredentials()
+        plugins = {"rewrite": RewritingPlugin("rewrite", {})}
+        conn = duckdb.connect()
+
+        cursor = Environment.initialize_cursor(creds, conn.cursor(), plugins)
+
+        assert cursor.execute("SELECT 41").fetchone() == (42,)
+        conn.close()
