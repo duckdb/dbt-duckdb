@@ -66,7 +66,7 @@ class TestPostgresPlugin:
         # the statement must parse, and the DSN literal must round-trip unchanged
         assert len(duckdb.extract_statements(stmt)) == 1
         literal = stmt[len("ATTACH ") : stmt.index(" AS postgres_db")]
-        assert duckdb.sql(f"SELECT {literal}").fetchone()[0] == dsn
+        assert duckdb.sql(f"SELECT {literal}").fetchall()[0][0] == dsn
 
     def test_extension_setting_escapes_quotes(self, mocker):
         plugin = BasePlugin.create(
