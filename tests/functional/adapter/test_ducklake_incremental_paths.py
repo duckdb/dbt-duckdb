@@ -18,6 +18,19 @@ select
 """
 
 
+@pytest.fixture(scope="class")
+def models__incremental_partitioned_model(test_database_name):
+    return f"""
+{{{{ config(materialized='incremental', database='{test_database_name}', partitioned_by='id') }}}}
+select
+    {{% if var('fail', false) %}}
+        cast(error('boom') as integer)
+    {{% else %}}
+        {{{{ var('marker', 10) }}}}
+    {{% endif %}} as id
+"""
+
+
 def active_table_path(project, node):
     metadata_schema = ducklake_metadata_schema(node.database)
     row = project.run_sql(
@@ -48,8 +61,11 @@ def select_ids(project, node):
 
 class TestDucklakeIncrementalPaths(BaseDucklakeIntegration):
     @pytest.fixture(scope="class")
-    def models(self, models__incremental_model):
-        return {"incremental_model.sql": models__incremental_model}
+    def models(self, models__incremental_model, models__incremental_partitioned_model):
+        return {
+            "incremental_model.sql": models__incremental_model,
+            "incremental_partitioned_model.sql": models__incremental_partitioned_model,
+        }
 
     def test_full_refresh_is_stored_under_its_own_name(self, project):
         result = run_dbt(
@@ -79,5 +95,40 @@ class TestDucklakeIncrementalPaths(BaseDucklakeIntegration):
         assert select_ids(project, node) == [(7,)]
         assert active_table_path(project, node) == expected_path
         run_dbt(["run", "--select", "incremental_model", "--full-refresh"])
+        assert select_ids(project, node) == [(10,)]
+        assert active_table_path(project, node) == expected_path
+
+    def test_failed_full_refresh_keeps_old_rows_partitioned_by(self, project):
+        # Same rollback check as above, but the build runs a different
+        # statement sequence: create table as (select ... limit 0), then
+        # alter table set partitioned by, then the insert that fails.
+        result = run_dbt(
+            [
+                "run",
+                "--select",
+                "incremental_partitioned_model",
+                "--full-refresh",
+                "--vars",
+                "{marker: 7}",
+            ]
+        )
+        node = result.results[0].node
+        expected_path = f"{node.alias}/"
+        assert select_ids(project, node) == [(7,)]
+
+        run_dbt(
+            [
+                "run",
+                "--select",
+                "incremental_partitioned_model",
+                "--full-refresh",
+                "--vars",
+                "{fail: true}",
+            ],
+            expect_pass=False,
+        )
+        assert select_ids(project, node) == [(7,)]
+        assert active_table_path(project, node) == expected_path
+        run_dbt(["run", "--select", "incremental_partitioned_model", "--full-refresh"])
         assert select_ids(project, node) == [(10,)]
         assert active_table_path(project, node) == expected_path
