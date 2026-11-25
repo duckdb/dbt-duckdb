@@ -10,6 +10,9 @@ class Plugin(BasePlugin):
         # columns declared on the source.
         columns = source_config.columns
         assert source_config.as_dict()["columns"] == columns
+        # The keys the README says a plugin can rely on.
+        documented = {"name", "data_type", "description", "meta", "quote"}
+        assert all(documented <= column.keys() for column in columns.values())
 
         names = [column["name"] for column in columns.values()]
         dtypes = {name: str for name, column in columns.items() if column["data_type"] == "text"}

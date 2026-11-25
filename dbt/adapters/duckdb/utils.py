@@ -26,8 +26,9 @@ class SourceConfig:
     database: Optional[str]
     meta: Dict[str, Any]
     tags: List[str]
-    # The columns declared on the source, keyed by name in declaration order. Each
-    # value is the column as dbt parsed it, a dict with at least "name" and "data_type".
+    # The columns declared on the source, keyed by name in declaration order. Each value
+    # is the column as dbt parsed it, as a dict. Plugins can rely on "name", "data_type",
+    # "description", "meta" and "quote"; the other keys depend on the dbt-core version.
     columns: Dict[str, Dict[str, Any]] = field(default_factory=dict)
 
     def get(self, key, default=None):
