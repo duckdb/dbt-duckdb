@@ -1,12 +1,18 @@
+import gc
 import tempfile
 import unittest
+from argparse import Namespace
 from pathlib import Path
+from unittest import mock
 
 import duckdb
+from dbt.flags import set_from_args
 
+from dbt.adapters.duckdb import DuckDBAdapter
 from dbt.adapters.duckdb.connections import DuckDBConnectionManager
 from dbt.adapters.duckdb.credentials import DuckDBCredentials
 from dbt.adapters.duckdb.environments.local import LocalEnvironment
+from tests.unit.utils import config_from_parts_or_dicts
 
 
 def _wal_path(db_path):
@@ -21,8 +27,9 @@ class TestEnvironmentCheckpoint(unittest.TestCase):
     true), so committed changes sit in the write-ahead log and are never
     flushed into the database file. Fresh connections that cannot replay
     the WAL (e.g. on filesystems with unreliable locking) then see stale
-    data from a previous run. Closing the last handle, or the environment
-    itself, must checkpoint the database first.
+    data from a previous run. Checkpointing once at the end of each
+    invocation, via DuckDBConnectionManager.cleanup_all, flushes the WAL
+    so fresh connections see the latest data.
     """
 
     def setUp(self):
@@ -39,7 +46,23 @@ class TestEnvironmentCheckpoint(unittest.TestCase):
         handle.cursor().execute("INSERT INTO t VALUES ('VALUE_B')")
         return handle
 
-    def test_last_handle_close_checkpoints(self):
+    def _adapter(self):
+        set_from_args(Namespace(STRICT_MODE=True), {})
+        profile_cfg = {
+            "outputs": {"test": {"type": "duckdb", "path": str(self.db_path)}},
+            "target": "test",
+        }
+        project_cfg = {
+            "name": "X",
+            "version": "0.1",
+            "profile": "test",
+            "project-root": "/tmp/dbt/does-not-exist",
+            "config-version": 2,
+        }
+        config = config_from_parts_or_dicts(project_cfg, profile_cfg, cli_vars={})
+        return DuckDBAdapter(config, mock.MagicMock())
+
+    def test_last_handle_close_does_not_checkpoint(self):
         env = LocalEnvironment(DuckDBCredentials(path=str(self.db_path)))
         handle = self._write_via_handle(env)
         # Sanity check: the committed writes live in the WAL while the
@@ -47,9 +70,28 @@ class TestEnvironmentCheckpoint(unittest.TestCase):
         self.assertTrue(_wal_path(self.db_path).exists())
         handle.close()
         self.assertEqual(env.handle_count, 0)
-        # The connection stays open (keep_open), but the WAL must have been
-        # flushed into the database file so fresh connections see the data
-        # even if they cannot replay the WAL.
+        # Closing the last handle does not checkpoint: dbt releases each
+        # thread's connection after every node, so checkpointing here
+        # would run after nearly every node instead of once per
+        # invocation. The WAL is untouched until the end of the run.
+        self.assertTrue(_wal_path(self.db_path).exists())
+        # The checkpoint itself still works when run directly.
+        env.checkpoint()
+        self.assertFalse(_wal_path(self.db_path).exists())
+
+    def test_cleanup_all_checkpoints_at_end_of_invocation(self):
+        adapter = self._adapter()
+        adapter.acquire_connection("test")
+        adapter.execute("CREATE TABLE t AS SELECT 'VALUE_A' AS label")
+        adapter.execute("INSERT INTO t VALUES ('VALUE_B')")
+        adapter.release_connection()
+        # Releasing the connection closes the last handle without
+        # checkpointing, so the WAL is still there.
+        self.assertTrue(_wal_path(self.db_path).exists())
+        # cleanup_all runs at the end of an invocation and checkpoints
+        # once, so fresh connections see the data even if they cannot
+        # replay the WAL.
+        adapter.cleanup_connections()
         self.assertFalse(_wal_path(self.db_path).exists())
         conn = duckdb.connect(str(self.db_path))
         try:
@@ -88,6 +130,24 @@ class TestEnvironmentCheckpoint(unittest.TestCase):
         # close_all_connections must really release the environment instead
         # of just dropping the reference and leaking the connection.
         self.assertIsNone(env.conn)
+        self.assertFalse(_wal_path(self.db_path).exists())
+
+    def test_close_all_connections_keeps_open_handles_working(self):
+        env = LocalEnvironment(DuckDBCredentials(path=str(self.db_path)))
+        handle = self._write_via_handle(env)
+        DuckDBConnectionManager._ENV = env
+        # A handle is still open: closing all connections must not break
+        # it. Only the reference is dropped, as on main.
+        DuckDBConnectionManager.close_all_connections()
+        self.assertIsNone(DuckDBConnectionManager._ENV)
+        self.assertIsNotNone(env.conn)
+        self.assertEqual(handle.cursor().execute("SELECT COUNT(*) FROM t").fetchone()[0], 2)
+        handle.close()
+        # The environment is released when its last handle closes, which
+        # closes the connection and flushes the WAL.
+        del handle
+        del env
+        gc.collect()
         self.assertFalse(_wal_path(self.db_path).exists())
 
     def test_checkpoint_on_memory_database_is_safe(self):

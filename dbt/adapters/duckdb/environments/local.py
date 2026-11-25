@@ -70,32 +70,54 @@ class LocalEnvironment(Environment):
         into the database file. A fresh connection that cannot replay the
         WAL then sees stale data from a previous run
         (https://github.com/duckdb/dbt-duckdb/issues/703). Checkpointing
-        here makes committed data visible to any new connection, matching
-        the outcome of running the CLI once per invocation.
+        once at the end of an invocation makes committed data visible to
+        any new connection, matching the outcome of running the CLI once
+        per invocation.
 
-        This is best-effort: CHECKPOINT raises if a transaction is open on
-        the connection, in which case the data stays in the WAL until the
-        transaction commits and the next checkpoint runs.
+        This only covers the primary database: a bare CHECKPOINT touches
+        just the default database, so attached databases are not
+        checkpointed. It also only runs for a native DuckDB file, never
+        for a DuckLake catalog (where a checkpoint runs catalog
+        maintenance) or MotherDuck (where it would go to the server).
+
+        This is best-effort: any error is logged and ignored, so the data
+        stays in the WAL until the next checkpoint runs.
         """
         if self.conn is None:
+            return
+        if not self._is_native_file_database():
             return
         try:
             self.conn.execute("CHECKPOINT")
         except Exception as e:
             logger.debug(f"Ignoring error while checkpointing DuckDB database: {e}")
 
+    def _is_native_file_database(self):
+        """True when the current database is a native DuckDB file.
+
+        duckdb_databases() must report type 'duckdb' with a non-null path
+        for current_database(). That excludes in-memory databases (no path),
+        DuckLake catalogs (type 'ducklake') and MotherDuck (type
+        'motherduck'), where a checkpoint would do the wrong thing.
+        """
+        try:
+            row = self.conn.execute(
+                "SELECT type, path FROM duckdb_databases() "
+                "WHERE database_name = current_database()"
+            ).fetchone()
+        except Exception as e:
+            logger.debug(f"Ignoring error while checking database type: {e}")
+            return False
+        if not row or len(row) != 2:
+            return False
+        db_type, path = row
+        return db_type == "duckdb" and path is not None
+
     def notify_closed(self):
         with self.lock:
             self.handle_count -= 1
-            if self.handle_count == 0:
-                if self._keep_open:
-                    # The connection stays open for the next invocation, so
-                    # flush the WAL now: dbt's cleanup closes every handle
-                    # at the end of a command, which makes this the boundary
-                    # between one dbtRunner() invocation and the next.
-                    self.checkpoint()
-                else:
-                    self.close()
+            if self.handle_count == 0 and not self._keep_open:
+                self.close()
 
     @classmethod
     def is_cancelable(cls):
