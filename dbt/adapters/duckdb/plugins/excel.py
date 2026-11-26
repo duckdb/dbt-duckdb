@@ -47,24 +47,6 @@ class Plugin(BasePlugin):
     def store(self, target_config: TargetConfig):
         plugin_output_config = self._config["output"]
 
-        # Create the writer on the first instance of the call to store.
-        # Instead if we instantiated the writer in the constructor
-        # with mode = 'w', this would result in an existing file getting
-        # overwritten. This can happen if dbt test is executed for example.
-        if not hasattr(self, "_excel_writer"):
-            with self._excel_writer_create_lock:
-                if not hasattr(self, "_excel_writer"):
-                    self._excel_writer = pd.ExcelWriter(
-                        plugin_output_config["file"],
-                        mode=plugin_output_config.get("mode", "w"),
-                        engine=plugin_output_config.get("engine", "xlsxwriter"),
-                        engine_kwargs=plugin_output_config.get("engine_kwargs", {}),
-                        date_format=plugin_output_config.get("date_format"),
-                        datetime_format=plugin_output_config.get("datetime_format"),
-                    )
-                    if not plugin_output_config.get("header_styling", True):
-                        excel.ExcelFormatter.header_style = None
-
         target_output_config = {
             **plugin_output_config,
             **target_config.config.get("overrides", {}),
@@ -95,6 +77,25 @@ class Plugin(BasePlugin):
             data_df = data_df[data_df.notna().any(axis=1)]
             if data_df.shape[0] == 0:
                 return
+
+        # Create the writer on the first instance of the call to store.
+        # Instead if we instantiated the writer in the constructor
+        # with mode = 'w', this would result in an existing file getting
+        # overwritten. This can happen if dbt test is executed for example.
+        if not hasattr(self, "_excel_writer"):
+            with self._excel_writer_create_lock:
+                if not hasattr(self, "_excel_writer"):
+                    self._excel_writer = pd.ExcelWriter(
+                        plugin_output_config["file"],
+                        mode=plugin_output_config.get("mode", "w"),
+                        engine=plugin_output_config.get("engine", "xlsxwriter"),
+                        engine_kwargs=plugin_output_config.get("engine_kwargs", {}),
+                        date_format=plugin_output_config.get("date_format"),
+                        datetime_format=plugin_output_config.get("datetime_format"),
+                    )
+                    if not plugin_output_config.get("header_styling", True):
+                        excel.ExcelFormatter.header_style = None
+
         try:
             df.to_excel(
                 self._excel_writer,
