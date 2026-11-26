@@ -385,7 +385,7 @@ def materialize(df, con):
 
 {% macro write_to_file(relation, location, options) -%}
   {% call statement('write_to_file') -%}
-    copy {{ relation }} to '{{ location }}' ({{ options }})
+    copy {{ relation }} to '{{ adapter.escape_sql_string(location) }}' ({{ options }})
   {%- endcall %}
 {% endmacro %}
 

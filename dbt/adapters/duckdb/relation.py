@@ -5,6 +5,7 @@ from typing import Optional
 from typing import Type
 
 from .connections import DuckDBConnectionManager
+from .utils import escape_sql_string
 from .utils import SourceConfig
 from dbt.adapters.base.relation import BaseRelation
 from dbt.adapters.contracts.relation import HasQuoting
@@ -71,7 +72,7 @@ class DuckDBRelation(BaseRelation):
 
             # If it's a function call or already has single quotes, don't add them
             if "(" not in ext_location and not ext_location.startswith("'"):
-                ext_location = f"'{ext_location}'"
+                ext_location = f"'{escape_sql_string(ext_location)}'"
             kwargs["external"] = ext_location
 
         return super().create_from(quoting, source, **kwargs)  # type: ignore

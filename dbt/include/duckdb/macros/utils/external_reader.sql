@@ -29,7 +29,7 @@
   {%- if format != 'parquet' and rendered_options.get('compression') and 'compression' not in read_options -%}
     {%- set read_options = dict(read_options, compression=rendered_options['compression']) -%}
   {%- endif -%}
-  read_{{ format }}('{{ read_location }}'
+  read_{{ format }}('{{ adapter.escape_sql_string(read_location) }}'
   {%- for key, value in read_options.items() -%}
     , {{ key }}=
     {%- if value is string -%}
