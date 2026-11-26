@@ -980,7 +980,9 @@ custom user-defined functions.
 1. `load`: Takes a [SourceConfig](dbt/adapters/duckdb/utils.py) instance, which encapsulates the configuration for a
 a dbt source and can optionally return a DataFrame-like object that DuckDB knows how to turn into a table (this is
 similar to a dbt-duckdb Python model, but without the ability to `ref` any models or access any information beyond
-the source config.)
+the source config.) The columns declared on the source table are available as `source_config.columns`, a dict keyed
+by column name in declaration order. Each value is a dict with at least the column's `name`, `data_type` (`None` when
+no type is declared), `description`, `meta` and `quote`; the other keys depend on the installed dbt-core version.
 1. `store`: Takes a [TargetConfig](dbt/adapters/duckdb/utils.py) instance, which encapsulates the configuration for
 an `external` materialization and can perform additional operations once the CSV/Parquet/JSON file is written. The
 [glue](dbt/adapters/duckdb/plugins/glue.py) and [sqlalchemy](dbt/adapters/duckdb/plugins/sqlalchemy.py) are examples

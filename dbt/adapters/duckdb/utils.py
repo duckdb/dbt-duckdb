@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from dataclasses import field
 from typing import Any
 from typing import Dict
 from typing import List
@@ -25,6 +26,10 @@ class SourceConfig:
     database: Optional[str]
     meta: Dict[str, Any]
     tags: List[str]
+    # The columns declared on the source, keyed by name in declaration order. Each value
+    # is the column as dbt parsed it, as a dict. Plugins can rely on "name", "data_type",
+    # "description", "meta" and "quote"; the other keys depend on the dbt-core version.
+    columns: Dict[str, Dict[str, Any]] = field(default_factory=dict)
 
     def get(self, key, default=None):
         return self.meta.get(key, default)
@@ -48,6 +53,7 @@ class SourceConfig:
             "schema": self.schema,
             "database": self.database,
             "tags": self.tags,
+            "columns": self.columns,
         }
         base.update(self.meta)
         return base
@@ -58,6 +64,8 @@ class SourceConfig:
         # Use the config properties as well if they are present
         config_properties = source.config.extra if source.config else {}
         meta.update(config_properties)
+        # RelationConfig does not declare the columns that a source definition carries
+        columns = getattr(source, "columns", None) or {}
         return SourceConfig(
             name=source.name,
             identifier=source.identifier,
@@ -65,6 +73,7 @@ class SourceConfig:
             database=source.database,
             meta=meta,
             tags=source.tags or [],
+            columns={name: column.to_dict() for name, column in columns.items()},
         )
 
 
