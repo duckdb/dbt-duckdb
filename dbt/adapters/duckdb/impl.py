@@ -139,8 +139,10 @@ class DuckDBAdapter(SQLAdapter):
                     "`column_types` declared as `float` create 4-byte FLOAT columns, which "
                     "lose precision (19.99 is stored as 19.989999771118164). With the flag "
                     "on they create DOUBLE columns, and existing FLOAT columns change on "
-                    "their next full rebuild."
+                    "their next full rebuild. Model contracts that declare `data_type: float` "
+                    "for such a column need `data_type: double` once the flag is on."
                 ),
+                "docs_url": "https://github.com/duckdb/dbt-duckdb#behavior-flags",
             }
         ]
 
