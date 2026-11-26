@@ -114,6 +114,16 @@ class Environment(abc.ABC):
     def get_binding_char(self) -> str:
         return "?"
 
+    def checkpoint(self):
+        """Flush the write-ahead log into the database file.
+
+        The default implementation does nothing; environments backed by a
+        local DuckDB file override it. Other environments (remote, or
+        catalogs where a checkpoint would run server-side maintenance)
+        must not checkpoint here.
+        """
+        pass
+
     def close(self):
         pass
 

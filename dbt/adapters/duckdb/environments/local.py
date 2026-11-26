@@ -7,6 +7,9 @@ from .. import credentials
 from .. import utils
 from dbt.adapters.contracts.connection import AdapterResponse
 from dbt.adapters.contracts.connection import Connection
+from dbt.adapters.events.logging import AdapterLogger
+
+logger = AdapterLogger("DuckDB")
 
 
 class DuckDBCursorWrapper:
@@ -57,6 +60,58 @@ class LocalEnvironment(Environment):
             credentials.keep_open or credentials.path == ":memory:" or credentials.is_motherduck
         )
         self._REGISTERED_DF: dict = {}
+
+    def checkpoint(self):
+        """Flush the write-ahead log into the database file.
+
+        The shared connection stays open between dbt invocations in the same
+        process (keep_open defaults to true), so without an explicit
+        checkpoint committed changes sit in the WAL and are never merged
+        into the database file. A fresh connection that cannot replay the
+        WAL then sees stale data from a previous run
+        (https://github.com/duckdb/dbt-duckdb/issues/703). Checkpointing
+        once at the end of an invocation makes committed data visible to
+        any new connection, matching the outcome of running the CLI once
+        per invocation.
+
+        This only covers the primary database: a bare CHECKPOINT touches
+        just the default database, so attached databases are not
+        checkpointed. It also only runs for a native DuckDB file, never
+        for a DuckLake catalog (where a checkpoint runs catalog
+        maintenance) or MotherDuck (where it would go to the server).
+
+        This is best-effort: any error is logged and ignored, so the data
+        stays in the WAL until the next checkpoint runs.
+        """
+        if self.conn is None:
+            return
+        if not self._is_native_file_database():
+            return
+        try:
+            self.conn.execute("CHECKPOINT")
+        except Exception as e:
+            logger.debug(f"Ignoring error while checkpointing DuckDB database: {e}")
+
+    def _is_native_file_database(self):
+        """True when the current database is a native DuckDB file.
+
+        duckdb_databases() must report type 'duckdb' with a non-null path
+        for current_database(). That excludes in-memory databases (no path),
+        DuckLake catalogs (type 'ducklake') and MotherDuck (type
+        'motherduck'), where a checkpoint would do the wrong thing.
+        """
+        try:
+            row = self.conn.execute(
+                "SELECT type, path FROM duckdb_databases() "
+                "WHERE database_name = current_database()"
+            ).fetchone()
+        except Exception as e:
+            logger.debug(f"Ignoring error while checking database type: {e}")
+            return False
+        if not row or len(row) != 2:
+            return False
+        db_type, path = row
+        return db_type == "duckdb" and path is not None
 
     def notify_closed(self):
         with self.lock:
@@ -168,6 +223,10 @@ class LocalEnvironment(Environment):
 
     def close(self):
         if self.conn:
+            # Flush committed changes into the database file before
+            # releasing the connection, so fresh connections see the latest
+            # data even if they cannot replay the WAL.
+            self.checkpoint()
             self.conn.close()
             self.conn = None
 

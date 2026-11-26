@@ -131,7 +131,37 @@ class DuckDBConnectionManager(SQLConnectionManager):
     def close_all_connections(cls):
         with cls._LOCK:
             if cls._ENV is not None:
+                env = cls._ENV
                 cls._ENV = None
+                # Only release the environment when no handles are still
+                # open. Closing it with handles outstanding breaks those
+                # handles ("Connection already closed!"), where just
+                # dropping the reference keeps them working, as on main.
+                # The environment is then released when its last handle
+                # closes; at atexit the handles are normally all released
+                # already, so the close below still runs.
+                if getattr(env, "handle_count", 0) == 0:
+                    try:
+                        env.close()
+                    except Exception as e:
+                        logger.debug(f"Ignoring error while closing DuckDB environment: {e}")
+
+    def cleanup_all(self) -> None:
+        # dbt calls this at the end of every command (adapter_management),
+        # so it is the boundary between one dbtRunner() invocation and the
+        # next. Checkpoint once here instead of when the last handle
+        # closes: dbt releases each thread's connection after every node,
+        # so checkpointing on handle close would run after nearly every
+        # node instead of once per invocation.
+        try:
+            super().cleanup_all()
+        finally:
+            env = DuckDBConnectionManager._ENV
+            if env is not None:
+                try:
+                    env.checkpoint()
+                except Exception as e:
+                    logger.debug(f"Ignoring error while checkpointing DuckDB database: {e}")
 
     def execute(
         self,
