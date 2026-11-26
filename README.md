@@ -617,6 +617,25 @@ models:
 > [!TIP]
 > Microbatching might not always be best option from a performance perspective. Consider that DuckDB operates on row groups, not physical partitions (unless you have explicitly partitioned data in a DuckLake). While you can do batch processing in parallel, more threads with more batches in parallel does not always equal better performance as row groups might not align 1-1 with the batches. Be sure to test different amounts of threads to match your use case.
 
+#### Indexes on DuckDB Models
+
+Set `indexes` on a DuckDB `table` or `incremental` model to create indexes
+along with the model. Each entry lists its `columns` and can set `unique`
+to create a unique index. For example, in `models/customers.sql`:
+
+```sql
+{{ config(
+    materialized='table',
+    indexes=[{'columns': ['customer_id'], 'unique': True}],
+) }}
+
+select 1 as customer_id
+union all
+select 2 as customer_id
+```
+
+Use this option for DuckDB tables, not DuckLake tables, which do not support indexes.
+
 #### DuckLake Partitioning and Sort Order
 
 For DuckLake-backed tables (including MotherDuck-managed DuckLake), you can configure the physical layout of `table` or `incremental` models with two settings:
