@@ -8,6 +8,7 @@ from duckdb import DuckDBPyConnection
 
 from . import BasePlugin
 from ..credentials import DuckDBCredentials
+from ..utils import escape_sql_string
 from dbt.adapters.events.logging import AdapterLogger
 
 PG_EXT = "postgres"
@@ -95,7 +96,7 @@ class Plugin(BasePlugin):
         for setting, value in self._settings.items():
             # Quote string values
             if isinstance(value, str):
-                value = f"'{value}'"
+                value = f"'{escape_sql_string(value)}'"
             elif isinstance(value, bool):
                 value = "true" if value else "false"
             set_stmt = f"SET {setting} = {value};"
@@ -113,17 +114,17 @@ class Plugin(BasePlugin):
         attach_options: List[Tuple[str, Optional[str]]] = [("TYPE", "POSTGRES")]
 
         if self._pg_schema:
-            attach_options.append(("SCHEMA", f"'{self._pg_schema}'"))
+            attach_options.append(("SCHEMA", f"'{escape_sql_string(self._pg_schema)}'"))
 
         if self._secret:
-            attach_options.append(("SECRET", f"'{self._secret}'"))
+            attach_options.append(("SECRET", f"'{escape_sql_string(self._secret)}'"))
 
         # Additional attach options
         for k, v in self._attach_options.items():
             if isinstance(v, bool):
                 v = "true" if v else "false"
             elif isinstance(v, str):
-                v = f"'{v}'"
+                v = f"'{escape_sql_string(v)}'"
             attach_options.append((k.upper(), v))
 
         if self._read_only:
@@ -134,5 +135,6 @@ class Plugin(BasePlugin):
             f"{k} {v}" if v is not None else k for k, v in attach_options
         )
 
-        attach_stmt = f"ATTACH '{self._dsn}' AS {self._duckdb_alias} ({attach_options_str});"
+        dsn = escape_sql_string(self._dsn)
+        attach_stmt = f"ATTACH '{dsn}' AS {self._duckdb_alias} ({attach_options_str});"
         return attach_stmt
