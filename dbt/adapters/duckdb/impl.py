@@ -11,6 +11,7 @@ from typing import Sequence
 from typing import TYPE_CHECKING
 from uuid import uuid4
 
+from dbt_common.behavior_flags import BehaviorFlag
 from dbt_common.contracts.constraints import ColumnLevelConstraint
 from dbt_common.contracts.constraints import ConstraintType
 from dbt_common.contracts.constraints import ModelLevelConstraint
@@ -124,6 +125,26 @@ class DuckDBAdapter(SQLAdapter):
         ConstraintType.primary_key: ConstraintSupport.ENFORCED,
         ConstraintType.foreign_key: ConstraintSupport.ENFORCED,
     }
+
+    @property
+    def _behavior_flags(self) -> List[BehaviorFlag]:
+        return [
+            {
+                "name": "duckdb_float_as_double",
+                "default": False,
+                "description": (
+                    "DuckDB's FLOAT is a 4-byte single-precision type, while Postgres, "
+                    "Snowflake and BigQuery treat `float` as 8-byte double precision. With "
+                    "`duckdb_float_as_double` turned off, `dbt.type_float()` and seed "
+                    "`column_types` declared as `float` create 4-byte FLOAT columns, which "
+                    "lose precision (19.99 is stored as 19.989999771118164). With the flag "
+                    "on they create DOUBLE columns, and existing FLOAT columns change on "
+                    "their next full rebuild. Model contracts that declare `data_type: float` "
+                    "for such a column need `data_type: double` once the flag is on."
+                ),
+                "docs_url": "https://github.com/duckdb/dbt-duckdb#behavior-flags",
+            }
+        ]
 
     # can be overridden via the model config metadata
     _temp_schema_name = DEFAULT_TEMP_SCHEMA_NAME

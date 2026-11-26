@@ -401,6 +401,26 @@ The `retries` block supports the following settings:
 | `query_attempts` | `None` | The number of times to retry a query that fails with one of the `retryable_exceptions`. |
 | `retryable_exceptions` | `["IOException"]` | The list of DuckDB exception types that should trigger a retry. |
 
+### Behavior Flags
+
+dbt-duckdb uses dbt's [behavior flags](https://docs.getdbt.com/reference/global-configs/behavior-changes) to roll out
+changes that could break existing projects. Each flag is off by default, and you turn it on in `dbt_project.yml`:
+
+```yaml
+flags:
+  duckdb_float_as_double: true
+```
+
+| Flag | Default | Description |
+| --- | --- | --- |
+| `duckdb_float_as_double` | `false` | DuckDB's `FLOAT` is a 4-byte single-precision type, while Postgres, Snowflake and BigQuery treat a bare `float` as 8-byte double precision. With the flag on, `dbt.type_float()` and seed `column_types` declared as `float` create `DOUBLE` columns instead, so a value like 19.99 is stored exactly. |
+
+Things to know before turning on `duckdb_float_as_double`:
+
+- Existing `FLOAT` columns change only when the table is fully rebuilt. A plain `dbt seed` keeps the existing column types until you run it with `--full-refresh`.
+- Model contracts are not remapped. A contract that declares `data_type: float` for a column built with `dbt.type_float()` fails with a data type mismatch once the flag is on, so change the contract to `data_type: double`.
+- Explicit `float4`, `real`, `float8` and `double` types are left as they are.
+
 ### Reading and Writing External Files
 
 One of DuckDB's most powerful features is its ability to read and write CSV, JSON, and Parquet files directly, without needing to import/export
