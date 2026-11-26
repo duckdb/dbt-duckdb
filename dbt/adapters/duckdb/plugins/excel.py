@@ -112,9 +112,8 @@ class Plugin(BasePlugin):
         except ValueError as ve:
             # Catches errors resembling the below & logs an appropriate message
             # ValueError('This sheet is too large! Your sheet size is: 1100000, 1 Max sheet size is: 1048576, 16384')
-            if (
-                str(ve).startswith("This sheet is too large")
-                and target_output_config["ignore_sheet_too_large"]
+            if str(ve).startswith("This sheet is too large") and target_output_config.get(
+                "ignore_sheet_too_large", False
             ):
                 pd.DataFrame(
                     [{"Error": target_output_config.get("ignore_sheet_too_large_error", str(ve))}]
