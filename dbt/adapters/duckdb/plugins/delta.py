@@ -30,7 +30,8 @@ class Plugin(BasePlugin):
         as_of_version = source_config.get("as_of_version", None)
         as_of_datetime = source_config.get("as_of_datetime", None)
 
-        if as_of_version:
+        # version 0 is the first commit of a table, so check for None instead of truthiness
+        if as_of_version is not None:
             dt.load_as_version(as_of_version)
 
         if as_of_datetime:

@@ -4,6 +4,7 @@ import pandas as pd
 import tempfile
 
 from dbt.tests.util import (
+    check_relations_equal,
     run_dbt,
 )
 from deltalake.writer import write_deltalake
@@ -43,7 +44,7 @@ delta2_sql = """
 """
 delta3_sql = """
     {{ config(materialized='table') }}
-    select * as a from {{ source('delta_source_test', 'table_2') }} WHERE y = 'd'
+    select * from {{ source('delta_source_test', 'table_2') }}
 """
 
 delta3_sql_expected = """
@@ -121,12 +122,13 @@ class TestPlugins:
         results = run_dbt()
         assert len(results) == 4
 
-        # check_relations_equal(
-        #     project.adapter,
-        #     [
-        #         "delta_table3",
-        #         "delta_table3_expected",
-        #     ],
-        # )
-        # res = project.run_sql("SELECT count(1) FROM 'delta_table3'", fetch="one")
-        # assert res[0] == 2
+        # table_2 has two versions; as_of_version: 0 must read the first one
+        check_relations_equal(
+            project.adapter,
+            [
+                "delta_table3",
+                "delta_table3_expected",
+            ],
+        )
+        res = project.run_sql("SELECT count(1) FROM delta_table3", fetch="one")
+        assert res[0] == 1
