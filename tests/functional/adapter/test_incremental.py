@@ -571,6 +571,48 @@ SELECT 1 AS id, 'Alice' AS name, 25 AS age, 'Engineer' AS job
 """
 
 
+_merge_using_columns = """
+{{ config(
+    materialized='incremental',
+    incremental_strategy='merge',
+    merge_on_using_columns=['id']
+) }}
+
+{% if is_incremental() %}
+SELECT 1 AS id, 'Alice Updated' AS name, 26 AS age, 'Senior Engineer' AS job
+UNION ALL
+SELECT 4 AS id, 'Diana' AS name, 28 AS age, 'Designer' AS job
+{% else %}
+SELECT 1 AS id, 'Alice' AS name, 25 AS age, 'Engineer' AS job
+UNION ALL
+SELECT 2 AS id, 'Bob' AS name, 30 AS age, 'Manager' AS job
+UNION ALL
+SELECT 3 AS id, 'Charlie' AS name, 35 AS age, 'Director' AS job
+{% endif %}
+"""
+
+_merge_using_columns_with_predicates = """
+{{ config(
+    materialized='incremental',
+    incremental_strategy='merge',
+    merge_on_using_columns=['id'],
+    incremental_predicates=["DBT_INTERNAL_DEST.age < 30"]
+) }}
+
+{% if is_incremental() %}
+SELECT 1 AS id, 'Alice Updated' AS name, 26 AS age, 'Senior Engineer' AS job
+UNION ALL
+SELECT 4 AS id, 'Diana' AS name, 28 AS age, 'Designer' AS job
+{% else %}
+SELECT 1 AS id, 'Alice' AS name, 25 AS age, 'Engineer' AS job
+UNION ALL
+SELECT 2 AS id, 'Bob' AS name, 30 AS age, 'Manager' AS job
+UNION ALL
+SELECT 3 AS id, 'Charlie' AS name, 35 AS age, 'Director' AS job
+{% endif %}
+"""
+
+
 class TestIncrementalMerge:
     """Test class for DuckDB merge incremental strategy configurations"""
     
@@ -585,6 +627,8 @@ class TestIncrementalMerge:
             "merge_with_set_expressions.sql": _merge_with_set_expressions,
             "merge_with_returning.sql": _merge_with_returning,
             "merge_custom_clauses.sql": _merge_custom_clauses,
+            "merge_using_columns.sql": _merge_using_columns,
+            "merge_using_columns_with_predicates.sql": _merge_using_columns_with_predicates,
         }
 
     def test_merge_debug(self, project):
@@ -691,6 +735,24 @@ class TestIncrementalMerge:
         # Verify Bob still exists (wasn't deleted because not in source data)
         bob = project.run_sql(f"SELECT COUNT(*) as count FROM {relation} WHERE id = 2", fetch="one")
         assert bob[0] == 1
+
+    def test_merge_using_columns(self, project):
+        """Test merge joining on merge_on_using_columns instead of unique_key"""
+        run_dbt(["run", "--select", "merge_using_columns"], expect_pass=True)
+        run_dbt(["run", "--select", "merge_using_columns"], expect_pass=True)
+
+        relation = relation_from_name(project.adapter, "merge_using_columns")
+        rows = project.run_sql(f"SELECT id, name FROM {relation} ORDER BY id", fetch="all")
+        assert rows == [(1, "Alice Updated"), (2, "Bob"), (3, "Charlie"), (4, "Diana")]
+
+    def test_merge_using_columns_with_predicates(self, project):
+        """merge_on_using_columns combined with incremental_predicates"""
+        run_dbt(["run", "--select", "merge_using_columns_with_predicates"], expect_pass=True)
+        run_dbt(["run", "--select", "merge_using_columns_with_predicates"], expect_pass=True)
+
+        relation = relation_from_name(project.adapter, "merge_using_columns_with_predicates")
+        rows = project.run_sql(f"SELECT id, name FROM {relation} ORDER BY id", fetch="all")
+        assert rows == [(1, "Alice Updated"), (2, "Bob"), (3, "Charlie"), (4, "Diana")]
 
 
 class TestIncrementalMergeValidation:

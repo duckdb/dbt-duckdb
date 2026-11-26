@@ -3,7 +3,13 @@
     {%- set join_predicates = [] -%}
     {%- set using_clause_requested = merge_on_using_columns and merge_on_using_columns | length > 0 -%}
 
-    {%- if not using_clause_requested -%}
+    {%- if using_clause_requested and incremental_filters | length > 0 -%}
+        {#-- A MERGE takes either USING (columns) or ON <condition>, not both, so with
+             incremental predicates the USING columns are joined in the ON condition --#}
+        {% for column in merge_on_using_columns %}
+            {% do join_predicates.append("DBT_INTERNAL_SOURCE." ~ column ~ " = DBT_INTERNAL_DEST." ~ column) %}
+        {% endfor %}
+    {%- elif not using_clause_requested -%}
         {% if unique_key %}
             {% if unique_key is sequence and unique_key is not mapping and unique_key is not string %}
                 {% for key in unique_key %}
@@ -17,11 +23,8 @@
         {% endif %}
     {%- endif -%}
 
-    {% if using_clause_requested %}
+    {% if using_clause_requested and incremental_filters | length == 0 %}
         USING ({{ merge_on_using_columns | join(', ') }})
-        {%- if incremental_filters | length > 0 %}
-        ON ({{ incremental_filters | join(") AND (") }})
-        {%- endif %}
     {% else %}
         ON ({{ (join_predicates + incremental_filters) | join(") AND (") }})
     {% endif %}
